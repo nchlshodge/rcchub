@@ -1109,10 +1109,6 @@ function App(){
   const [vans,setVans] = useState([]);
   const [rentals,setRentals] = useState([]);
   const [warningLights,setWarningLights] = useState([]);
-  const [maintenanceNotes,setMaintenanceNotes] = useState([]);
-  const [repairLog,setRepairLog] = useState([]);
-  const [alerts,setAlerts] = useState([]);
-  const [allUsers,setAllUsers] = useState([]);
   const [loadingData,setLoadingData] = useState(true);
 
   async function refreshProfile(){
@@ -1185,21 +1181,20 @@ function App(){
     }
   }
 
+  // Only the three collections a regular driver actually needs
+  // (vans, their rentals, and warning lights) load immediately on
+  // sign-in. Admin-only data (maintenance notes, repair log, alerts,
+  // and the full user list) loads lazily, only once the admin
+  // dashboard is actually opened — see AdminDataLoader below.
   useEffect(()=>{
     if(!user) return;
     const unsubs = [];
     unsubs.push(db.collection('vans').onSnapshot(s=>setVans(s.docs.map(d=>({id:d.id,...d.data()})))));
     unsubs.push(db.collection('vanRentals').onSnapshot(s=>setRentals(s.docs.map(d=>({id:d.id,...d.data()})))));
     unsubs.push(db.collection('vanWarningLights').onSnapshot(s=>setWarningLights(s.docs.map(d=>({id:d.id,...d.data()})))));
-    unsubs.push(db.collection('vanMaintenanceNotes').onSnapshot(s=>setMaintenanceNotes(s.docs.map(d=>({id:d.id,...d.data()})))));
-    unsubs.push(db.collection('vanRepairLog').onSnapshot(s=>setRepairLog(s.docs.map(d=>({id:d.id,...d.data()})))));
-    unsubs.push(db.collection('vanAlerts').onSnapshot(s=>setAlerts(s.docs.map(d=>({id:d.id,...d.data()})))));
-    if(isAdmin){
-      unsubs.push(db.collection('users').onSnapshot(s=>setAllUsers(s.docs.map(d=>({id:d.id,...d.data()})))));
-    }
     setLoadingData(false);
     return ()=>unsubs.forEach(u=>u());
-  },[user,isAdmin]);
+  },[user]);
 
   if(user===undefined){
     return <div className="app"><div className="loading">Loading...</div></div>;
@@ -1227,11 +1222,38 @@ function App(){
         </>}
       />
       {mode==='admin' && isAdmin
-        ? <AdminDashboard allUsers={allUsers} vans={vans} rentals={rentals} warningLights={warningLights} maintenanceNotes={maintenanceNotes} repairLog={repairLog} alerts={alerts} />
+        ? <AdminDataLoader vans={vans} rentals={rentals} warningLights={warningLights} />
         : <DriverHome user={user} profile={profile} vans={vans} rentals={rentals} warningLights={warningLights} refreshProfile={refreshProfile} />
       }
     </div>
   );
+}
+
+// Loads admin-only collections (maintenance, repairs, alerts, all
+// users) only once the admin dashboard is actually opened, instead of
+// on every sign-in. Shows a brief loading state the first time, then
+// stays subscribed for the rest of the session so switching tabs is
+// instant afterward.
+function AdminDataLoader({vans,rentals,warningLights}){
+  const [maintenanceNotes,setMaintenanceNotes] = useState([]);
+  const [repairLog,setRepairLog] = useState([]);
+  const [alerts,setAlerts] = useState([]);
+  const [allUsers,setAllUsers] = useState([]);
+  const [ready,setReady] = useState(false);
+
+  useEffect(()=>{
+    const unsubs = [];
+    unsubs.push(db.collection('vanMaintenanceNotes').onSnapshot(s=>setMaintenanceNotes(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vanRepairLog').onSnapshot(s=>setRepairLog(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vanAlerts').onSnapshot(s=>setAlerts(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('users').onSnapshot(s=>{setAllUsers(s.docs.map(d=>({id:d.id,...d.data()}))); setReady(true);}));
+    return ()=>unsubs.forEach(u=>u());
+  },[]);
+
+  if(!ready){
+    return <div className="content"><div className="loading">Loading admin data...</div></div>;
+  }
+  return <AdminDashboard allUsers={allUsers} vans={vans} rentals={rentals} warningLights={warningLights} maintenanceNotes={maintenanceNotes} repairLog={repairLog} alerts={alerts} />;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
