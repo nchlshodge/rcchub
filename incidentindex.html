@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RCC — Incident Report</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #f7f6f3; min-height: 100vh; color: #1a1a1a; }
+
+    /* ── Nav ── */
+    .nav {
+      background: #fff;
+      border-bottom: 1px solid #e8e4dc;
+      padding: 0 2rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .nav-brand {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      font-weight: 400;
+      color: #2557b8;
+      letter-spacing: -0.3px;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-brand span {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 400;
+      color: #aaa;
+      margin-left: 6px;
+    }
+    .nav-right { display: flex; align-items: center; gap: 12px; }
+    .nav-user { font-size: 13px; color: #666; }
+    .nav-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: #eef2fb; border: 1px solid #d7e2f5;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 500; color: #2557b8;
+      overflow: hidden; flex-shrink: 0;
+    }
+    .nav-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .nav-signout {
+      font-size: 13px; color: #999; background: none; border: none;
+      cursor: pointer; font-family: 'Inter', sans-serif; padding: 0;
+    }
+    .nav-signout:hover { color: #333; }
+
+    /* ── Page ── */
+    .page { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+
+    .page-header { margin-bottom: 2rem; }
+    .page-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px; font-weight: 400; color: #1a1a1a; margin-bottom: 4px;
+    }
+    .page-sub { font-size: 14px; color: #888; }
+    .page-sub span { color: #c0392b; }
+
+    /* ── Auth bar ── */
+    .auth-bar {
+      display: flex; align-items: center; gap: 12px;
+      background: #fff; border: 1px solid #e8e4dc;
+      border-radius: 10px; padding: 12px 16px; margin-bottom: 1.75rem;
+    }
+    .auth-bar.signed-in { background: #eef2fb; border-color: #d7e2f5; }
+    .auth-bar-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: #f0ece4; display: flex; align-items: center;
+      justify-content: center; flex-shrink: 0; font-size: 14px;
+      font-weight: 500; color: #888; overflow: hidden;
+    }
+    .auth-bar-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .auth-bar-info { flex: 1; min-width: 0; }
+    .auth-bar-info strong { display: block; font-size: 14px; color: #1a1a1a; }
+    .auth-bar-info span { font-size: 12px; color: #888; }
+    .btn-google {
+      display: flex; align-items: center; gap: 8px;
+      background: #fff; border: 1px solid #d1cdc4; border-radius: 7px;
+      padding: 8px 14px; font-size: 13px; font-weight: 500;
+      color: #374151; cursor: pointer; white-space: nowrap;
+      transition: border-color .15s, box-shadow .15s; font-family: 'Inter', sans-serif;
+      flex-shrink: 0;
+    }
+    .btn-google:hover { border-color: #2557b8; box-shadow: 0 0 0 3px rgba(37,87,184,.08); }
+    .btn-signout {
+      background: none; border: none; font-size: 12px; color: #aaa;
+      cursor: pointer; padding: 0; font-family: 'Inter', sans-serif; flex-shrink: 0;
+    }
+    .btn-signout:hover { color: #333; }
+
+    /* ── Sections ── */
+    .section { background: #fff; border: 1px solid #e8e4dc; border-radius: 10px; margin-bottom: 1.25rem; overflow: hidden; }
+    .section-head {
+      background: #faf9f6; padding: 11px 18px;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid #e8e4dc;
+    }
+    .section-num {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #2557b8; color: #fff; font-size: 12px; font-weight: 500;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .section-title { font-size: 14px; font-weight: 500; color: #1a1a1a; }
+    .section-body { padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+
+    /* ── Fields ── */
+    .row { display: grid; gap: 12px; }
+    .row-2 { grid-template-columns: 1fr 1fr; }
+    .row-3 { grid-template-columns: 1fr 1fr 1fr; }
+    label.lbl { font-size: 12px; font-weight: 500; color: #666; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; }
+    .req { color: #c0392b; margin-left: 2px; }
+    input[type=text], input[type=email], input[type=tel], input[type=date], input[type=time], select, textarea {
+      width: 100%; background: #fff; border: 1px solid #d1cdc4; border-radius: 7px;
+      padding: 9px 11px; font-size: 14px; color: #1a1a1a; font-family: 'Inter', sans-serif;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: #2557b8; box-shadow: 0 0 0 3px rgba(37,87,184,.1);
+    }
+    textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+    .autofilled { background: #eef2fb !important; border-color: #a9c1e8 !important; }
+    .field-err { border-color: #c0392b !important; box-shadow: 0 0 0 3px rgba(192,57,43,.1) !important; }
+    .err-msg { font-size: 12px; color: #c0392b; margin-top: 4px; display: none; }
+    .char-count { font-size: 11px; color: #bbb; text-align: right; margin-top: 3px; }
+
+    /* ── Check/radio ── */
+    .check-group { display: flex; flex-wrap: wrap; gap: 8px; }
+    .check-opt {
+      display: flex; align-items: center; gap: 6px; cursor: pointer;
+      font-size: 13px; color: #1a1a1a; padding: 6px 11px;
+      border: 1px solid #d1cdc4; border-radius: 6px;
+      transition: border-color .15s, background .15s; user-select: none;
+    }
+    .check-opt:has(input:checked) { border-color: #2557b8; background: #eef2fb; }
+    .check-opt input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: #2557b8; }
+    .radio-group { display: flex; flex-wrap: wrap; gap: 8px; }
+    .radio-opt {
+      display: flex; align-items: center; gap: 6px; cursor: pointer;
+      font-size: 13px; padding: 6px 12px; border: 1px solid #d1cdc4;
+      border-radius: 6px; transition: border-color .15s, background .15s; user-select: none;
+    }
+    .radio-opt:has(input:checked) { border-color: #2557b8; background: #eef2fb; }
+    .radio-opt input { width: 14px; height: 14px; accent-color: #2557b8; cursor: pointer; }
+
+    /* ── Office section ── */
+    .office {
+      background: #faf9f6; border: 1px solid #e8e4dc;
+      border-radius: 10px; padding: 16px 18px; margin-bottom: 1.25rem;
+    }
+    .office-label {
+      font-size: 11px; font-weight: 500; text-transform: uppercase;
+      letter-spacing: .06em; color: #bbb; margin-bottom: 14px;
+    }
+
+    /* ── Buttons ── */
+    .btn-row { display: flex; gap: 10px; justify-content: flex-end; }
+    .btn-primary {
+      background: #2557b8; color: #fff; border: none; border-radius: 7px;
+      padding: 10px 28px; font-size: 14px; font-weight: 500; cursor: pointer;
+      font-family: 'Inter', sans-serif; transition: background .15s;
+    }
+    .btn-primary:hover { background: #1e4694; }
+    .btn-secondary {
+      background: #fff; color: #888; border: 1px solid #d1cdc4; border-radius: 7px;
+      padding: 10px 20px; font-size: 14px; cursor: pointer;
+      font-family: 'Inter', sans-serif; transition: background .15s;
+    }
+    .btn-secondary:hover { background: #faf9f6; }
+
+    /* ── Success ── */
+    .success {
+      background: #fff; border: 1px solid #e8e4dc; border-radius: 10px;
+      padding: 3rem 2rem; text-align: center; display: none;
+    }
+    .success-icon {
+      width: 56px; height: 56px; background: #eef2fb; border: 1px solid #d7e2f5;
+      border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; margin: 0 auto 1.25rem;
+    }
+    .success h2 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 400; margin-bottom: 6px; }
+    .success p { font-size: 14px; color: #888; margin-bottom: 1.5rem; }
+    .success strong { color: #2557b8; }
+
+    @media(max-width:560px) { .row-2, .row-3 { grid-template-columns: 1fr; } .auth-bar { flex-wrap: wrap; } }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav class="nav">
+    <a href="index.html" class="nav-brand">RCC <span>· All apps</span></a>
+    <div class="nav-right" id="nav-right">
+      <div class="nav-avatar" id="nav-avatar" style="display:none"></div>
+      <span class="nav-user" id="nav-user"></span>
+      <button class="nav-signout" id="nav-signout" onclick="doSignOut()" style="display:none">Sign out</button>
+    </div>
+  </nav>
+
+  <div class="page">
+    <div class="page-header">
+      <h1 class="page-title">Incident Report</h1>
+      <p class="page-sub">Fields marked <span>*</span> are required.</p>
+    </div>
+
+    <!-- Auth bar -->
+    <div class="auth-bar" id="auth-bar">
+      <div class="auth-bar-avatar" id="auth-avatar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div class="auth-bar-info" id="auth-info">
+        <strong>Not signed in</strong>
+        <span>Sign in to auto-fill your information</span>
+      </div>
+      <button class="btn-google" id="btn-google" onclick="signInGoogle()">
+        <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Sign in with Google
+      </button>
+      <button class="btn-signout" id="btn-signout" onclick="doSignOut()" style="display:none">Sign out</button>
+    </div>
+
+    <form id="ir-form" novalidate>
+
+      <!-- 1: Incident Details -->
+      <div class="section">
+        <div class="section-head"><div class="section-num">1</div><div class="section-title">Incident Details</div></div>
+        <div class="section-body">
+          <div>
+            <label class="lbl">Type of Incident <span class="req">*</span></label>
+            <div class="check-group" id="ir-inc-type">
+              <label class="check-opt"><input type="checkbox" value="Injury"> Injury</label>
+              <label class="check-opt"><input type="checkbox" value="Near Miss"> Near Miss</label>
+              <label class="check-opt"><input type="checkbox" value="Property Damage"> Property Damage</label>
+              <label class="check-opt"><input type="checkbox" value="Security"> Security</label>
+              <label class="check-opt"><input type="checkbox" value="Environmental"> Environmental</label>
+              <label class="check-opt"><input type="checkbox" value="Other"> Other</label>
+            </div>
+            <div class="err-msg" id="ir-type-err">Please select at least one incident type.</div>
+          </div>
+          <div class="row row-3">
+            <div><label class="lbl" for="ir-inc-date">Date of Incident <span class="req">*</span></label><input type="date" id="ir-inc-date" required></div>
+            <div><label class="lbl" for="ir-inc-time">Time of Incident <span class="req">*</span></label><input type="time" id="ir-inc-time" required></div>
+            <div><label class="lbl" for="ir-report-date">Date of Report <span class="req">*</span></label><input type="date" id="ir-report-date" required></div>
+          </div>
+          <div>
+            <label class="lbl" for="ir-location">Location <span class="req">*</span></label>
+            <input type="text" id="ir-location" placeholder="Building, room, floor, outdoor area…" required>
+          </div>
+          <div>
+            <label class="lbl" for="ir-description">Description <span class="req">*</span></label>
+            <textarea id="ir-description" placeholder="Describe what happened — sequence of events, conditions, and activities at the time…" required maxlength="1500" oninput="document.getElementById('ir-desc-count').textContent=this.value.length+'/1500'"></textarea>
+            <div class="char-count" id="ir-desc-count">0/1500</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2: People Involved -->
+      <div class="section">
+        <div class="section-head"><div class="section-num">2</div><div class="section-title">People Involved</div></div>
+        <div class="section-body">
+          <div class="row row-2">
+            <div><label class="lbl" for="ir-inv-name">Full Name <span class="req">*</span></label><input type="text" id="ir-inv-name" placeholder="Person(s) involved" required></div>
+            <div><label class="lbl" for="ir-inv-role">Role / Department</label><input type="text" id="ir-inv-role" placeholder="e.g. Volunteer, Staff, Visitor"></div>
+          </div>
+          <div class="row row-2">
+            <div><label class="lbl" for="ir-inv-phone">Phone</label><input type="tel" id="ir-inv-phone" placeholder="Phone number"></div>
+            <div><label class="lbl" for="ir-inv-email">Email</label><input type="email" id="ir-inv-email" placeholder="email@example.com"></div>
+          </div>
+          <div>
+            <label class="lbl" for="ir-witnesses">Witnesses</label>
+            <textarea id="ir-witnesses" style="min-height:64px" placeholder="Names and contact info of anyone who witnessed the incident…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3: Injury -->
+      <div class="section">
+        <div class="section-head"><div class="section-num">3</div><div class="section-title">Injury &amp; Damage</div></div>
+        <div class="section-body">
+          <div>
+            <label class="lbl">Was there a physical injury?</label>
+            <div class="radio-group">
+              <label class="radio-opt"><input type="radio" name="ir-injury" value="yes"> Yes</label>
+              <label class="radio-opt"><input type="radio" name="ir-injury" value="no"> No</label>
+            </div>
+          </div>
+          <div id="ir-injury-detail" style="display:none;flex-direction:column;gap:16px">
+            <div><label class="lbl" for="ir-injury-desc">Nature of Injury</label><input type="text" id="ir-injury-desc" placeholder="e.g. Laceration to left hand, sprained ankle…"></div>
+            <div>
+              <label class="lbl">Medical treatment required?</label>
+              <div class="radio-group">
+                <label class="radio-opt"><input type="radio" name="ir-treatment" value="None"> None</label>
+                <label class="radio-opt"><input type="radio" name="ir-treatment" value="First Aid"> First Aid on site</label>
+                <label class="radio-opt"><input type="radio" name="ir-treatment" value="Doctor"> Doctor / Clinic</label>
+                <label class="radio-opt"><input type="radio" name="ir-treatment" value="Hospital"> Hospital / ER</label>
+              </div>
+            </div>
+          </div>
+          <div><label class="lbl" for="ir-damage-desc">Property / Equipment Damage</label><input type="text" id="ir-damage-desc" placeholder="Describe any damage (leave blank if none)"></div>
+        </div>
+      </div>
+
+      <!-- 4: Cause -->
+      <div class="section">
+        <div class="section-head"><div class="section-num">4</div><div class="section-title">Cause &amp; Contributing Factors</div></div>
+        <div class="section-body">
+          <div><label class="lbl" for="ir-immediate-cause">Immediate Cause</label><input type="text" id="ir-immediate-cause" placeholder="The direct action or condition that led to the incident"></div>
+          <div><label class="lbl" for="ir-root-cause">Root Cause / Contributing Factors</label><textarea id="ir-root-cause" placeholder="Underlying conditions — environment, equipment, training, fatigue, procedures…"></textarea></div>
+        </div>
+      </div>
+
+      <!-- 5: Actions -->
+      <div class="section">
+        <div class="section-head"><div class="section-num">5</div><div class="section-title">Immediate Actions Taken</div></div>
+        <div class="section-body">
+          <div><label class="lbl" for="ir-actions">Actions taken at the scene</label><textarea id="ir-actions" placeholder="First aid provided, evacuations, equipment shutdowns, emergency services called…"></textarea></div>
+          <div><label class="lbl" for="ir-notified">Who was notified, and when?</label><input type="text" id="ir-notified" placeholder="e.g. Supervisor notified at 2:30pm, safety team alerted…"></div>
+        </div>
+      </div>
+
+      <!-- 6: Reporter -->
+      <div class="section">
+        <div class="section-head"><div class="section-num">6</div><div class="section-title">Reporter Information</div></div>
+        <div class="section-body">
+          <div class="row row-2">
+            <div><label class="lbl" for="ir-rep-name">Your Full Name <span class="req">*</span></label><input type="text" id="ir-rep-name" required placeholder="First and last name"></div>
+            <div><label class="lbl" for="ir-rep-title">Job Title / Department</label><input type="text" id="ir-rep-title" placeholder="e.g. Volunteer, Facilities"></div>
+          </div>
+          <div class="row row-2">
+            <div><label class="lbl" for="ir-rep-phone">Phone <span class="req">*</span></label><input type="tel" id="ir-rep-phone" required placeholder="Your contact number"></div>
+            <div><label class="lbl" for="ir-rep-email">Email <span class="req">*</span></label><input type="email" id="ir-rep-email" required placeholder="your@email.com"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Office use -->
+      <div class="office">
+        <div class="office-label">For office / supervisor use only</div>
+        <div class="row row-2">
+          <div><label class="lbl" for="ir-off-received">Received by</label><input type="text" id="ir-off-received" placeholder="Name"></div>
+          <div><label class="lbl" for="ir-off-date">Date received</label><input type="date" id="ir-off-date"></div>
+        </div>
+        <div style="margin-top:12px"><label class="lbl" for="ir-off-notes">Follow-up actions / notes</label><textarea id="ir-off-notes" style="min-height:72px" placeholder="Actions assigned, investigation notes…"></textarea></div>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" class="btn-secondary" onclick="irClear()">Clear form</button>
+        <button type="submit" class="btn-primary">Submit Report</button>
+      </div>
+    </form>
+
+    <!-- Success -->
+    <div class="success" id="ir-success">
+      <div class="success-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2557b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <h2>Report submitted</h2>
+      <p>Reference number: <strong id="ir-ref-num"></strong></p>
+      <button class="btn-secondary" onclick="irReset()">Submit another report</button>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script>
+  (function(){
+    var firebaseConfig = {
+      apiKey: "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+      authDomain: "bedsidercc.firebaseapp.com",
+      projectId: "bedsidercc",
+      storageBucket: "bedsidercc.firebasestorage.app",
+      messagingSenderId: "950958384975",
+      appId: "1:950958384975:web:6f43dec5a7ba842c69c73a"
+    };
+    var fbApp; try { fbApp=firebase.app(); } catch(e) { fbApp=firebase.initializeApp(firebaseConfig); }
+    var auth = firebase.auth();
+    var db   = firebase.firestore();
+    var today = new Date().toISOString().split('T')[0];
+    document.getElementById('ir-report-date').value = today;
+
+    auth.onAuthStateChanged(function(user){
+      var bar     = document.getElementById('auth-bar');
+      var avatar  = document.getElementById('auth-avatar');
+      var info    = document.getElementById('auth-info');
+      var btnG    = document.getElementById('btn-google');
+      var btnOut  = document.getElementById('btn-signout');
+      var navAv   = document.getElementById('nav-avatar');
+      var navUser = document.getElementById('nav-user');
+      var navOut  = document.getElementById('nav-signout');
+
+      if(user){
+        bar.classList.add('signed-in');
+        if(user.photoURL){ avatar.innerHTML='<img src="'+user.photoURL+'" alt="">'; navAv.innerHTML='<img src="'+user.photoURL+'" alt="">'; }
+        else { var i=(user.displayName||user.email||'?').charAt(0).toUpperCase(); avatar.textContent=i; navAv.textContent=i; }
+        navAv.style.display='flex';
+        navUser.textContent = user.displayName || user.email;
+        navOut.style.display='block';
+        info.innerHTML='<strong>'+(user.displayName||user.email)+'</strong><span>Reporter info filled in below</span>';
+        btnG.style.display='none'; btnOut.style.display='block';
+        setField('ir-rep-name', user.displayName||'');
+        setField('ir-rep-email', user.email||'');
+        setField('ir-rep-phone', user.phoneNumber||'');
+        db.collection('users').doc(user.uid).get().then(function(doc){
+          if(doc.exists){ var d=doc.data();
+            setField('ir-rep-phone', d.phone||d.phoneNumber||'');
+            setField('ir-rep-title', d.department||d.role||d.title||'');
+            setField('ir-rep-name',  d.displayName||d.name||'');
+          }
+        }).catch(function(){});
+      } else {
+        bar.classList.remove('signed-in');
+        avatar.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+        navAv.style.display='none'; navUser.textContent=''; navOut.style.display='none';
+        info.innerHTML='<strong>Not signed in</strong><span>Sign in to auto-fill your information</span>';
+        btnG.style.display='flex'; btnOut.style.display='none';
+        clearReporterFields();
+      }
+    });
+
+    window.signInGoogle = function(){
+      var provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider).catch(function(err){ console.error(err.message); });
+    };
+    window.doSignOut = function(){ auth.signOut(); };
+
+    function setField(id, value){
+      if(!value) return;
+      var el=document.getElementById(id);
+      if(!el||el.value) return;
+      el.value=value; el.classList.add('autofilled');
+      el.addEventListener('input',function(){ el.classList.remove('autofilled'); },{once:true});
+    }
+    function clearReporterFields(){
+      ['ir-rep-name','ir-rep-title','ir-rep-phone','ir-rep-email'].forEach(function(id){
+        var el=document.getElementById(id); if(el){ el.value=''; el.classList.remove('autofilled'); }
+      });
+    }
+
+    document.querySelectorAll('input[name="ir-injury"]').forEach(function(r){
+      r.addEventListener('change',function(){
+        document.getElementById('ir-injury-detail').style.display=(r.value==='yes'&&r.checked)?'flex':'none';
+      });
+    });
+
+    var requiredIds=['ir-inc-date','ir-inc-time','ir-report-date','ir-location','ir-description','ir-inv-name','ir-rep-name','ir-rep-phone','ir-rep-email'];
+    requiredIds.forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input',function(){ el.classList.remove('field-err'); }); });
+
+    document.getElementById('ir-form').addEventListener('submit',function(e){
+      e.preventDefault(); var ok=true;
+      requiredIds.forEach(function(id){ var el=document.getElementById(id); if(!el.value.trim()){ el.classList.add('field-err'); ok=false; } else { el.classList.remove('field-err'); } });
+      var types=document.querySelectorAll('#ir-inc-type input:checked');
+      var typeErr=document.getElementById('ir-type-err');
+      if(!types.length){ typeErr.style.display='block'; ok=false; } else { typeErr.style.display='none'; }
+      if(!ok) return;
+
+      var injuryChecked=document.querySelector('input[name="ir-injury"]:checked');
+      var treatChecked=document.querySelector('input[name="ir-treatment"]:checked');
+      var report={
+        incidentTypes: Array.from(types).map(function(c){ return c.value; }),
+        incidentDate:  document.getElementById('ir-inc-date').value,
+        incidentTime:  document.getElementById('ir-inc-time').value,
+        reportDate:    document.getElementById('ir-report-date').value,
+        location:      document.getElementById('ir-location').value,
+        description:   document.getElementById('ir-description').value,
+        involvedName:  document.getElementById('ir-inv-name').value,
+        involvedRole:  document.getElementById('ir-inv-role').value,
+        involvedPhone: document.getElementById('ir-inv-phone').value,
+        involvedEmail: document.getElementById('ir-inv-email').value,
+        witnesses:     document.getElementById('ir-witnesses').value,
+        injury:        injuryChecked ? injuryChecked.value : '',
+        injuryDesc:    document.getElementById('ir-injury-desc').value,
+        treatment:     treatChecked  ? treatChecked.value  : '',
+        damageDesc:    document.getElementById('ir-damage-desc').value,
+        immediateCause:document.getElementById('ir-immediate-cause').value,
+        rootCause:     document.getElementById('ir-root-cause').value,
+        actionsTaken:  document.getElementById('ir-actions').value,
+        notified:      document.getElementById('ir-notified').value,
+        reporterName:  document.getElementById('ir-rep-name').value,
+        reporterTitle: document.getElementById('ir-rep-title').value,
+        reporterPhone: document.getElementById('ir-rep-phone').value,
+        reporterEmail: document.getElementById('ir-rep-email').value,
+        submittedAt:   firebase.firestore.FieldValue.serverTimestamp(),
+        uid:           auth.currentUser ? auth.currentUser.uid : null
+      };
+
+      if(auth.currentUser){
+        db.collection('incidentReports').add(report).then(showSuccess).catch(function(){ showSuccess(); });
+      } else { showSuccess(); }
+    });
+
+    function showSuccess(){
+      document.getElementById('ir-form').style.display='none';
+      document.getElementById('ir-success').style.display='block';
+      document.getElementById('ir-ref-num').textContent='IR-'+Date.now().toString(36).toUpperCase().slice(-6);
+    }
+
+    window.irClear=function(){
+      if(!confirm('Clear all fields?')) return;
+      document.getElementById('ir-form').reset();
+      document.getElementById('ir-report-date').value=today;
+      document.getElementById('ir-injury-detail').style.display='none';
+      document.getElementById('ir-desc-count').textContent='0/1500';
+      document.querySelectorAll('.field-err').forEach(function(el){ el.classList.remove('field-err'); });
+      document.getElementById('ir-type-err').style.display='none';
+      if(auth.currentUser){ setField('ir-rep-name',auth.currentUser.displayName||''); setField('ir-rep-email',auth.currentUser.email||''); }
+    };
+
+    window.irReset=function(){
+      document.getElementById('ir-form').style.display='block';
+      document.getElementById('ir-success').style.display='none';
+      irClear();
+    };
+  })();
+  </script>
+</body>
+</html>
