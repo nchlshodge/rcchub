@@ -174,14 +174,14 @@ async function uploadPhoto(file, path){
 }
 
 // ---------- Driver Application ----------
-function DriverApply({user,onDone}){
+function DriverApply({user,onDone,prefill,prefillName,prefillPhone}){
   const [form,setForm] = useState({
-    birthdate:'',licenseExp:'',cdl:null,
+    birthdate:'',licenseExp: prefill?.licenseExp || '',cdl:null,
     atFaultAccidents3yr:null,atFaultAccidentsDetails:'',
     movingViolations3yr:null,movingViolationsDetails:'',
     insuranceCancelled:null,licenseRevokedSuspended:null,
   });
-  const [phone,setPhone] = useState('');
+  const [phone,setPhone] = useState(prefillPhone || '');
   const [saving,setSaving] = useState(false);
   function set(field,val){ setForm(f=>({...f,[field]:val})); }
   const canSubmit = phone && form.birthdate && form.licenseExp && form.cdl!==null
@@ -191,12 +191,12 @@ function DriverApply({user,onDone}){
   async function submit(){
     setSaving(true);
     await db.collection('users').doc(user.uid).set({
-      name: user.displayName || '',
+      name: prefillName || user.displayName || '',
       email: user.email || '',
       phone,
       uid: user.uid,
       vanRentalProfile: {
-        ...form, licenseVerifiedInPerson:false, status:'pending', createdAt: Date.now(),
+        ...form, licenseVerifiedInPerson: prefill?.licenseVerifiedInPerson || false, status:'pending', createdAt: Date.now(),
       }
     }, {merge:true});
     setSaving(false);
@@ -206,6 +206,11 @@ function DriverApply({user,onDone}){
     <div className="content">
       <div className="card">
         <h2>Driver Application</h2>
+        {prefill && (
+          <div className="banner-safe" style={{marginBottom:10}}>
+            An admin already added some of your info. Just finish the rest below.
+          </div>
+        )}
         <div className="banner-safe" style={{marginBottom:6}}>
           Before you can be approved to drive, please bring a copy of your driver's license to the main office. An admin will confirm it's on file and mark your application verified.
         </div>
@@ -549,6 +554,9 @@ function DriverHome({user,profile,vans,rentals,warningLights,refreshProfile}){
   if(!vr.status){
     return <DriverApply user={user} onDone={refreshProfile} />;
   }
+  if(vr.status==='needs_info'){
+    return <DriverApply user={user} onDone={refreshProfile} prefill={vr} prefillName={profile.name} prefillPhone={profile.phone} />;
+  }
   if(vr.status==='pending'){
     return (
       <div className="content">
@@ -612,6 +620,124 @@ function DriverHome({user,profile,vans,rentals,warningLights,refreshProfile}){
 }
 
 // ---------- Admin Dashboard ----------
+function AddVanForm({onAdd}){
+  const [name,setName] = useState('');
+  const [isBorrowed,setIsBorrowed] = useState(false);
+  const [borrowedFrom,setBorrowedFrom] = useState('');
+  const [returnDate,setReturnDate] = useState('');
+  const [saving,setSaving] = useState(false);
+
+  async function submit(){
+    setSaving(true);
+    await onAdd(name, isBorrowed, borrowedFrom, returnDate);
+    setName(''); setIsBorrowed(false); setBorrowedFrom(''); setReturnDate('');
+    setSaving(false);
+  }
+
+  return (
+    <div style={{marginTop:20, paddingTop:20, borderTop:'1px solid var(--border)'}}>
+      <h3>Add a Van</h3>
+      <p className="muted">For your own fleet, or a vehicle borrowed from another organization for a season or event.</p>
+      <label>Van Name</label>
+      <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. First Baptist's 15-passenger van" />
+      <label>Is this a borrowed vehicle?</label>
+      <YesNo value={isBorrowed} onChange={setIsBorrowed} />
+      {isBorrowed && (<>
+        <label>Borrowed From</label>
+        <input value={borrowedFrom} onChange={e=>setBorrowedFrom(e.target.value)} placeholder="Organization name" />
+        <label>Expected Return Date</label>
+        <input type="date" value={returnDate} onChange={e=>setReturnDate(e.target.value)} />
+      </>)}
+      <button className="primary" disabled={!name || saving} onClick={submit}>{saving?'Adding...':'Add Van'}</button>
+    </div>
+  );
+}
+
+function AdminAddDriver(){
+  const [name,setName] = useState('');
+  const [email,setEmail] = useState('');
+  const [phone,setPhone] = useState('');
+  const [licenseExp,setLicenseExp] = useState('');
+  const [licenseVerified,setLicenseVerified] = useState(false);
+  const [saving,setSaving] = useState(false);
+  const [generatedLink,setGeneratedLink] = useState(null);
+  const [invites,setInvites] = useState([]);
+
+  useEffect(()=>{
+    const unsub = db.collection('vanDriverInvites').where('claimed','==',false).onSnapshot(snap=>{
+      setInvites(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return unsub;
+  },[]);
+
+  const canSubmit = name && email && !saving;
+
+  async function createInvite(){
+    setSaving(true);
+    const token = uid()+uid();
+    await db.collection('vanDriverInvites').doc(token).set({
+      name, email: email.toLowerCase().trim(), phone, licenseExp,
+      licenseVerifiedInPerson: licenseVerified,
+      claimed:false, createdAt:Date.now(),
+    });
+    const url = new URL(window.location.href);
+    url.searchParams.set('invite', token);
+    setGeneratedLink(url.toString());
+    setName(''); setEmail(''); setPhone(''); setLicenseExp(''); setLicenseVerified(false);
+    setSaving(false);
+  }
+
+  async function deleteInvite(token){
+    if(!confirm('Remove this invite? The person will need a new one if you want to add them again.')) return;
+    await db.collection('vanDriverInvites').doc(token).delete();
+  }
+
+  return (
+    <div className="card">
+      <h3>Add an Existing Driver</h3>
+      <p className="muted">For people already approved to drive before this app existed, or anyone you'd rather set up yourself. When they sign in with the matching email, their info here fills in automatically. You can also send them the link directly as a shortcut.</p>
+
+      <label>Full Name</label>
+      <input value={name} onChange={e=>setName(e.target.value)} />
+      <label>Email (must match their Google sign-in)</label>
+      <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@example.com" />
+      <label>Phone Number</label>
+      <input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" />
+      <label>License Expiration Date (if known)</label>
+      <input type="date" value={licenseExp} onChange={e=>setLicenseExp(e.target.value)} />
+      <label>Has this person's license already been seen in person?</label>
+      <YesNo value={licenseVerified} onChange={setLicenseVerified} />
+
+      <button className="primary" disabled={!canSubmit} onClick={createInvite}>{saving?'Creating...':'Add Driver'}</button>
+
+      {generatedLink && (
+        <div className="banner-safe" style={{wordBreak:'break-all', marginTop:14}}>
+          Added! If you'd like, you can also send this direct link — it's optional since matching by email works automatically once they sign in:
+          <div style={{marginTop:8,fontWeight:400,fontSize:14}}>{generatedLink}</div>
+          <button className="secondary" style={{marginTop:10}} onClick={()=>navigator.clipboard.writeText(generatedLink)}>Copy Link</button>
+        </div>
+      )}
+
+      <h3 style={{marginTop:24}}>Awaiting First Sign-In</h3>
+      {invites.length===0 && <p className="muted">None waiting.</p>}
+      {invites.map(inv=>{
+        const url = new URL(window.location.href);
+        url.searchParams.set('invite', inv.id);
+        return (
+          <div key={inv.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+            <div><strong>{inv.name}</strong> — {inv.email}</div>
+            <div className="muted" style={{wordBreak:'break-all'}}>{url.toString()}</div>
+            <div style={{display:'flex',gap:8,marginTop:8}}>
+              <button className="secondary" style={{marginTop:0}} onClick={()=>navigator.clipboard.writeText(url.toString())}>Copy Link</button>
+              <button className="secondary" style={{marginTop:0,color:'var(--danger)',borderColor:'var(--danger)'}} onClick={()=>deleteInvite(inv.id)}>Remove</button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function PendingDriverCard({driverUser,onApprove,onDeny,onVerify,onUpdateExp}){
   const vr = driverUser.vanRentalProfile;
   const [editingExp,setEditingExp] = useState(false);
@@ -670,6 +796,17 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
   }
   async function resolveMaint(id){ await db.collection('vanMaintenanceNotes').doc(id).update({resolved:true}); }
   async function setVanStatus(vanId,status){ await db.collection('vans').doc(vanId).update({status}); }
+  async function addVan(name, isBorrowed, borrowedFrom, returnDate){
+    await db.collection('vans').add({
+      name, mileage:0, gas:100, status:'available', lowPriority:false,
+      borrowed: isBorrowed, borrowedFrom: isBorrowed ? borrowedFrom : null,
+      expectedReturnDate: isBorrowed ? returnDate : null,
+    });
+  }
+  async function removeVan(vanId){
+    if(!confirm('Remove this van from the system? This does not delete its rental history.')) return;
+    await db.collection('vans').doc(vanId).delete();
+  }
   async function addRepair(vanId,date,serviceType,notes,performedBy){
     await db.collection('vanRepairLog').add({vanId,date,serviceType,notes,performedBy,createdAt:Date.now()});
   }
@@ -694,6 +831,7 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
     <div className="content">
       <div className="nav-tabs">
         <button className={tab==='approvals'?'active':''} onClick={()=>setTab('approvals')}>Drivers</button>
+        <button className={tab==='adddriver'?'active':''} onClick={()=>setTab('adddriver')}>Add Driver</button>
         <button className={tab==='vans'?'active':''} onClick={()=>setTab('vans')}>Vans</button>
         <button className={tab==='schedule'?'active':''} onClick={()=>setTab('schedule')}>Schedule</button>
         <button className={tab==='repairs'?'active':''} onClick={()=>setTab('repairs')}>Repairs</button>
@@ -729,22 +867,32 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
         </div>
       )}
 
+      {tab==='adddriver' && <AdminAddDriver />}
+
       {tab==='vans' && (
         <div className="card">
           <h3>Vans</h3>
           {vans.map(v=>(
             <div key={v.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <div><div>{v.name} {v.lowPriority && <span className="badge pending">low priority</span>}</div><div className="muted">{v.mileage} mi · {v.gas}% gas</div></div>
+                <div>
+                  <div>{v.name} {v.lowPriority && <span className="badge pending">low priority</span>} {v.borrowed && <span className="badge admin">borrowed</span>}</div>
+                  <div className="muted">{v.mileage} mi · {v.gas}% gas</div>
+                  {v.borrowed && <div className="muted">From {v.borrowedFrom || 'unspecified org'}{v.expectedReturnDate ? ` · return by ${v.expectedReturnDate}` : ''}</div>}
+                </div>
                 <span className={`badge ${v.status}`}>{v.status}</span>
               </div>
-              <div style={{display:'flex',gap:8,marginTop:8}}>
+              <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
                 {v.status!=='maintenance'
                   ? <button className="secondary" style={{marginTop:0}} onClick={()=>setVanStatus(v.id,'maintenance')}>Send to Maintenance</button>
                   : <button className="secondary" style={{marginTop:0}} onClick={()=>setVanStatus(v.id,'available')}>Mark Available</button>}
+                <button className="secondary" style={{marginTop:0,color:'var(--danger)',borderColor:'var(--danger)'}} onClick={()=>removeVan(v.id)}>
+                  {v.borrowed ? 'Returned — Remove' : 'Remove'}
+                </button>
               </div>
             </div>
           ))}
+          <AddVanForm onAdd={addVan} />
         </div>
       )}
 
@@ -979,6 +1127,7 @@ function App(){
       if(u){
         await ensureVansSeeded();
         await ensureWarningLightsSeeded();
+        await claimDriverInviteIfAny(u);
         const doc = await db.collection('users').doc(u.uid).get();
         const data = doc.exists ? doc.data() : {};
         setProfile(data);
@@ -988,6 +1137,53 @@ function App(){
       }
     });
   },[]);
+
+  // If this person was pre-registered by an admin (via direct invite link,
+  // or by matching email), merge that invite's info into their real
+  // users/{uid} doc so they land on "pending" or "approved" instead of a
+  // blank application. Only runs if they don't already have a vanRentalProfile.
+  async function claimDriverInviteIfAny(u){
+    const existing = await db.collection('users').doc(u.uid).get();
+    if(existing.exists && existing.data().vanRentalProfile) return; // already has one, don't overwrite
+
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('invite');
+    let inviteDoc = null;
+
+    if(token){
+      const doc = await db.collection('vanDriverInvites').doc(token).get();
+      if(doc.exists && !doc.data().claimed) inviteDoc = doc;
+    }
+    if(!inviteDoc && u.email){
+      const snap = await db.collection('vanDriverInvites')
+        .where('email','==',u.email.toLowerCase().trim())
+        .where('claimed','==',false)
+        .limit(1).get();
+      if(!snap.empty) inviteDoc = snap.docs[0];
+    }
+    if(!inviteDoc) return;
+
+    const inv = inviteDoc.data();
+    await db.collection('users').doc(u.uid).set({
+      name: u.displayName || inv.name || '',
+      email: u.email || inv.email || '',
+      phone: inv.phone || '',
+      uid: u.uid,
+      vanRentalProfile: {
+        birthdate:'', licenseExp: inv.licenseExp||'', cdl:null,
+        atFaultAccidents3yr:null, atFaultAccidentsDetails:'',
+        movingViolations3yr:null, movingViolationsDetails:'',
+        insuranceCancelled:null, licenseRevokedSuspended:null,
+        licenseVerifiedInPerson: inv.licenseVerifiedInPerson||false,
+        status:'needs_info', createdAt: Date.now(), addedByAdmin:true,
+      }
+    }, {merge:true});
+    await db.collection('vanDriverInvites').doc(inviteDoc.id).update({claimed:true, claimedBy:u.uid, claimedAt:Date.now()});
+
+    if(token){
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }
 
   useEffect(()=>{
     if(!user) return;
