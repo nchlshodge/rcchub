@@ -206,7 +206,10 @@ function DriverApply({user,onDone}){
     <div className="content">
       <div className="card">
         <h2>Driver Application</h2>
-        <p className="muted">Fill this out once. You'll also need to show your physical license to an admin in person before you're approved to drive.</p>
+        <div className="banner-safe" style={{marginBottom:6}}>
+          Before you can be approved to drive, please bring a copy of your driver's license to the main office. An admin will confirm it's on file and mark your application verified.
+        </div>
+        <p className="muted">Fill out the rest below. You'll see your approval status once both this form and the license copy are on file.</p>
 
         <label>Phone Number</label>
         <input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" />
@@ -551,7 +554,13 @@ function DriverHome({user,profile,vans,rentals,warningLights,refreshProfile}){
       <div className="content">
         <div className="card center">
           <h2>Application Pending</h2>
-          <p className="muted">Thanks! An admin needs to approve your application before you can request a van. We'll be in touch.</p>
+          {vr.licenseVerifiedInPerson ? (
+            <p className="muted">Thanks! Your license is on file. An admin will finish reviewing your application shortly.</p>
+          ) : (
+            <div className="banner-safe" style={{textAlign:'left'}}>
+              Almost there — please bring a copy of your driver's license to the main office so an admin can confirm it's on file. Your application won't be approved until that's done.
+            </div>
+          )}
         </div>
       </div>
     );
