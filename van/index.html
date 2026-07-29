@@ -176,7 +176,7 @@ async function uploadPhoto(file, path){
 // ---------- Driver Application ----------
 function DriverApply({user,onDone}){
   const [form,setForm] = useState({
-    birthdate:'',licenseNumber:'',licenseState:'',licenseExp:'',cdl:null,
+    birthdate:'',licenseExp:'',cdl:null,
     atFaultAccidents3yr:null,atFaultAccidentsDetails:'',
     movingViolations3yr:null,movingViolationsDetails:'',
     insuranceCancelled:null,licenseRevokedSuspended:null,
@@ -184,21 +184,19 @@ function DriverApply({user,onDone}){
   const [phone,setPhone] = useState('');
   const [saving,setSaving] = useState(false);
   function set(field,val){ setForm(f=>({...f,[field]:val})); }
-  const canSubmit = phone && form.birthdate && form.licenseNumber && form.licenseState
-    && form.licenseExp && form.cdl!==null
+  const canSubmit = phone && form.birthdate && form.licenseExp && form.cdl!==null
     && form.atFaultAccidents3yr!==null && form.movingViolations3yr!==null
     && form.insuranceCancelled!==null && form.licenseRevokedSuspended!==null && !saving;
 
   async function submit(){
     setSaving(true);
-    const licenseLast4 = form.licenseNumber.slice(-4);
     await db.collection('users').doc(user.uid).set({
       name: user.displayName || '',
       email: user.email || '',
       phone,
       uid: user.uid,
       vanRentalProfile: {
-        ...form, licenseLast4, status:'pending', createdAt: Date.now(),
+        ...form, licenseVerifiedInPerson:false, status:'pending', createdAt: Date.now(),
       }
     }, {merge:true});
     setSaving(false);
@@ -208,16 +206,12 @@ function DriverApply({user,onDone}){
     <div className="content">
       <div className="card">
         <h2>Driver Application</h2>
-        <p className="muted">Fill this out once. An admin will review and approve you to drive.</p>
+        <p className="muted">Fill this out once. You'll also need to show your physical license to an admin in person before you're approved to drive.</p>
 
         <label>Phone Number</label>
         <input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" />
         <label>Date of Birth</label>
         <input type="date" value={form.birthdate} onChange={e=>set('birthdate',e.target.value)} />
-        <label>Driver's License #</label>
-        <input value={form.licenseNumber} onChange={e=>set('licenseNumber',e.target.value)} />
-        <label>State Issued</label>
-        <input value={form.licenseState} onChange={e=>set('licenseState',e.target.value)} placeholder="e.g. MI" maxLength={2} />
         <label>License Expiration Date</label>
         <input type="date" value={form.licenseExp} onChange={e=>set('licenseExp',e.target.value)} />
         <label>Do you hold a CDL?</label>
@@ -609,6 +603,47 @@ function DriverHome({user,profile,vans,rentals,warningLights,refreshProfile}){
 }
 
 // ---------- Admin Dashboard ----------
+function PendingDriverCard({driverUser,onApprove,onDeny,onVerify,onUpdateExp}){
+  const vr = driverUser.vanRentalProfile;
+  const [editingExp,setEditingExp] = useState(false);
+  const [expDraft,setExpDraft] = useState(vr.licenseExp||'');
+  const needsVerify = !vr.licenseVerifiedInPerson;
+
+  return (
+    <div className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+      <div><strong>{driverUser.name}</strong> — {driverUser.phone}</div>
+      <div className="muted">DOB: {vr.birthdate}</div>
+      <div className="muted" style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        {!editingExp ? (
+          <>License expires: {vr.licenseExp || '(not set)'} {vr.cdl ? '· CDL' : ''}
+            <button className="link-btn" style={{padding:0,fontSize:13}} onClick={()=>{setExpDraft(vr.licenseExp||''); setEditingExp(true);}}>Edit</button>
+          </>
+        ) : (
+          <>
+            <input type="date" value={expDraft} onChange={e=>setExpDraft(e.target.value)} style={{width:'auto',padding:8}} />
+            <button className="link-btn" style={{padding:0,fontSize:13}} onClick={()=>{onUpdateExp(driverUser.id, expDraft); setEditingExp(false);}}>Save</button>
+            <button className="link-btn" style={{padding:0,fontSize:13,color:'var(--muted)'}} onClick={()=>setEditingExp(false)}>Cancel</button>
+          </>
+        )}
+      </div>
+      <div className="muted">
+        License check: <strong style={{color: vr.licenseVerifiedInPerson ? 'var(--safe)' : 'var(--danger)'}}>
+          {vr.licenseVerifiedInPerson ? 'Verified in person ✓' : 'Not yet verified in person'}
+        </strong>
+      </div>
+      <div className="muted">At-fault accidents (3yr): {vr.atFaultAccidents3yr ? (vr.atFaultAccidentsDetails||'Yes') : 'None reported'}</div>
+      <div className="muted">Moving violations (3yr): {vr.movingViolations3yr ? (vr.movingViolationsDetails||'Yes') : 'None reported'}</div>
+      <div className="muted">Insurance cancelled/refused: {vr.insuranceCancelled ? <strong style={{color:'var(--danger)'}}>YES</strong> : 'No'}</div>
+      <div className="muted">License revoked/suspended/restricted: {vr.licenseRevokedSuspended ? <strong style={{color:'var(--danger)'}}>YES</strong> : 'No'}</div>
+      <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
+        {needsVerify && <button className="secondary" style={{marginTop:0}} onClick={()=>onVerify(driverUser.id)}>Mark license verified in person</button>}
+        <button className="primary" style={{marginTop:0}} disabled={needsVerify} onClick={()=>onApprove(driverUser.id)}>Approve</button>
+        <button className="secondary" style={{marginTop:0}} onClick={()=>onDeny(driverUser.id)}>Deny</button>
+      </div>
+    </div>
+  );
+}
+
 function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,repairLog,alerts}){
   const [tab,setTab] = useState('approvals');
   const driverUsers = allUsers.filter(u=>u.vanRentalProfile);
@@ -618,6 +653,8 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
 
   async function approve(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'approved'}); }
   async function deny(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'denied'}); }
+  async function verifyLicenseInPerson(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.licenseVerifiedInPerson':true}); }
+  async function updateLicenseExp(uid_, newExp){ await db.collection('users').doc(uid_).update({'vanRentalProfile.licenseExp':newExp}); }
   async function resolveAlert(id){ await db.collection('vanAlerts').doc(id).update({resolved:true}); }
   async function addWarningLight(name,safety,feedback,vanId){
     await db.collection('vanWarningLights').add({name,safety,feedback: safety? null : feedback, van: vanId||null});
@@ -660,24 +697,9 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
         <div className="card">
           <h3>Pending Applications</h3>
           {pending.length===0 && <p className="muted">None pending.</p>}
-          {pending.map(u=>{
-            const vr = u.vanRentalProfile;
-            return (
-              <div key={u.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-                <div><strong>{u.name}</strong> — {u.phone}</div>
-                <div className="muted">DOB: {vr.birthdate}</div>
-                <div className="muted">License #{vr.licenseNumber} ({vr.licenseState}), exp {vr.licenseExp} {vr.cdl ? '· CDL' : ''}</div>
-                <div className="muted">At-fault accidents (3yr): {vr.atFaultAccidents3yr ? (vr.atFaultAccidentsDetails||'Yes') : 'None reported'}</div>
-                <div className="muted">Moving violations (3yr): {vr.movingViolations3yr ? (vr.movingViolationsDetails||'Yes') : 'None reported'}</div>
-                <div className="muted">Insurance cancelled/refused: {vr.insuranceCancelled ? <strong style={{color:'var(--danger)'}}>YES</strong> : 'No'}</div>
-                <div className="muted">License revoked/suspended/restricted: {vr.licenseRevokedSuspended ? <strong style={{color:'var(--danger)'}}>YES</strong> : 'No'}</div>
-                <div style={{display:'flex',gap:8,marginTop:8}}>
-                  <button className="primary" style={{marginTop:0}} onClick={()=>approve(u.id)}>Approve</button>
-                  <button className="secondary" style={{marginTop:0}} onClick={()=>deny(u.id)}>Deny</button>
-                </div>
-              </div>
-            );
-          })}
+          {pending.map(u=>(
+            <PendingDriverCard key={u.id} driverUser={u} onApprove={approve} onDeny={deny} onVerify={verifyLicenseInPerson} onUpdateExp={updateLicenseExp} />
+          ))}
           <h3 style={{marginTop:20}}>Approved Drivers</h3>
           {approved.map(u=>{
             const vr = u.vanRentalProfile;
