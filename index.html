@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RCC · Ministry Apps</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="theme-color" content="#2557b8">
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500;600&display=swap');
+
+    :root {
+      --bg:         #f7f6f3;
+      --bg-card:    #ffffff;
+      --bg-raised:  #f0ece4;
+      --border:     #e8e4dc;
+      --border-mid: rgba(0,0,0,0.14);
+      --text:       #1a1a1a;
+      --text-mid:   #5c5650;
+      --text-soft:  #9e9890;
+      --blue:       #2557b8;
+      --blue-dim:   rgba(37,87,184,0.08);
+      --blue-glow:  rgba(37,87,184,0.20);
+      --gold:       #b5892a;
+      --gold-dim:   rgba(181,137,42,0.10);
+      --gold-glow:  rgba(181,137,42,0.22);
+      --green:      #2e7a52;
+      --green-dim:  rgba(46,122,82,0.10);
+      --red:        #a03030;
+      --red-dim:    rgba(160,48,48,0.10);
+      --radius:     14px;
+      --radius-sm:  8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      font-weight: 400;
+      color: var(--blue);
+      letter-spacing: -0.2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo img { height: 26px; width: auto; display: block; }
+    .logo span {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text-soft);
+      margin-left: 8px;
+    }
+    #userInfo { display: flex; align-items: center; gap: 10px; }
+    #userName { font-size: 14px; color: var(--text-mid); }
+    #signOutBtn {
+      background: transparent;
+      color: var(--text-soft);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+    }
+    #signOutBtn:hover { border-color: var(--border-mid); color: var(--text-mid); }
+
+    main {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 48px 20px 100px;
+    }
+
+    /* ── LOGIN ── */
+    #loginScreen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+      padding: 40px 24px;
+    }
+    .login-mark {
+      width: 108px; height: 108px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .login-mark img { width: 100%; height: 100%; object-fit: contain; }
+    .login-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 34px;
+      font-weight: 400;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .login-title em { color: var(--blue); font-style: normal; }
+    .login-sub {
+      font-size: 15px;
+      color: var(--text-mid);
+      margin-bottom: 40px;
+      max-width: 300px;
+      line-height: 1.7;
+    }
+    .auth-buttons { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; }
+    #googleSignInBtn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: #fff;
+      color: #374151;
+      border: 1px solid #d1cdc4;
+      border-radius: var(--radius);
+      padding: 15px 24px;
+      font-size: 15px;
+      font-weight: 500;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    #googleSignInBtn:hover { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-dim); }
+    .email-toggle {
+      background: none; border: none; color: var(--text-soft);
+      font-size: 13px; cursor: pointer; margin-top: 6px; text-decoration: underline;
+      font-family: 'Inter', sans-serif;
+    }
+    .email-form { display: none; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; margin-top: 4px; }
+    .email-form.open { display: flex; }
+    .email-form input {
+      width: 100%; padding: 13px 15px;
+      border: 1px solid #d1cdc4; border-radius: var(--radius-sm);
+      font-size: 15px; font-family: 'Inter', sans-serif;
+    }
+    .email-form input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-dim); }
+    .email-form button {
+      background: var(--blue); color: #fff; border: none; border-radius: var(--radius-sm);
+      padding: 13px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif;
+    }
+    .email-form-links { display: flex; justify-content: space-between; font-size: 12px; margin-top: 2px; }
+    .email-form-links button { background: none; border: none; color: var(--text-soft); cursor: pointer; text-decoration: underline; padding: 0; font-family: 'Inter', sans-serif; }
+    .auth-error { font-size: 13px; color: var(--red); max-width: 300px; display: none; }
+
+    /* ── DASHBOARD ── */
+    .welcome {
+      margin-bottom: 32px;
+    }
+    .welcome-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 26px;
+      font-weight: 400;
+      margin-bottom: 4px;
+    }
+    .welcome-sub { font-size: 14px; color: var(--text-soft); }
+
+    .module-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .module-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color .15s, transform .15s;
+    }
+    .module-card:hover { border-color: var(--blue-glow); transform: translateY(-1px); }
+
+    .module-icon {
+      width: 46px; height: 46px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 21px;
+      flex-shrink: 0;
+    }
+    .module-icon.bedside      { background: var(--gold-dim); }
+    .module-icon.incident     { background: rgba(160,48,48,0.08); }
+    .module-icon.vanrental    { background: rgba(46,90,122,0.08); }
+
+    .module-info { flex: 1; min-width: 0; }
+    .module-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 18px;
+      font-weight: 400;
+      margin-bottom: 2px;
+    }
+    .module-desc { font-size: 13px; color: var(--text-soft); }
+    .module-arrow { color: var(--text-soft); font-size: 18px; flex-shrink: 0; }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-soft);
+    }
+    .empty-icon {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      margin: 0 auto 16px;
+    }
+    .empty-text { font-size: 16px; color: var(--text-mid); margin-bottom: 6px; font-family: 'Playfair Display', serif; }
+    .empty-sub { font-size: 14px; color: var(--text-soft); }
+
+    .loading { text-align: center; padding: 60px; color: var(--text-soft); font-size: 15px; }
+
+    @media (max-width: 480px) {
+      .login-title { font-size: 28px; }
+      header { padding: 0 16px; }
+      #userName { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-mark"><img src="assets/rcc-logo.png" alt="RCC — Love God. Love People."></div>
+  <div class="login-title">RCC <em>Ministry Apps</em></div>
+  <p class="login-sub">One sign-in for Bedside, incident reporting, and van scheduling.</p>
+
+  <div class="auth-buttons">
+    <button id="googleSignInBtn">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Sign in with Google
+    </button>
+    <button class="email-toggle" id="emailToggle">or use email &amp; password</button>
+
+    <div class="email-form" id="emailForm">
+      <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email">
+      <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password">
+      <button id="emailSignInBtn">Sign in</button>
+      <div class="email-form-links">
+        <button id="emailSignUpBtn">Create an account</button>
+        <button id="emailResetBtn">Forgot password?</button>
+      </div>
+    </div>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appShell" style="display:none;">
+  <header>
+    <div class="logo"><img src="assets/rcc-logo-plain.png" alt="RCC">RCC <span>· Ministry Apps</span></div>
+    <div id="userInfo">
+      <span id="userName"></span>
+      <button id="signOutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="welcome">
+      <div class="welcome-title" id="welcomeTitle">Welcome</div>
+      <div class="welcome-sub">Choose where you'd like to go.</div>
+    </div>
+
+    <div id="moduleGrid" class="module-grid">
+      <div class="loading">Loading your apps...</div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey:            "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+    authDomain:        "bedsidercc.firebaseapp.com",
+    projectId:         "bedsidercc",
+    storageBucket:     "bedsidercc.firebasestorage.app",
+    messagingSenderId: "950958384975",
+    appId:             "1:950958384975:web:6f43dec5a7ba842c69c73a"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
+
+  // ── MODULE REGISTRY ──
+  // To add a module for another church/org later: extend this list and
+  // gate visibility off users/{uid}.modules the same way.
+  const MODULES = [
+    {
+      key: 'bedside',
+      name: 'Bedside',
+      desc: 'Care visits, prayer requests, and the prayer wall',
+      icon: '🕊️',
+      iconClass: 'bedside',
+      href: 'bedside/index.html',
+    },
+    {
+      key: 'incidentReport',
+      name: 'Incident Report',
+      desc: 'Report an injury, near miss, or property issue',
+      icon: '📋',
+      iconClass: 'incident',
+      href: 'incident-report.html',
+    },
+    {
+      key: 'vanRental',
+      name: 'Van Rental',
+      desc: 'Request a van, check one out, or manage the fleet',
+      icon: '🚐',
+      iconClass: 'vanrental',
+      href: 'van-rental.html',
+    },
+  ];
+
+  let currentUser = null;
+
+  auth.onAuthStateChanged(async user => {
+    if (user) {
+      currentUser = user;
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appShell').style.display = 'block';
+      document.getElementById('userName').textContent = user.displayName || user.email;
+      document.getElementById('welcomeTitle').textContent =
+        'Welcome' + (user.displayName ? ', ' + user.displayName.split(' ')[0] : '');
+
+      await ensureUserDoc(user);
+      loadModules(user.uid);
+    } else {
+      currentUser = null;
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('appShell').style.display = 'none';
+    }
+  });
+
+  // Create a baseline users/{uid} doc on first sign-in without clobbering
+  // fields other apps (Bedside, etc.) may already have written.
+  async function ensureUserDoc(user) {
+    const ref = db.collection('users').doc(user.uid);
+    const doc = await ref.get();
+    if (!doc.exists) {
+      await ref.set({
+        name: user.displayName || '',
+        email: user.email || '',
+        uid: user.uid,
+        modules: { bedside: true, incidentReport: true, vanRental: false },
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    } else if (!doc.data().modules) {
+      // Existing user from before the hub existed — default them to the
+      // two modules that predate Van Rental so nobody loses access.
+      await ref.set({
+        modules: { bedside: true, incidentReport: true, vanRental: false }
+      }, { merge: true });
+    }
+  }
+
+  function loadModules(uid) {
+    db.collection('users').doc(uid).onSnapshot(doc => {
+      const data = doc.data() || {};
+      const modules = data.modules || {};
+      renderModules(modules);
+    }, err => {
+      document.getElementById('moduleGrid').innerHTML =
+        '<div class="empty-state"><div class="empty-text">Could not load your apps.</div></div>';
+      console.error(err);
+    });
+  }
+
+  function renderModules(modules) {
+    const enabled = MODULES.filter(m => modules[m.key]);
+    const container = document.getElementById('moduleGrid');
+
+    if (!enabled.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🔒</div>
+          <div class="empty-text">No apps enabled yet</div>
+          <div class="empty-sub">Ask an admin to turn on access for your account.</div>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = enabled.map(m => `
+      <a class="module-card" href="${m.href}">
+        <div class="module-icon ${m.iconClass}">${m.icon}</div>
+        <div class="module-info">
+          <div class="module-name">${m.name}</div>
+          <div class="module-desc">${m.desc}</div>
+        </div>
+        <div class="module-arrow">→</div>
+      </a>`).join('');
+  }
+
+  // ── AUTH ──
+  document.getElementById('googleSignInBtn').addEventListener('click', () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err => showAuthError(err.message));
+  });
+
+  document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+
+  document.getElementById('emailToggle').addEventListener('click', () => {
+    document.getElementById('emailForm').classList.toggle('open');
+  });
+
+  document.getElementById('emailSignInBtn').addEventListener('click', () => {
+    const email = document.getElementById('emailInput').value.trim();
+    const password = document.getElementById('passwordInput').value;
+    if (!email || !password) { showAuthError('Enter your email and password.'); return; }
+    auth.signInWithEmailAndPassword(email, password).catch(err => showAuthError(err.message));
+  });
+
+  document.getElementById('emailSignUpBtn').addEventListener('click', () => {
+    const email = document.getElementById('emailInput').value.trim();
+    const password = document.getElementById('passwordInput').value;
+    if (!email || !password) { showAuthError('Enter an email and password to create an account.'); return; }
+    if (password.length < 6) { showAuthError('Password must be at least 6 characters.'); return; }
+    auth.createUserWithEmailAndPassword(email, password).catch(err => showAuthError(err.message));
+  });
+
+  document.getElementById('emailResetBtn').addEventListener('click', () => {
+    const email = document.getElementById('emailInput').value.trim();
+    if (!email) { showAuthError('Enter your email above first, then tap "Forgot password?"'); return; }
+    auth.sendPasswordResetEmail(email)
+      .then(() => showAuthError('Password reset email sent.'))
+      .catch(err => showAuthError(err.message));
+  });
+
+  function showAuthError(msg) {
+    const el = document.getElementById('authError');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+</script>
+</body>
+</html>
