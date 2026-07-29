@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCC Van Usage</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="theme-color" content="#2557b8">
+
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500;600&display=swap');
+  :root{
+    --blue:#2557b8; --blue-dim:rgba(37,87,184,.08); --blue-glow:rgba(37,87,184,.20);
+    --bg:#f7f6f3; --card:#ffffff; --text:#1a1a1a;
+    --muted:#7a746a; --danger:#a03030; --danger-dim:rgba(160,48,48,.08);
+    --safe:#2e7a52; --safe-dim:rgba(46,122,82,.08); --border:#e8e4dc;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);}
+  h1,h2,h3{font-family:'Playfair Display',Georgia,serif;margin:0 0 8px;font-weight:400;}
+  .app{max-width:560px;margin:0 auto;min-height:100vh;background:var(--bg);padding-bottom:40px;}
+  .topbar{background:#fff;border-bottom:1px solid var(--border);color:var(--text);padding:0 20px;height:60px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50;}
+  .topbar h1{font-size:20px;color:var(--blue);display:flex;align-items:center;gap:10px;}
+  .topbar .backlink{font-size:13px;color:var(--muted);text-decoration:none;font-weight:400;font-family:'Inter',sans-serif;}
+  .topbar-right{display:flex;align-items:center;gap:10px;}
+  .topbar button.plain{background:transparent;border:1px solid var(--border);color:var(--muted);padding:7px 12px;border-radius:8px;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;}
+  .content{padding:20px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;}
+  label{display:block;font-size:15px;font-weight:600;margin:14px 0 6px;}
+  input,select,textarea{width:100%;padding:14px;font-size:16px;border:2px solid var(--border);border-radius:10px;background:#fff;color:var(--text);font-family:'Inter',sans-serif;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);}
+  textarea{min-height:80px;}
+  button.primary{width:100%;padding:16px;font-size:17px;font-weight:600;background:var(--blue);color:#fff;border:none;border-radius:12px;margin-top:16px;cursor:pointer;font-family:'Inter',sans-serif;}
+  button.primary:hover{opacity:.92;}
+  button.secondary{width:100%;padding:16px;font-size:17px;font-weight:600;background:#fff;color:var(--blue);border:2px solid var(--blue);border-radius:12px;margin-top:10px;cursor:pointer;font-family:'Inter',sans-serif;}
+  button.danger{background:var(--danger);}
+  button:disabled{opacity:.45;cursor:default;}
+  .toggle-row{display:flex;gap:12px;margin-top:10px;}
+  .toggle-row button{flex:1;padding:16px;font-size:16px;border-radius:10px;border:2px solid var(--border);background:#fff;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
+  .toggle-row button.active-yes{background:var(--safe-dim);color:var(--safe);border-color:var(--safe);}
+  .toggle-row button.active-no{background:var(--danger-dim);color:var(--danger);border-color:var(--danger);}
+  .badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;}
+  .badge.pending{background:#f5e3c3;color:#8a6100;}
+  .badge.approved{background:var(--safe-dim);color:var(--safe);}
+  .badge.available{background:var(--safe-dim);color:var(--safe);}
+  .badge.inuse{background:#f5e3c3;color:#8a6100;}
+  .badge.maintenance{background:var(--danger-dim);color:var(--danger);}
+  .badge.admin{background:var(--blue-dim);color:var(--blue);}
+  .list-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);}
+  .list-item:last-child{border-bottom:none;}
+  .muted{color:var(--muted);font-size:14px;}
+  .center{text-align:center;}
+  .camera-box{border:2px dashed var(--border);border-radius:12px;padding:20px;text-align:center;margin-top:8px;}
+  .camera-box img{max-width:100%;border-radius:8px;margin-top:10px;}
+  .upload-progress{font-size:13px;color:var(--blue);margin-top:8px;}
+  .banner-safe{background:var(--safe-dim);color:var(--safe);padding:14px;border-radius:10px;margin-top:12px;font-weight:600;}
+  .banner-danger{background:var(--danger-dim);color:var(--danger);padding:14px;border-radius:10px;margin-top:12px;font-weight:700;}
+  .nav-tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:16px;overflow-x:auto;}
+  .nav-tabs button{flex:1;padding:12px 10px;background:none;border:none;font-size:14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap;cursor:pointer;font-family:'Inter',sans-serif;}
+  .nav-tabs button.active{color:var(--blue);border-bottom-color:var(--blue);}
+  .link-btn{background:none;border:none;color:var(--blue);font-size:15px;font-weight:600;text-decoration:underline;padding:8px 0;cursor:pointer;font-family:'Inter',sans-serif;}
+  .step-dot{display:flex;gap:6px;justify-content:center;margin-bottom:16px;padding-top:16px;}
+  .step-dot span{width:8px;height:8px;border-radius:50%;background:var(--border);}
+  .step-dot span.on{background:var(--blue);}
+  .login-mark{width:72px;height:72px;margin:40px auto 12px;display:flex;align-items:center;justify-content:center;font-size:34px;}
+  .login-title{font-family:'Playfair Display',serif;font-size:28px;text-align:center;margin-bottom:6px;}
+  .login-sub{font-size:14px;color:var(--muted);text-align:center;margin-bottom:28px;}
+  #googleSignInBtn{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;border:1px solid #d1cdc4;border-radius:12px;padding:15px;font-size:15px;font-weight:500;cursor:pointer;width:100%;font-family:'Inter',sans-serif;}
+  .loading{text-align:center;padding:40px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const {useState,useEffect,useRef} = React;
+
+// ---------- Firebase ----------
+const firebaseConfig = {
+  apiKey:            "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+  authDomain:        "bedsidercc.firebaseapp.com",
+  projectId:         "bedsidercc",
+  storageBucket:     "bedsidercc.firebasestorage.app",
+  messagingSenderId: "950958384975",
+  appId:             "1:950958384975:web:6f43dec5a7ba842c69c73a"
+};
+try { firebase.app(); } catch(e) { firebase.initializeApp(firebaseConfig); }
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+function uid(){ return Math.random().toString(36).slice(2,10); }
+
+// Seed vans once if the collection is empty (first-run convenience only)
+async function ensureVansSeeded(){
+  const snap = await db.collection('vans').limit(1).get();
+  if(!snap.empty) return;
+  const seed = [
+    {name:'White Chevy Van (low priority use)', mileage:52310, gas:75, status:'available', lowPriority:true},
+    {name:'Brown GMC Van', mileage:88120, gas:40, status:'available', lowPriority:false},
+    {name:'White Ford Van', mileage:31200, gas:90, status:'available', lowPriority:false},
+  ];
+  const batch = db.batch();
+  seed.forEach(v=>{ const ref = db.collection('vans').doc(); batch.set(ref, v); });
+  await batch.commit();
+}
+async function ensureWarningLightsSeeded(){
+  const snap = await db.collection('vanWarningLights').limit(1).get();
+  if(!snap.empty) return;
+  const seed = [
+    {name:'Tire Pressure Light', safety:false, feedback:"That's the tire pressure light — we know about it, low priority. Thanks for flagging it, no need to call anyone."},
+    {name:'Check Engine Light (known emissions sensor)', safety:false, feedback:"That's a known issue — not a safety concern. Go ahead and drive.", van:null},
+    {name:'Brake Warning Light', safety:true, feedback:null},
+    {name:'Oil Pressure Light', safety:true, feedback:null},
+  ];
+  const batch = db.batch();
+  seed.forEach(l=>{ const ref = db.collection('vanWarningLights').doc(); batch.set(ref, l); });
+  await batch.commit();
+}
+
+// ---------- Small components ----------
+function TopBar({title,onBack,right,hubLink}){
+  return (
+    <div className="topbar">
+      <h1>
+        {hubLink && <a className="backlink" href="../index.html">← All apps</a>}
+        {onBack && <button className="plain" onClick={onBack}>← Back</button>}
+        {title}
+      </h1>
+      <div className="topbar-right">{right}</div>
+    </div>
+  );
+}
+
+function YesNo({value,onChange,yesLabel="Yes",noLabel="No"}){
+  return (
+    <div className="toggle-row">
+      <button type="button" className={value===true?'active-yes':''} onClick={()=>onChange(true)}>{yesLabel}</button>
+      <button type="button" className={value===false?'active-no':''} onClick={()=>onChange(false)}>{noLabel}</button>
+    </div>
+  );
+}
+
+function CameraCapture({label, onCapture, photoUrl, uploading}){
+  const inputRef = useRef();
+  return (
+    <div className="camera-box">
+      <div className="muted">{label}</div>
+      <input ref={inputRef} type="file" accept="image/*" capture="environment" style={{display:'none'}}
+        onChange={e=>{ const file = e.target.files[0]; if(file) onCapture(file); }} />
+      <button type="button" className="secondary" style={{marginTop:10}} onClick={()=>inputRef.current.click()} disabled={uploading}>
+        📷 {uploading ? 'Uploading...' : (photoUrl ? 'Retake Photo' : 'Open Camera')}
+      </button>
+      {uploading && <div className="upload-progress">Uploading photo…</div>}
+      {photoUrl && !uploading && <img src={photoUrl} alt="capture" />}
+    </div>
+  );
+}
+
+// Uploads a File to Firebase Storage under a given path, returns download URL
+async function uploadPhoto(file, path){
+  const ref = storage.ref().child(path);
+  await ref.put(file);
+  return await ref.getDownloadURL();
+}
+
+// ---------- Driver Application ----------
+function DriverApply({user,onDone}){
+  const [form,setForm] = useState({
+    birthdate:'',licenseNumber:'',licenseState:'',licenseExp:'',cdl:null,
+    atFaultAccidents3yr:null,atFaultAccidentsDetails:'',
+    movingViolations3yr:null,movingViolationsDetails:'',
+    insuranceCancelled:null,licenseRevokedSuspended:null,
+  });
+  const [phone,setPhone] = useState('');
+  const [saving,setSaving] = useState(false);
+  function set(field,val){ setForm(f=>({...f,[field]:val})); }
+  const canSubmit = phone && form.birthdate && form.licenseNumber && form.licenseState
+    && form.licenseExp && form.cdl!==null
+    && form.atFaultAccidents3yr!==null && form.movingViolations3yr!==null
+    && form.insuranceCancelled!==null && form.licenseRevokedSuspended!==null && !saving;
+
+  async function submit(){
+    setSaving(true);
+    const licenseLast4 = form.licenseNumber.slice(-4);
+    await db.collection('users').doc(user.uid).set({
+      name: user.displayName || '',
+      email: user.email || '',
+      phone,
+      uid: user.uid,
+      vanRentalProfile: {
+        ...form, licenseLast4, status:'pending', createdAt: Date.now(),
+      }
+    }, {merge:true});
+    setSaving(false);
+    onDone();
+  }
+  return (
+    <div className="content">
+      <div className="card">
+        <h2>Driver Application</h2>
+        <p className="muted">Fill this out once. An admin will review and approve you to drive.</p>
+
+        <label>Phone Number</label>
+        <input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" />
+        <label>Date of Birth</label>
+        <input type="date" value={form.birthdate} onChange={e=>set('birthdate',e.target.value)} />
+        <label>Driver's License #</label>
+        <input value={form.licenseNumber} onChange={e=>set('licenseNumber',e.target.value)} />
+        <label>State Issued</label>
+        <input value={form.licenseState} onChange={e=>set('licenseState',e.target.value)} placeholder="e.g. MI" maxLength={2} />
+        <label>License Expiration Date</label>
+        <input type="date" value={form.licenseExp} onChange={e=>set('licenseExp',e.target.value)} />
+        <label>Do you hold a CDL?</label>
+        <YesNo value={form.cdl} onChange={v=>set('cdl',v)} />
+
+        <label>In the past 3 years, have you had any at-fault accidents?</label>
+        <YesNo value={form.atFaultAccidents3yr} onChange={v=>set('atFaultAccidents3yr',v)} />
+        {form.atFaultAccidents3yr && (<><label>Please explain</label><textarea value={form.atFaultAccidentsDetails} onChange={e=>set('atFaultAccidentsDetails',e.target.value)} /></>)}
+
+        <label>In the past 3 years, have you had any moving traffic violations?</label>
+        <YesNo value={form.movingViolations3yr} onChange={v=>set('movingViolations3yr',v)} />
+        {form.movingViolations3yr && (<><label>Please explain</label><textarea value={form.movingViolationsDetails} onChange={e=>set('movingViolationsDetails',e.target.value)} /></>)}
+
+        <label>Has an insurance company ever cancelled or refused to provide you personal auto insurance?</label>
+        <YesNo value={form.insuranceCancelled} onChange={v=>set('insuranceCancelled',v)} />
+
+        <label>Has your driver's license ever been revoked, suspended, or restricted?</label>
+        <YesNo value={form.licenseRevokedSuspended} onChange={v=>set('licenseRevokedSuspended',v)} />
+
+        <button className="primary" disabled={!canSubmit} onClick={submit}>{saving?'Submitting...':'Submit Application'}</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- License Renewal ----------
+function LicenseRenewal({user,profile,onDone}){
+  const vr = profile.vanRentalProfile || {};
+  const [licenseExp,setLicenseExp] = useState('');
+  const [cdl,setCdl] = useState(vr.cdl ?? null);
+  const [atFaultAccidents1yr,setAtFaultAccidents1yr] = useState(null);
+  const [atFaultDetails,setAtFaultDetails] = useState('');
+  const [movingViolations1yr,setMovingViolations1yr] = useState(null);
+  const [movingDetails,setMovingDetails] = useState('');
+  const [licenseRevokedSuspended,setLicenseRevokedSuspended] = useState(null);
+  const [saving,setSaving] = useState(false);
+  const canSubmit = licenseExp && cdl!==null && atFaultAccidents1yr!==null && movingViolations1yr!==null && licenseRevokedSuspended!==null && !saving;
+
+  async function submit(){
+    setSaving(true);
+    await db.collection('users').doc(user.uid).set({
+      vanRentalProfile: {
+        ...vr, licenseExp, cdl, atFaultAccidents1yr, atFaultDetails,
+        movingViolations1yr, movingDetails, licenseRevokedSuspended,
+        lastRenewed: Date.now(),
+      }
+    }, {merge:true});
+    setSaving(false);
+    onDone();
+  }
+  return (
+    <div className="content">
+      <div className="card">
+        <h2>Renew Your License</h2>
+        <label>New Expiration Date</label>
+        <input type="date" value={licenseExp} onChange={e=>setLicenseExp(e.target.value)} />
+        <label>Do you hold a CDL?</label>
+        <YesNo value={cdl} onChange={setCdl} />
+
+        <label>In the past year, have you had any at-fault accidents?</label>
+        <YesNo value={atFaultAccidents1yr} onChange={setAtFaultAccidents1yr} />
+        {atFaultAccidents1yr && (<><label>Please explain</label><textarea value={atFaultDetails} onChange={e=>setAtFaultDetails(e.target.value)} /></>)}
+
+        <label>In the past year, have you had any moving traffic violations?</label>
+        <YesNo value={movingViolations1yr} onChange={setMovingViolations1yr} />
+        {movingViolations1yr && (<><label>Please explain</label><textarea value={movingDetails} onChange={e=>setMovingDetails(e.target.value)} /></>)}
+
+        <label>Has your driver's license been revoked, suspended, or restricted since your last renewal?</label>
+        <YesNo value={licenseRevokedSuspended} onChange={setLicenseRevokedSuspended} />
+
+        <button className="primary" disabled={!canSubmit} onClick={submit}>{saving?'Saving...':'Save Renewal'}</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Request Rental (auto-assign) ----------
+function rentalOverlaps(aStart,aEnd,bStart,bEnd){ return aStart < bEnd && bStart < aEnd; }
+
+function RequestRental({user,vans,rentals,onAssigned}){
+  const [date,setDate] = useState('');
+  const [time,setTime] = useState('');
+  const [endDate,setEndDate] = useState('');
+  const [endTime,setEndTime] = useState('');
+  const [purpose,setPurpose] = useState('');
+  const [error,setError] = useState('');
+  const [saving,setSaving] = useState(false);
+
+  async function autoAssign(){
+    setError(''); setSaving(true);
+    const start = new Date(`${date}T${time}`);
+    const end = new Date(`${endDate}T${endTime}`);
+    if(!(start < end)){ setError('End date/time must be after the start date/time.'); setSaving(false); return; }
+
+    const activeRentals = rentals.filter(r=>r.status!=='completed' && r.status!=='cancelled');
+    const vansWithConflict = new Set(
+      activeRentals.filter(r=>{
+        if(!r.date || !r.time) return false;
+        const rStart = new Date(`${r.date}T${r.time}`);
+        const rEnd = r.endDate && r.endTime ? new Date(`${r.endDate}T${r.endTime}`) : new Date(rStart.getTime()+4*60*60*1000);
+        return rentalOverlaps(start,end,rStart,rEnd);
+      }).map(r=>r.vanId)
+    );
+
+    const available = vans.filter(v=>v.status!=='maintenance' && !vansWithConflict.has(v.id));
+    if(available.length===0){ setError('No vans are free for that time window. An admin will follow up.'); setSaving(false); return; }
+
+    const van = [...available].sort((a,b)=>{
+      if(!!a.lowPriority !== !!b.lowPriority) return a.lowPriority ? 1 : -1;
+      return a.mileage-b.mileage;
+    })[0];
+
+    const rentalRef = db.collection('vanRentals').doc();
+    await rentalRef.set({
+      driverId: user.uid, vanId: van.id, date, time, endDate, endTime, purpose,
+      status: 'assigned', createdAt: Date.now(),
+    });
+    await db.collection('vans').doc(van.id).update({status:'inuse'});
+    setSaving(false);
+    onAssigned();
+  }
+  return (
+    <div className="content">
+      <div className="card">
+        <h2>Request a Van</h2>
+        <label>Start Date</label>
+        <input type="date" value={date} onChange={e=>setDate(e.target.value)} />
+        <label>Start Time</label>
+        <input type="time" value={time} onChange={e=>setTime(e.target.value)} />
+        <label>Return Date</label>
+        <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} />
+        <label>Return Time</label>
+        <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} />
+        <label>Purpose / Destination</label>
+        <input value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="e.g. Youth group retreat" />
+        {error && <div className="banner-danger">{error}</div>}
+        <button className="primary" disabled={!date || !time || !endDate || !endTime || saving} onClick={autoAssign}>{saving?'Finding a van...':'Find Me a Van'}</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Checkout Flow ----------
+function CheckoutFlow({user,van,rental,warningLights,onDone}){
+  const [step,setStep] = useState(0);
+  const [mileage,setMileage] = useState('');
+  const [mileagePhoto,setMileagePhoto] = useState(null);
+  const [mileageUploading,setMileageUploading] = useState(false);
+  const [gas,setGas] = useState('');
+  const [gasPhoto,setGasPhoto] = useState(null);
+  const [gasUploading,setGasUploading] = useState(false);
+  const [clean,setClean] = useState(null);
+  const [cleanPhoto,setCleanPhoto] = useState(null);
+  const [cleanUploading,setCleanUploading] = useState(false);
+  const [hasWarningLight,setHasWarningLight] = useState(null);
+  const [selectedLight,setSelectedLight] = useState('');
+  const [unknownLightDesc,setUnknownLightDesc] = useState('');
+  const [showFeedback,setShowFeedback] = useState(null);
+  const [saving,setSaving] = useState(false);
+
+  const relevantLights = warningLights.filter(l=>!l.van || l.van===van.id);
+
+  async function handlePhoto(file, setPhoto, setUploading){
+    setUploading(true);
+    const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/${uid()}.jpg`);
+    setPhoto(url);
+    setUploading(false);
+  }
+
+  async function finishCheckout(){
+    setSaving(true);
+    await db.collection('vanRentals').doc(rental.id).update({
+      checkout: {mileage,mileagePhoto,gas,gasPhoto,clean,cleanPhoto,hasWarningLight,selectedLight,unknownLightDesc,at:Date.now()}
+    });
+    await db.collection('vans').doc(van.id).update({
+      mileage: Number(mileage)||van.mileage, gas: Number(gas)||van.gas,
+    });
+    if(hasWarningLight && !selectedLight){
+      await db.collection('vanAlerts').add({
+        type:'unknown_safety_light', driverId:user.uid, vanId:van.id, rentalId:rental.id,
+        description:unknownLightDesc, createdAt:Date.now(), resolved:false,
+      });
+    }
+    setSaving(false);
+    onDone();
+  }
+
+  function handleLightSelect(lightId){
+    setSelectedLight(lightId);
+    const light = warningLights.find(l=>l.id===lightId);
+    if(light){
+      if(!light.safety) setShowFeedback({type:'safe', text: light.feedback});
+      else setShowFeedback({type:'danger', text: "This is a known safety issue. Please call Nicholas right now before taking the van."});
+    }
+  }
+
+  const steps = ['Get Keys','Mileage','Gas','Cleanliness','Warning Lights','Confirm'];
+
+  return (
+    <div className="content">
+      <div className="step-dot">{steps.map((s,i)=><span key={i} className={i<=step?'on':''}></span>)}</div>
+      <div className="card">
+        {step===0 && (<>
+          <h2>Get Your Keys</h2>
+          <p>You've been assigned <strong>{van.name}</strong>.</p>
+          <p>Keys are located in the church office key box, labeled with the van name. If the office is locked, keys are in the lockbox by the side door — ask an admin for the code if you don't have it.</p>
+          <button className="primary" onClick={()=>setStep(1)}>I Have the Keys</button>
+        </>)}
+        {step===1 && (<>
+          <h2>Verify Mileage</h2>
+          <label>Current Odometer Reading</label>
+          <input type="number" value={mileage} onChange={e=>setMileage(e.target.value)} placeholder={`Last known: ${van.mileage}`} />
+          <CameraCapture label="Take a photo of the odometer" photoUrl={mileagePhoto} uploading={mileageUploading} onCapture={f=>handlePhoto(f,setMileagePhoto,setMileageUploading)} />
+          <button className="primary" disabled={!mileage || !mileagePhoto || mileageUploading} onClick={()=>setStep(2)}>Next</button>
+        </>)}
+        {step===2 && (<>
+          <h2>Verify Gas Tank</h2>
+          <label>Gas Level (%)</label>
+          <input type="number" min="0" max="100" value={gas} onChange={e=>setGas(e.target.value)} />
+          <CameraCapture label="Take a photo of the gas gauge" photoUrl={gasPhoto} uploading={gasUploading} onCapture={f=>handlePhoto(f,setGasPhoto,setGasUploading)} />
+          <button className="primary" disabled={!gas || !gasPhoto || gasUploading} onClick={()=>setStep(3)}>Next</button>
+        </>)}
+        {step===3 && (<>
+          <h2>Cleanliness Check</h2>
+          <label>Is the van clean?</label>
+          <YesNo value={clean} onChange={setClean} />
+          <CameraCapture label="Take a photo of the van interior" photoUrl={cleanPhoto} uploading={cleanUploading} onCapture={f=>handlePhoto(f,setCleanPhoto,setCleanUploading)} />
+          <button className="primary" disabled={clean===null || !cleanPhoto || cleanUploading} onClick={()=>setStep(4)}>Next</button>
+        </>)}
+        {step===4 && (<>
+          <h2>Warning Lights</h2>
+          <label>Are any warning lights on?</label>
+          <YesNo value={hasWarningLight} onChange={v=>{setHasWarningLight(v); setShowFeedback(null); setSelectedLight('');}} />
+          {hasWarningLight && (<>
+            <label>Which light is it?</label>
+            <select value={selectedLight} onChange={e=>handleLightSelect(e.target.value)}>
+              <option value="">Select a light...</option>
+              {relevantLights.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
+              <option value="">Don't see it / not sure</option>
+            </select>
+            {!selectedLight && (<><label>Describe what you see</label><textarea value={unknownLightDesc} onChange={e=>setUnknownLightDesc(e.target.value)} placeholder="Describe the light or symbol" /></>)}
+            {showFeedback && <div className={showFeedback.type==='safe' ? 'banner-safe' : 'banner-danger'}>{showFeedback.text}</div>}
+            {hasWarningLight && !selectedLight && unknownLightDesc && (
+              <div className="banner-danger">We don't have this one on file. Please call Nicholas right now before driving. We've also notified the admin team.</div>
+            )}
+          </>)}
+          <button className="primary" disabled={hasWarningLight===null || (hasWarningLight && !selectedLight && !unknownLightDesc)} onClick={()=>setStep(5)}>Next</button>
+        </>)}
+        {step===5 && (<>
+          <h2>Confirm & Go</h2>
+          <p className="muted">Van: {van.name}</p>
+          <p className="muted">Mileage: {mileage} | Gas: {gas}%</p>
+          <p className="muted">Clean: {clean?'Yes':'No'}</p>
+          <p className="muted">Warning light: {hasWarningLight ? (selectedLight ? warningLights.find(l=>l.id===selectedLight)?.name : 'Unknown - reported') : 'None'}</p>
+          <button className="primary" disabled={saving} onClick={finishCheckout}>{saving?'Saving...':'Confirm & Drive Safely'}</button>
+        </>)}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Return Flow ----------
+function ReturnFlow({van,rental,onDone}){
+  const [mileage,setMileage] = useState('');
+  const [gas,setGas] = useState('');
+  const [clean,setClean] = useState(null);
+  const [cleanPhoto,setCleanPhoto] = useState(null);
+  const [cleanUploading,setCleanUploading] = useState(false);
+  const [cleanedBy,setCleanedBy] = useState('');
+  const [problems,setProblems] = useState(null);
+  const [problemDetails,setProblemDetails] = useState('');
+  const [saving,setSaving] = useState(false);
+
+  const canSubmit = mileage && gas && clean!==null && cleanPhoto && cleanedBy && problems!==null && !saving;
+
+  async function handlePhoto(file){
+    setCleanUploading(true);
+    const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/return-${uid()}.jpg`);
+    setCleanPhoto(url);
+    setCleanUploading(false);
+  }
+
+  async function finishReturn(){
+    setSaving(true);
+    await db.collection('vanRentals').doc(rental.id).update({
+      status:'completed',
+      return: {mileage,gas,clean,cleanPhoto,cleanedBy,problems,problemDetails,at:Date.now()}
+    });
+    await db.collection('vans').doc(van.id).update({
+      mileage: Number(mileage)||van.mileage, gas: Number(gas)||van.gas, status:'available',
+    });
+    if(problems && problemDetails){
+      await db.collection('vanMaintenanceNotes').add({
+        vanId:van.id, note:problemDetails, reportedBy:rental.driverId, rentalId:rental.id,
+        createdAt:Date.now(), resolved:false,
+      });
+    }
+    setSaving(false);
+    onDone();
+  }
+
+  return (
+    <div className="content">
+      <div className="card">
+        <h2>Return the Van</h2>
+        <label>Final Odometer Reading</label>
+        <input type="number" value={mileage} onChange={e=>setMileage(e.target.value)} />
+        <label>Final Gas Level (%)</label>
+        <input type="number" min="0" max="100" value={gas} onChange={e=>setGas(e.target.value)} />
+        <label>Is the van clean?</label>
+        <YesNo value={clean} onChange={setClean} />
+        <CameraCapture label="Take a photo of the clean interior at turn-in" photoUrl={cleanPhoto} uploading={cleanUploading} onCapture={handlePhoto} />
+        <label>Who is responsible for making sure it was cleaned? (name)</label>
+        <input value={cleanedBy} onChange={e=>setCleanedBy(e.target.value)} placeholder="Full name" />
+        <label>Were there any problems?</label>
+        <YesNo value={problems} onChange={setProblems} />
+        {problems && (<><label>Please describe</label><textarea value={problemDetails} onChange={e=>setProblemDetails(e.target.value)} /></>)}
+        <button className="primary" disabled={!canSubmit} onClick={finishReturn}>{saving?'Saving...':'Complete Return'}</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Driver Home ----------
+function DriverHome({user,profile,vans,rentals,warningLights,refreshProfile}){
+  const [view,setView] = useState('home');
+  const vr = profile.vanRentalProfile || {};
+  const myRentals = rentals.filter(r=>r.driverId===user.uid);
+  const activeRental = myRentals.find(r=>r.status==='assigned' && !r.checkout) || myRentals.find(r=>r.checkout && !r.return);
+  const activeVan = activeRental ? vans.find(v=>v.id===activeRental.vanId) : null;
+
+  if(!vr.status){
+    return <DriverApply user={user} onDone={refreshProfile} />;
+  }
+  if(vr.status==='pending'){
+    return (
+      <div className="content">
+        <div className="card center">
+          <h2>Application Pending</h2>
+          <p className="muted">Thanks! An admin needs to approve your application before you can request a van. We'll be in touch.</p>
+        </div>
+      </div>
+    );
+  }
+  if(vr.status==='denied'){
+    return (
+      <div className="content">
+        <div className="card center">
+          <h2>Application Not Approved</h2>
+          <p className="muted">Please reach out to an admin if you have questions.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if(view==='renew') return <LicenseRenewal user={user} profile={profile} onDone={()=>{setView('home'); refreshProfile();}} />;
+  if(view==='request') return <RequestRental user={user} vans={vans} rentals={rentals} onAssigned={()=>setView('home')} />;
+
+  if(activeRental && activeVan && !activeRental.checkout){
+    return <CheckoutFlow user={user} van={activeVan} rental={activeRental} warningLights={warningLights} onDone={()=>setView('home')} />;
+  }
+  if(activeRental && activeVan && activeRental.checkout && !activeRental.return){
+    return <ReturnFlow van={activeVan} rental={activeRental} onDone={()=>setView('home')} />;
+  }
+
+  return (
+    <div className="content">
+      <div className="card">
+        <h2>Welcome, {(profile.name||user.displayName||'').split(' ')[0]}</h2>
+        <p className="muted">License expires {vr.licenseExp}</p>
+        <button className="primary" onClick={()=>setView('request')}>Request a Van</button>
+        <button className="secondary" onClick={()=>setView('renew')}>Renew My License</button>
+      </div>
+      <div className="card">
+        <h3>My Rental History</h3>
+        {myRentals.length===0 && <p className="muted">No rentals yet.</p>}
+        {myRentals.slice().reverse().map(r=>{
+          const van = vans.find(v=>v.id===r.vanId);
+          return (
+            <div key={r.id} className="list-item">
+              <div><div>{van?.name}</div><div className="muted">{r.date} {r.time}</div></div>
+              <span className={`badge ${r.status==='completed'?'available':'inuse'}`}>{r.status}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Admin Dashboard ----------
+function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,repairLog,alerts}){
+  const [tab,setTab] = useState('approvals');
+  const driverUsers = allUsers.filter(u=>u.vanRentalProfile);
+  const pending = driverUsers.filter(u=>u.vanRentalProfile.status==='pending');
+  const approved = driverUsers.filter(u=>u.vanRentalProfile.status==='approved');
+  const openAlerts = alerts.filter(a=>!a.resolved);
+
+  async function approve(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'approved'}); }
+  async function deny(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'denied'}); }
+  async function resolveAlert(id){ await db.collection('vanAlerts').doc(id).update({resolved:true}); }
+  async function addWarningLight(name,safety,feedback,vanId){
+    await db.collection('vanWarningLights').add({name,safety,feedback: safety? null : feedback, van: vanId||null});
+  }
+  async function resolveMaint(id){ await db.collection('vanMaintenanceNotes').doc(id).update({resolved:true}); }
+  async function setVanStatus(vanId,status){ await db.collection('vans').doc(vanId).update({status}); }
+  async function addRepair(vanId,date,serviceType,notes,performedBy){
+    await db.collection('vanRepairLog').add({vanId,date,serviceType,notes,performedBy,createdAt:Date.now()});
+  }
+  async function addManualReservation({vanId,driverId,date,time,endDate,endTime,purpose}){
+    await db.collection('vanRentals').add({
+      driverId: driverId||null, vanId, date, time, endDate, endTime, purpose,
+      status:'assigned', createdAt:Date.now(), createdByAdmin:true,
+    });
+    const van = vans.find(v=>v.id===vanId);
+    if(van && van.status!=='maintenance') await db.collection('vans').doc(vanId).update({status:'inuse'});
+  }
+  async function cancelReservation(rentalId){
+    const rental = rentals.find(r=>r.id===rentalId);
+    if(!rental) return;
+    await db.collection('vanRentals').doc(rentalId).update({status:'cancelled'});
+    const otherActive = rentals.some(r=>r.id!==rentalId && r.vanId===rental.vanId && r.status!=='completed' && r.status!=='cancelled' && r.checkout && !r.return);
+    const van = vans.find(v=>v.id===rental.vanId);
+    if(van && van.status!=='maintenance' && !otherActive){ await db.collection('vans').doc(rental.vanId).update({status:'available'}); }
+  }
+
+  return (
+    <div className="content">
+      <div className="nav-tabs">
+        <button className={tab==='approvals'?'active':''} onClick={()=>setTab('approvals')}>Drivers</button>
+        <button className={tab==='vans'?'active':''} onClick={()=>setTab('vans')}>Vans</button>
+        <button className={tab==='schedule'?'active':''} onClick={()=>setTab('schedule')}>Schedule</button>
+        <button className={tab==='repairs'?'active':''} onClick={()=>setTab('repairs')}>Repairs</button>
+        <button className={tab==='lights'?'active':''} onClick={()=>setTab('lights')}>Lights</button>
+        <button className={tab==='alerts'?'active':''} onClick={()=>setTab('alerts')}>Alerts{openAlerts.length>0?` (${openAlerts.length})`:''}</button>
+        <button className={tab==='maint'?'active':''} onClick={()=>setTab('maint')}>Maint.</button>
+      </div>
+
+      {tab==='approvals' && (
+        <div className="card">
+          <h3>Pending Applications</h3>
+          {pending.length===0 && <p className="muted">None pending.</p>}
+          {pending.map(u=>{
+            const vr = u.vanRentalProfile;
+            return (
+              <div key={u.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+                <div><strong>{u.name}</strong> — {u.phone}</div>
+                <div className="muted">DOB: {vr.birthdate}</div>
+                <div className="muted">License #{vr.licenseNumber} ({vr.licenseState}), exp {vr.licenseExp} {vr.cdl ? '· CDL' : ''}</div>
+                <div className="muted">At-fault accidents (3yr): {vr.atFaultAccidents3yr ? (vr.atFaultAccidentsDetails||'Yes') : 'None reported'}</div>
+                <div className="muted">Moving violations (3yr): {vr.movingViolations3yr ? (vr.movingViolationsDetails||'Yes') : 'None reported'}</div>
+                <div className="muted">Insurance cancelled/refused: {vr.insuranceCancelled ? <strong style={{color:'var(--danger)'}}>YES</strong> : 'No'}</div>
+                <div className="muted">License revoked/suspended/restricted: {vr.licenseRevokedSuspended ? <strong style={{color:'var(--danger)'}}>YES</strong> : 'No'}</div>
+                <div style={{display:'flex',gap:8,marginTop:8}}>
+                  <button className="primary" style={{marginTop:0}} onClick={()=>approve(u.id)}>Approve</button>
+                  <button className="secondary" style={{marginTop:0}} onClick={()=>deny(u.id)}>Deny</button>
+                </div>
+              </div>
+            );
+          })}
+          <h3 style={{marginTop:20}}>Approved Drivers</h3>
+          {approved.map(u=>{
+            const vr = u.vanRentalProfile;
+            const flags = [];
+            if(vr.atFaultAccidents1yr) flags.push('at-fault accident');
+            if(vr.movingViolations1yr) flags.push('moving violation');
+            if(vr.licenseRevokedSuspended) flags.push('license revoked/suspended');
+            return (
+              <div key={u.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+                <div style={{display:'flex',justifyContent:'space-between'}}>
+                  <div>{u.name}</div><span className="badge approved">approved</span>
+                </div>
+                {vr.lastRenewed && <div className="muted">Last renewed: {new Date(vr.lastRenewed).toLocaleDateString()}</div>}
+                {flags.length>0 && <div className="muted" style={{color:'var(--danger)',fontWeight:600}}>Flagged at renewal: {flags.join(', ')}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tab==='vans' && (
+        <div className="card">
+          <h3>Vans</h3>
+          {vans.map(v=>(
+            <div key={v.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div><div>{v.name} {v.lowPriority && <span className="badge pending">low priority</span>}</div><div className="muted">{v.mileage} mi · {v.gas}% gas</div></div>
+                <span className={`badge ${v.status}`}>{v.status}</span>
+              </div>
+              <div style={{display:'flex',gap:8,marginTop:8}}>
+                {v.status!=='maintenance'
+                  ? <button className="secondary" style={{marginTop:0}} onClick={()=>setVanStatus(v.id,'maintenance')}>Send to Maintenance</button>
+                  : <button className="secondary" style={{marginTop:0}} onClick={()=>setVanStatus(v.id,'available')}>Mark Available</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab==='schedule' && <ScheduleAdmin vans={vans} approvedDrivers={approved} rentals={rentals} onAdd={addManualReservation} onCancel={cancelReservation} />}
+      {tab==='repairs' && <RepairsAdmin vans={vans} repairLog={repairLog} onAdd={addRepair} />}
+      {tab==='lights' && <WarningLightsAdmin vans={vans} warningLights={warningLights} onAdd={addWarningLight} />}
+
+      {tab==='alerts' && (
+        <div className="card">
+          <h3>Safety Alerts</h3>
+          {openAlerts.length===0 && <p className="muted">No open alerts.</p>}
+          {openAlerts.map(a=>{
+            const driver = allUsers.find(u=>u.id===a.driverId);
+            const van = vans.find(v=>v.id===a.vanId);
+            return (
+              <div key={a.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+                <div><strong>{driver?.name||'Unknown driver'}</strong> on {van?.name}</div>
+                <div className="muted">"{a.description}"</div>
+                <button className="secondary" style={{marginTop:8}} onClick={()=>resolveAlert(a.id)}>Mark Resolved</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tab==='maint' && (
+        <div className="card">
+          <h3>Maintenance Notes</h3>
+          {maintenanceNotes.length===0 && <p className="muted">No notes.</p>}
+          {maintenanceNotes.slice().reverse().map(m=>{
+            const van = vans.find(v=>v.id===m.vanId);
+            return (
+              <div key={m.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch',opacity:m.resolved?0.5:1}}>
+                <div><strong>{van?.name}</strong></div>
+                <div className="muted">{m.note}</div>
+                {!m.resolved && <button className="secondary" style={{marginTop:8}} onClick={()=>resolveMaint(m.id)}>Mark Resolved</button>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScheduleAdmin({vans,approvedDrivers,rentals,onAdd,onCancel}){
+  const [vanId,setVanId] = useState(vans[0]?.id||'');
+  const [driverId,setDriverId] = useState('');
+  const [date,setDate] = useState('');
+  const [time,setTime] = useState('');
+  const [endDate,setEndDate] = useState('');
+  const [endTime,setEndTime] = useState('');
+  const [purpose,setPurpose] = useState('');
+  const [error,setError] = useState('');
+  const activeRentals = rentals.filter(r=>r.status!=='completed' && r.status!=='cancelled');
+
+  async function submit(){
+    setError('');
+    if(!vanId || !date || !time || !endDate || !endTime){ setError('Fill in van, start, and end.'); return; }
+    const start = new Date(`${date}T${time}`);
+    const end = new Date(`${endDate}T${endTime}`);
+    if(!(start < end)){ setError('End date/time must be after start date/time.'); return; }
+    const conflict = activeRentals.some(r=>{
+      if(r.vanId!==vanId || !r.date || !r.time) return false;
+      const rStart = new Date(`${r.date}T${r.time}`);
+      const rEnd = r.endDate && r.endTime ? new Date(`${r.endDate}T${r.endTime}`) : new Date(rStart.getTime()+4*60*60*1000);
+      return start < rEnd && rStart < end;
+    });
+    if(conflict){ setError('That van already has an overlapping reservation for this window.'); return; }
+    await onAdd({vanId,driverId:driverId||null,date,time,endDate,endTime,purpose});
+    setDate('');setTime('');setEndDate('');setEndTime('');setPurpose('');setDriverId('');
+  }
+
+  const upcoming = activeRentals.slice().sort((a,b)=> new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+
+  return (
+    <div className="card">
+      <h3>Upcoming Reservations</h3>
+      {upcoming.length===0 && <p className="muted">Nothing scheduled.</p>}
+      {upcoming.map(r=>{
+        const van = vans.find(v=>v.id===r.vanId);
+        const driver = approvedDrivers.find(d=>d.id===r.driverId);
+        return (
+          <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+            <div><strong>{van?.name}</strong> {r.createdByAdmin && <span className="badge admin">admin-scheduled</span>}</div>
+            <div className="muted">{driver ? driver.name : (r.purpose||'No driver linked')}</div>
+            <div className="muted">{r.date} {r.time} → {r.endDate} {r.endTime}</div>
+            <button className="secondary" style={{marginTop:8}} onClick={()=>onCancel(r.id)}>Cancel Reservation</button>
+          </div>
+        );
+      })}
+
+      <h3 style={{marginTop:24}}>Add a Reservation / Block Dates</h3>
+      <p className="muted">Use this to book a van on someone's behalf, or to block a van out (e.g. for maintenance) so it won't be auto-assigned during that window.</p>
+      <label>Van</label>
+      <select value={vanId} onChange={e=>setVanId(e.target.value)}>{vans.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select>
+      <label>Driver (optional — leave blank to just block the dates)</label>
+      <select value={driverId} onChange={e=>setDriverId(e.target.value)}>
+        <option value="">No driver / blackout dates</option>
+        {approvedDrivers.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+      </select>
+      <label>Start Date</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} />
+      <label>Start Time</label><input type="time" value={time} onChange={e=>setTime(e.target.value)} />
+      <label>End Date</label><input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} />
+      <label>End Time</label><input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} />
+      <label>Purpose / Notes (optional)</label><input value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="e.g. Oil change appointment" />
+      {error && <div className="banner-danger">{error}</div>}
+      <button className="primary" onClick={submit}>Add to Schedule</button>
+    </div>
+  );
+}
+
+function RepairsAdmin({vans,repairLog,onAdd}){
+  const [vanId,setVanId] = useState(vans[0]?.id||'');
+  const [date,setDate] = useState('');
+  const [serviceType,setServiceType] = useState('');
+  const [customType,setCustomType] = useState('');
+  const [notes,setNotes] = useState('');
+  const [performedBy,setPerformedBy] = useState('');
+  const commonTypes = ['Oil Change','Tire Rotation','Check Engine Light Diagnosis','Brake Service','Battery Replacement','Inspection','Other'];
+
+  async function submit(){
+    const type = serviceType==='Other' ? customType : serviceType;
+    await onAdd(vanId,date,type,notes,performedBy);
+    setDate('');setServiceType('');setCustomType('');setNotes('');setPerformedBy('');
+  }
+  const canSubmit = vanId && date && (serviceType && (serviceType!=='Other' || customType));
+  const sorted = repairLog.slice().sort((a,b)=>b.createdAt-a.createdAt);
+
+  return (
+    <div className="card">
+      <h3>Repair History</h3>
+      {sorted.length===0 && <p className="muted">No repair records yet.</p>}
+      {sorted.map(r=>{
+        const van = vans.find(v=>v.id===r.vanId);
+        return (
+          <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+            <div><strong>{van?.name}</strong> — {r.date}</div>
+            <div className="muted">{r.serviceType}{r.performedBy ? ` · by ${r.performedBy}` : ''}</div>
+            {r.notes && <div className="muted">{r.notes}</div>}
+          </div>
+        );
+      })}
+      <h3 style={{marginTop:20}}>Log a Repair</h3>
+      <label>Van</label>
+      <select value={vanId} onChange={e=>setVanId(e.target.value)}>{vans.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select>
+      <label>Date</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} />
+      <label>What was done?</label>
+      <select value={serviceType} onChange={e=>setServiceType(e.target.value)}>
+        <option value="">Select...</option>
+        {commonTypes.map(t=><option key={t} value={t}>{t}</option>)}
+      </select>
+      {serviceType==='Other' && (<><label>Describe the service</label><input value={customType} onChange={e=>setCustomType(e.target.value)} /></>)}
+      <label>Notes (optional)</label><textarea value={notes} onChange={e=>setNotes(e.target.value)} />
+      <label>Performed By (optional)</label><input value={performedBy} onChange={e=>setPerformedBy(e.target.value)} placeholder="Shop name or staff member" />
+      <button className="primary" disabled={!canSubmit} onClick={submit}>Add Repair Record</button>
+    </div>
+  );
+}
+
+function WarningLightsAdmin({vans,warningLights,onAdd}){
+  const [name,setName] = useState('');
+  const [safety,setSafety] = useState(false);
+  const [feedback,setFeedback] = useState('');
+  const [vanId,setVanId] = useState('');
+  return (
+    <div className="card">
+      <h3>Known Warning Lights</h3>
+      {warningLights.map(l=>(
+        <div key={l.id} className="list-item">
+          <div><div>{l.name}</div>{l.van && <div className="muted">Van-specific</div>}</div>
+          <span className={`badge ${l.safety?'maintenance':'available'}`}>{l.safety?'safety':'non-safety'}</span>
+        </div>
+      ))}
+      <h3 style={{marginTop:20}}>Add New Light</h3>
+      <label>Light Name</label><input value={name} onChange={e=>setName(e.target.value)} />
+      <label>Is this a safety issue?</label>
+      <YesNo value={safety} onChange={setSafety} />
+      {!safety && (<><label>Feedback to show drivers</label><textarea value={feedback} onChange={e=>setFeedback(e.target.value)} /></>)}
+      <label>Specific to one van? (optional)</label>
+      <select value={vanId} onChange={e=>setVanId(e.target.value)}>
+        <option value="">All vans</option>
+        {vans.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+      </select>
+      <button className="primary" disabled={!name} onClick={()=>{onAdd(name,safety,feedback,vanId); setName('');setFeedback('');setVanId('');setSafety(false);}}>Add Light</button>
+    </div>
+  );
+}
+
+// ---------- Root App ----------
+function LoginScreen(){
+  function signIn(){
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err=>alert('Sign-in failed: '+err.message));
+  }
+  return (
+    <div className="content">
+      <div className="login-mark">🚐</div>
+      <div className="login-title">RCC Van Usage</div>
+      <p className="login-sub">Sign in to request a van or manage the fleet.</p>
+      <button id="googleSignInBtn" onClick={signIn}>
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Sign in with Google
+      </button>
+    </div>
+  );
+}
+
+function App(){
+  const [user,setUser] = useState(undefined); // undefined = checking, null = signed out
+  const [profile,setProfile] = useState(null);
+  const [isAdmin,setIsAdmin] = useState(false);
+  const [mode,setMode] = useState('driver'); // driver, admin
+  const [vans,setVans] = useState([]);
+  const [rentals,setRentals] = useState([]);
+  const [warningLights,setWarningLights] = useState([]);
+  const [maintenanceNotes,setMaintenanceNotes] = useState([]);
+  const [repairLog,setRepairLog] = useState([]);
+  const [alerts,setAlerts] = useState([]);
+  const [allUsers,setAllUsers] = useState([]);
+  const [loadingData,setLoadingData] = useState(true);
+
+  async function refreshProfile(){
+    if(!auth.currentUser) return;
+    const doc = await db.collection('users').doc(auth.currentUser.uid).get();
+    setProfile(doc.exists ? doc.data() : {});
+  }
+
+  useEffect(()=>{
+    auth.onAuthStateChanged(async u=>{
+      setUser(u);
+      if(u){
+        await ensureVansSeeded();
+        await ensureWarningLightsSeeded();
+        const doc = await db.collection('users').doc(u.uid).get();
+        const data = doc.exists ? doc.data() : {};
+        setProfile(data);
+        setIsAdmin(data.isAdmin===true);
+      } else {
+        setProfile(null); setIsAdmin(false);
+      }
+    });
+  },[]);
+
+  useEffect(()=>{
+    if(!user) return;
+    const unsubs = [];
+    unsubs.push(db.collection('vans').onSnapshot(s=>setVans(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vanRentals').onSnapshot(s=>setRentals(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vanWarningLights').onSnapshot(s=>setWarningLights(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vanMaintenanceNotes').onSnapshot(s=>setMaintenanceNotes(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vanRepairLog').onSnapshot(s=>setRepairLog(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vanAlerts').onSnapshot(s=>setAlerts(s.docs.map(d=>({id:d.id,...d.data()})))));
+    if(isAdmin){
+      unsubs.push(db.collection('users').onSnapshot(s=>setAllUsers(s.docs.map(d=>({id:d.id,...d.data()})))));
+    }
+    setLoadingData(false);
+    return ()=>unsubs.forEach(u=>u());
+  },[user,isAdmin]);
+
+  if(user===undefined){
+    return <div className="app"><div className="loading">Loading...</div></div>;
+  }
+  if(!user){
+    return (
+      <div className="app">
+        <TopBar title="RCC Van Usage" hubLink />
+        <LoginScreen />
+      </div>
+    );
+  }
+  if(loadingData || profile===null){
+    return <div className="app"><div className="loading">Loading your info...</div></div>;
+  }
+
+  return (
+    <div className="app">
+      <TopBar
+        title={mode==='admin' ? 'Van Admin' : 'Van Usage'}
+        hubLink
+        right={<>
+          {isAdmin && <button className="plain" onClick={()=>setMode(mode==='admin'?'driver':'admin')}>{mode==='admin'?'Driver view':'Admin'}</button>}
+          <button className="plain" onClick={()=>auth.signOut()}>Sign out</button>
+        </>}
+      />
+      {mode==='admin' && isAdmin
+        ? <AdminDashboard allUsers={allUsers} vans={vans} rentals={rentals} warningLights={warningLights} maintenanceNotes={maintenanceNotes} repairLog={repairLog} alerts={alerts} />
+        : <DriverHome user={user} profile={profile} vans={vans} rentals={rentals} warningLights={warningLights} refreshProfile={refreshProfile} />
+      }
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
