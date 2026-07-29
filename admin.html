@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RCC · Admin</title>
+  <meta name="theme-color" content="#2557b8">
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500;600&display=swap');
+
+    :root {
+      --bg:         #f7f6f3;
+      --bg-card:    #ffffff;
+      --bg-raised:  #f0ece4;
+      --border:     #e8e4dc;
+      --border-mid: rgba(0,0,0,0.14);
+      --text:       #1a1a1a;
+      --text-mid:   #5c5650;
+      --text-soft:  #9e9890;
+      --blue:       #2557b8;
+      --blue-dim:   rgba(37,87,184,0.08);
+      --blue-glow:  rgba(37,87,184,0.20);
+      --green:      #2e7a52;
+      --green-dim:  rgba(46,122,82,0.10);
+      --red:        #a03030;
+      --red-dim:    rgba(160,48,48,0.10);
+      --radius:     14px;
+      --radius-sm:  8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      font-weight: 400;
+      color: var(--blue);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo img { height: 24px; width: auto; }
+    .logo span { font-size: 13px; color: var(--text-soft); font-family: 'Inter', sans-serif; font-weight: 400; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .header-right a { font-size: 13px; color: var(--text-soft); text-decoration: none; }
+    #signOutBtn {
+      background: transparent;
+      color: var(--text-soft);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+    }
+
+    nav {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      padding: 0 16px;
+      gap: 4px;
+      overflow-x: auto;
+    }
+    .section-tab {
+      padding: 14px 16px;
+      font-size: 14px;
+      color: var(--text-soft);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+    .section-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .section-tab:hover:not(.active) { color: var(--text-mid); }
+    .badge-count {
+      display: inline-block;
+      background: var(--red-dim);
+      color: var(--red);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 10px;
+      margin-left: 6px;
+    }
+
+    main { max-width: 760px; margin: 0 auto; padding: 28px 16px 80px; }
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .subnav { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 16px; overflow-x: auto; }
+    .subtab { padding: 10px 14px; font-size: 13px; font-weight: 600; color: var(--text-soft); border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+    .subtab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+    .section-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+      font-weight: 400;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+    .card-title { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 400; margin-bottom: 3px; }
+    .card-text { font-size: 14px; color: var(--text-mid); margin-bottom: 8px; }
+    .card-meta { font-size: 12px; color: var(--text-soft); margin-bottom: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .tag { font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+    .tag-hospital { background: var(--blue-dim); color: var(--blue); }
+    .tag-general  { background: rgba(100,100,180,0.1); color: #5a5ab0; }
+    .tag-pending  { background: var(--red-dim); color: var(--red); }
+    .tag-public   { background: var(--green-dim); color: var(--green); }
+    .tag-hidden   { background: rgba(0,0,0,0.06); color: var(--text-soft); }
+
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn { padding: 9px 14px; border-radius: var(--radius-sm); border: none; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif; }
+    .btn-approve { background: var(--green-dim); color: var(--green); border: 1px solid rgba(46,122,82,0.25); }
+    .btn-hide { background: var(--red-dim); color: var(--red); border: 1px solid rgba(160,48,48,0.2); }
+    .btn-unhide { background: var(--bg-raised); color: var(--text-mid); border: 1px solid var(--border-mid); }
+    .btn-delete { background: transparent; color: var(--red); border: 1px solid rgba(160,48,48,0.2); }
+
+    .empty-state { text-align: center; padding: 50px 20px; color: var(--text-soft); }
+    .loading { text-align: center; padding: 40px; color: var(--text-soft); font-size: 15px; }
+
+    #loginScreen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh; text-align: center; padding: 40px 24px;
+    }
+    .login-title { font-family: 'Playfair Display', serif; font-size: 30px; margin-bottom: 8px; }
+    .login-sub { font-size: 14px; color: var(--text-mid); margin-bottom: 32px; max-width: 300px; }
+    #googleSignInBtn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: #fff; border: 1px solid #d1cdc4; border-radius: 12px;
+      padding: 15px 24px; font-size: 15px; font-weight: 500; cursor: pointer;
+      width: 100%; max-width: 300px; font-family: 'Inter', sans-serif;
+    }
+    .access-denied { text-align: center; padding: 60px 24px; }
+    .access-denied .title { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--red); margin-bottom: 10px; }
+    .access-denied .sub { color: var(--text-mid); font-size: 15px; }
+
+    .banner {
+      display: none; padding: 14px 20px; text-align: center; font-size: 14px; font-weight: 500;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 300;
+    }
+    .banner.show { display: block; }
+  </style>
+</head>
+<body>
+
+<div class="banner" id="banner"></div>
+
+<div id="loginScreen">
+  <div class="login-title">RCC Admin</div>
+  <p class="login-sub">Sign in to manage Bedside, Incident Reports, and Van Usage from one place.</p>
+  <button id="googleSignInBtn">
+    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+    Sign in with Google
+  </button>
+</div>
+
+<div id="appShell" style="display:none;">
+  <header>
+    <div class="logo"><img src="assets/rcc-logo-plain.png" alt="RCC">RCC <span>· Admin</span></div>
+    <div class="header-right">
+      <a href="index.html">← All apps</a>
+      <button id="signOutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <div id="accessCheck" style="padding:60px; text-align:center; color:var(--text-soft);">Checking access...</div>
+
+  <div id="adminUI" style="display:none;">
+    <nav>
+      <div class="section-tab active" data-section="bedside">Bedside</div>
+      <div class="section-tab" data-section="incidents">Incident Reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></div>
+      <div class="section-tab" data-section="vans">Van Usage</div>
+      <div class="section-tab" data-section="access">App Access</div>
+      <div class="section-tab" data-section="admins">Manage Admins</div>
+    </nav>
+
+    <main>
+      <!-- BEDSIDE -->
+      <div class="section active" id="section-bedside">
+        <h2 class="section-title">Bedside</h2>
+        <div class="subnav">
+          <div class="subtab active" data-btab="pending">Pending Prayer Requests</div>
+          <div class="subtab" data-btab="visits">Active Visits</div>
+          <div class="subtab" data-btab="wall">Prayer Wall</div>
+        </div>
+        <div id="bedside-pending"><div class="loading">Loading...</div></div>
+        <div id="bedside-visits" style="display:none;"><div class="loading">Loading...</div></div>
+        <div id="bedside-wall" style="display:none;"><div class="loading">Loading...</div></div>
+        <p class="card-text" style="margin-top:16px;">For discharge, add-visit, and full detail, use <a href="bedside/admin.html" style="color:var(--blue);">Bedside's own admin page →</a></p>
+      </div>
+
+      <!-- INCIDENT REPORTS -->
+      <div class="section" id="section-incidents">
+        <h2 class="section-title">Incident Reports</h2>
+        <div class="subnav">
+          <div class="subtab active" data-itab="new">New</div>
+          <div class="subtab" data-itab="followup">Needs Follow-up</div>
+          <div class="subtab" data-itab="reviewed">Reviewed</div>
+        </div>
+        <div id="incidentsList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- VAN USAGE -->
+      <div class="section" id="section-vans">
+        <h2 class="section-title">Van Usage</h2>
+        <div class="subnav">
+          <div class="subtab active" data-vtab="approvals">Driver Approvals</div>
+          <div class="subtab" data-vtab="vans">Vans</div>
+          <div class="subtab" data-vtab="alerts">Safety Alerts</div>
+        </div>
+        <div id="van-approvals"><div class="loading">Loading...</div></div>
+        <div id="van-vans" style="display:none;"><div class="loading">Loading...</div></div>
+        <div id="van-alerts" style="display:none;"><div class="loading">Loading...</div></div>
+        <p class="card-text" style="margin-top:16px;">For scheduling, repairs, and warning lights, use the <a href="van-rental.html" style="color:var(--blue);">Van Usage admin view →</a></p>
+      </div>
+
+      <!-- APP ACCESS -->
+      <div class="section" id="section-access">
+        <h2 class="section-title">App Access</h2>
+        <div class="card" style="background:var(--blue-dim); border-color:var(--blue-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">Controls which apps show up as tiles on each person's hub dashboard.</div>
+        </div>
+        <div id="moduleManageList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- MANAGE ADMINS -->
+      <div class="section" id="section-admins">
+        <h2 class="section-title">Manage Admins</h2>
+        <div class="card" style="background:var(--blue-dim); border-color:var(--blue-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">Anyone toggled on here gets full admin access across all apps, including the ability to manage other admins. Only toggle this on for people you trust with that.</div>
+        </div>
+        <div id="adminManageList"><div class="loading">Loading...</div></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="accessDenied" class="access-denied" style="display:none;">
+    <div class="title">Access Restricted</div>
+    <p class="sub">This area is limited to designated administrators.</p>
+  </div>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey:            "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+    authDomain:        "bedsidercc.firebaseapp.com",
+    projectId:         "bedsidercc",
+    storageBucket:     "bedsidercc.firebasestorage.app",
+    messagingSenderId: "950958384975",
+    appId:             "1:950958384975:web:6f43dec5a7ba842c69c73a"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  let currentUser = null;
+
+  document.getElementById('googleSignInBtn').addEventListener('click', () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err => showBanner('Sign-in failed: ' + err.message, true));
+  });
+  document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+
+  auth.onAuthStateChanged(async user => {
+    if (user) {
+      currentUser = user;
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appShell').style.display = 'block';
+      const userDoc = await db.collection('users').doc(user.uid).get();
+      const isAdmin = userDoc.exists && userDoc.data().isAdmin === true;
+      document.getElementById('accessCheck').style.display = 'none';
+      if (isAdmin) {
+        document.getElementById('adminUI').style.display = 'block';
+        loadBedsidePending();
+        loadBedsideVisits();
+        loadBedsideWall();
+        loadIncidentReports();
+        loadVanApprovals();
+        loadVans();
+        loadVanAlerts();
+        loadModuleManagement();
+        loadAdminManagement();
+      } else {
+        document.getElementById('accessDenied').style.display = 'block';
+      }
+    } else {
+      currentUser = null;
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('appShell').style.display = 'none';
+    }
+  });
+
+  // ── Top-level section switching ──
+  document.querySelectorAll('.section-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('section-' + tab.dataset.section).classList.add('active');
+    });
+  });
+
+  // ── Bedside sub-tabs ──
+  document.querySelectorAll('[data-btab]').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('[data-btab]').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      ['pending','visits','wall'].forEach(k => {
+        document.getElementById('bedside-' + k).style.display = (k === t.dataset.btab) ? 'block' : 'none';
+      });
+    });
+  });
+
+  function loadBedsidePending() {
+    db.collection('prayerRequests').where('status','==','pending').orderBy('createdAt','desc').onSnapshot(snap => {
+      const items = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      const c = document.getElementById('bedside-pending');
+      if (!items.length) { c.innerHTML = '<div class="empty-state">Nothing waiting for review. 🎉</div>'; return; }
+      c.innerHTML = items.map(r => `
+        <div class="card">
+          <div class="card-title">${escHtml(r.patientName)}</div>
+          <div class="card-text">${escHtml(r.text)}</div>
+          <div class="card-meta"><span class="tag ${r.type==='hospital_visit'?'tag-hospital':'tag-general'}">${r.type==='hospital_visit'?'Care Visit':'General Request'}</span><span>${escHtml(r.anonymous ? 'Anonymous' : (r.submittedBy?.name||''))}</span></div>
+          <div class="actions">
+            <button class="btn btn-approve" onclick="bedsideApprove('${r.id}')">Approve &amp; post publicly</button>
+            <button class="btn btn-hide" onclick="bedsideHide('${r.id}')">Keep private</button>
+          </div>
+        </div>`).join('');
+    });
+  }
+  function loadBedsideVisits() {
+    db.collection('visits').where('active','==',true).orderBy('createdAt','desc').onSnapshot(snap => {
+      const items = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      const c = document.getElementById('bedside-visits');
+      if (!items.length) { c.innerHTML = '<div class="empty-state">No active visits.</div>'; return; }
+      c.innerHTML = items.map(v => `
+        <div class="card">
+          <div class="card-title">${escHtml(v.patientName)}</div>
+          <div class="card-text">${escHtml(v.hospital)} — ${escHtml(v.reason)}</div>
+          <div class="card-meta"><span>Claimed by: ${escHtml((v.claimedBy||[]).map(c=>c.name).join(', ')||'No one yet')}</span></div>
+        </div>`).join('');
+    });
+  }
+  function loadBedsideWall() {
+    db.collection('prayerRequests').where('status','in',['public','hidden']).orderBy('createdAt','desc').onSnapshot(snap => {
+      const items = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      const c = document.getElementById('bedside-wall');
+      if (!items.length) { c.innerHTML = '<div class="empty-state">No prayer wall entries yet.</div>'; return; }
+      c.innerHTML = items.map(r => `
+        <div class="card">
+          <div class="card-title">${escHtml(r.patientName)}</div>
+          <div class="card-text">${escHtml(r.text)}</div>
+          <div class="card-meta"><span class="tag ${r.status==='public'?'tag-public':'tag-hidden'}">${r.status==='public'?'Public':'Hidden'}</span></div>
+          <div class="actions">
+            ${r.status==='public'
+              ? `<button class="btn btn-hide" onclick="bedsideHide('${r.id}')">Hide from wall</button>`
+              : `<button class="btn btn-unhide" onclick="bedsideUnhide('${r.id}')">Show on wall</button>`}
+          </div>
+        </div>`).join('');
+    });
+  }
+  window.bedsideApprove = async id => { await db.collection('prayerRequests').doc(id).update({status:'public', reviewedAt:new Date().toISOString()}); showBanner('Posted to the prayer wall.'); };
+  window.bedsideHide = async id => { await db.collection('prayerRequests').doc(id).update({status:'hidden', reviewedAt:new Date().toISOString()}); showBanner('Kept private.'); };
+  window.bedsideUnhide = async id => { await db.collection('prayerRequests').doc(id).update({status:'public'}); showBanner('Now visible on the prayer wall.'); };
+
+  // ── Incident Reports ──
+  let allIncidents = [], incidentFilter = 'new';
+  function loadIncidentReports() {
+    db.collection('incidentReports').orderBy('submittedAt','desc').onSnapshot(snap => {
+      allIncidents = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      renderIncidents();
+      const newCount = allIncidents.filter(r => !r.reviewStatus || r.reviewStatus==='new').length;
+      const badge = document.getElementById('incidentsCount');
+      if (newCount) { badge.textContent = newCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
+    }, err => {
+      document.getElementById('incidentsList').innerHTML = '<div class="empty-state">Could not load incident reports.</div>';
+      console.error(err);
+    });
+  }
+  document.querySelectorAll('[data-itab]').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('[data-itab]').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      incidentFilter = t.dataset.itab;
+      renderIncidents();
+    });
+  });
+  function renderIncidents() {
+    const c = document.getElementById('incidentsList');
+    const filtered = allIncidents.filter(r => (r.reviewStatus||'new') === incidentFilter);
+    if (!filtered.length) { c.innerHTML = '<div class="empty-state">Nothing here right now.</div>'; return; }
+    c.innerHTML = filtered.map(r => {
+      const date = r.submittedAt && r.submittedAt.toDate ? r.submittedAt.toDate().toLocaleString() : '';
+      const hasInjury = r.injury === 'yes';
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(r.location||'Unknown location')}</div>
+          <div class="card-meta"><span class="tag ${hasInjury?'tag-pending':'tag-general'}">${escHtml((r.incidentTypes||[]).join(', ')||'Type not specified')}</span><span>${r.incidentDate||''} ${r.incidentTime||''}</span></div>
+          <div class="card-text">${escHtml(r.description||'')}</div>
+          ${hasInjury ? `<div class="card-text" style="color:var(--red);"><strong>Injury:</strong> ${escHtml(r.injuryDesc||'no detail')} — treatment: ${escHtml(r.treatment||'n/a')}</div>` : ''}
+          <div class="card-meta"><span>Reported by ${escHtml(r.reporterName||'unknown')}${r.reporterPhone?' · '+escHtml(r.reporterPhone):''}</span></div>
+          <div class="card-meta"><span>Submitted ${date}</span></div>
+          <div class="actions">
+            ${incidentFilter!=='reviewed' ? `<button class="btn btn-approve" onclick="setIncidentStatus('${r.id}','reviewed')">Mark reviewed</button>` : ''}
+            ${incidentFilter!=='followup' ? `<button class="btn btn-hide" onclick="setIncidentStatus('${r.id}','followup')">Needs follow-up</button>` : ''}
+            ${incidentFilter!=='new' ? `<button class="btn btn-unhide" onclick="setIncidentStatus('${r.id}','new')">Move back to New</button>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+  window.setIncidentStatus = async (id, status) => {
+    await db.collection('incidentReports').doc(id).update({reviewStatus:status, reviewedAt:new Date().toISOString(), reviewedBy: currentUser.uid});
+    showBanner('Report updated.');
+  };
+
+  // ── Van Usage ──
+  document.querySelectorAll('[data-vtab]').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('[data-vtab]').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      ['approvals','vans','alerts'].forEach(k => {
+        document.getElementById('van-' + k).style.display = (k === t.dataset.vtab) ? 'block' : 'none';
+      });
+    });
+  });
+  function loadVanApprovals() {
+    db.collection('users').onSnapshot(snap => {
+      const drivers = snap.docs.map(d => ({id:d.id, ...d.data()})).filter(u => u.vanRentalProfile);
+      const pending = drivers.filter(u => u.vanRentalProfile.status === 'pending');
+      const c = document.getElementById('van-approvals');
+      if (!pending.length) { c.innerHTML = '<div class="empty-state">No pending driver applications.</div>'; return; }
+      c.innerHTML = pending.map(u => {
+        const vr = u.vanRentalProfile;
+        return `
+        <div class="card">
+          <div class="card-title">${escHtml(u.name||'Unnamed')}</div>
+          <div class="card-text">${escHtml(u.phone||'')} · License #${escHtml(vr.licenseNumber||'')} (${escHtml(vr.licenseState||'')})</div>
+          <div class="card-meta"><span>Insurance cancelled: ${vr.insuranceCancelled ? 'YES' : 'No'} · License revoked/suspended: ${vr.licenseRevokedSuspended ? 'YES' : 'No'}</span></div>
+          <div class="actions">
+            <button class="btn btn-approve" onclick="vanApprove('${u.id}')">Approve</button>
+            <button class="btn btn-hide" onclick="vanDeny('${u.id}')">Deny</button>
+          </div>
+        </div>`;
+      }).join('');
+    });
+  }
+  window.vanApprove = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.status':'approved'}); showBanner('Driver approved.'); };
+  window.vanDeny = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.status':'denied'}); showBanner('Application denied.'); };
+
+  function loadVans() {
+    db.collection('vans').onSnapshot(snap => {
+      const vans = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      const c = document.getElementById('van-vans');
+      if (!vans.length) { c.innerHTML = '<div class="empty-state">No vans on file.</div>'; return; }
+      c.innerHTML = vans.map(v => `
+        <div class="card">
+          <div class="card-title">${escHtml(v.name)}</div>
+          <div class="card-meta"><span class="tag ${v.status==='available'?'tag-public':(v.status==='maintenance'?'tag-pending':'tag-hidden')}">${v.status}</span><span>${v.mileage} mi · ${v.gas}% gas</span></div>
+          <div class="actions">
+            ${v.status!=='maintenance'
+              ? `<button class="btn btn-hide" onclick="setVanStatus('${v.id}','maintenance')">Send to Maintenance</button>`
+              : `<button class="btn btn-approve" onclick="setVanStatus('${v.id}','available')">Mark Available</button>`}
+          </div>
+        </div>`).join('');
+    });
+  }
+  window.setVanStatus = async (vanId, status) => { await db.collection('vans').doc(vanId).update({status}); showBanner('Van updated.'); };
+
+  function loadVanAlerts() {
+    db.collection('vanAlerts').onSnapshot(snap => {
+      const alerts = snap.docs.map(d => ({id:d.id, ...d.data()})).filter(a => !a.resolved);
+      const c = document.getElementById('van-alerts');
+      if (!alerts.length) { c.innerHTML = '<div class="empty-state">No open alerts.</div>'; return; }
+      c.innerHTML = alerts.map(a => `
+        <div class="card">
+          <div class="card-text">"${escHtml(a.description||'')}"</div>
+          <div class="actions"><button class="btn btn-approve" onclick="resolveVanAlert('${a.id}')">Mark Resolved</button></div>
+        </div>`).join('');
+    });
+  }
+  window.resolveVanAlert = async id => { await db.collection('vanAlerts').doc(id).update({resolved:true}); showBanner('Alert resolved.'); };
+
+  // ── App Access ──
+  const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage' };
+  function loadModuleManagement() {
+    db.collection('users').onSnapshot(snap => {
+      const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+      const c = document.getElementById('moduleManageList');
+      if (!users.length) { c.innerHTML = '<div class="empty-state">No users found yet.</div>'; return; }
+      c.innerHTML = users.map(u => {
+        const modules = u.modules || {};
+        const toggles = Object.keys(MODULE_LABELS).map(key => {
+          const on = modules[key] === true;
+          return `<button class="btn ${on?'btn-approve':'btn-unhide'}" style="margin-right:6px;margin-bottom:6px;" onclick="toggleModule('${u.id}','${key}',${!on})">${MODULE_LABELS[key]}: ${on?'On':'Off'}</button>`;
+        }).join('');
+        return `<div class="card"><div class="card-title">${escHtml(u.name||'(no name set)')}</div><div class="card-text">${escHtml(u.email||'')}</div><div class="actions">${toggles}</div></div>`;
+      }).join('');
+    });
+  }
+  window.toggleModule = async (uid, key, val) => {
+    await db.collection('users').doc(uid).set({modules:{[key]:val}}, {merge:true});
+    showBanner(`${MODULE_LABELS[key]} ${val?'enabled':'disabled'}.`);
+  };
+
+  // ── Manage Admins ──
+  function loadAdminManagement() {
+    db.collection('users').onSnapshot(snap => {
+      const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b) => {
+        if (!!a.isAdmin !== !!b.isAdmin) return a.isAdmin ? -1 : 1;
+        return (a.name||'').localeCompare(b.name||'');
+      });
+      const c = document.getElementById('adminManageList');
+      if (!users.length) { c.innerHTML = '<div class="empty-state">No users found yet.</div>'; return; }
+      c.innerHTML = users.map(u => {
+        const isAdmin = u.isAdmin === true;
+        const isSelf = u.id === currentUser.uid;
+        return `<div class="card"><div class="card-title">${escHtml(u.name||'(no name set)')}</div><div class="card-text">${escHtml(u.email||'')}</div>
+          <div class="actions">${isSelf ? `<span class="tag tag-public">You (admin)</span>` : (isAdmin ? `<button class="btn btn-hide" onclick="toggleAdmin('${u.id}',false)">Remove admin access</button>` : `<button class="btn btn-unhide" onclick="toggleAdmin('${u.id}',true)">Make admin</button>`)}</div></div>`;
+      }).join('');
+    });
+  }
+  window.toggleAdmin = async (uid, makeAdmin) => {
+    if (makeAdmin && !confirm('Give this person full admin access?')) return;
+    if (!makeAdmin && !confirm('Remove admin access for this person?')) return;
+    await db.collection('users').doc(uid).set({isAdmin: makeAdmin}, {merge:true});
+  };
+
+  function showBanner(msg, isError=false) {
+    const b = document.getElementById('banner');
+    b.textContent = msg;
+    b.style.background = isError ? '#fdecea' : '#eaf4ee';
+    b.style.color = isError ? '#a03030' : '#2e7a52';
+    b.classList.add('show');
+    setTimeout(() => b.classList.remove('show'), 3200);
+  }
+  function escHtml(str) { return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>

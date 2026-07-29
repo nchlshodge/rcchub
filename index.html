@@ -388,7 +388,7 @@
     db.collection('users').doc(uid).onSnapshot(doc => {
       const data = doc.data() || {};
       const modules = data.modules || {};
-      renderModules(modules);
+      renderModules(modules, data.isAdmin === true);
     }, err => {
       document.getElementById('moduleGrid').innerHTML =
         '<div class="empty-state"><div class="empty-text">Could not load your apps.</div></div>';
@@ -396,11 +396,11 @@
     });
   }
 
-  function renderModules(modules) {
+  function renderModules(modules, isAdmin) {
     const enabled = MODULES.filter(m => modules[m.key]);
     const container = document.getElementById('moduleGrid');
 
-    if (!enabled.length) {
+    if (!enabled.length && !isAdmin) {
       container.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">🔒</div>
@@ -410,7 +410,7 @@
       return;
     }
 
-    container.innerHTML = enabled.map(m => `
+    let html = enabled.map(m => `
       <a class="module-card" href="${m.href}">
         <div class="module-icon ${m.iconClass}">${m.icon}</div>
         <div class="module-info">
@@ -419,6 +419,20 @@
         </div>
         <div class="module-arrow">→</div>
       </a>`).join('');
+
+    if (isAdmin) {
+      html += `
+      <a class="module-card" href="admin.html">
+        <div class="module-icon" style="background: var(--blue-dim);">🛠️</div>
+        <div class="module-info">
+          <div class="module-name">Admin</div>
+          <div class="module-desc">Manage Bedside, Incident Reports, Van Usage, and access</div>
+        </div>
+        <div class="module-arrow">→</div>
+      </a>`;
+    }
+
+    container.innerHTML = html;
   }
 
   // ── AUTH ──
