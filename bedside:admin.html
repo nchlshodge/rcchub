@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bedside Admin</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="theme-color" content="#2557b8">
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
+
+    :root {
+      --bg:         #f7f4f0;
+      --bg-card:    #ffffff;
+      --bg-raised:  #f0ece6;
+      --bg-input:   #ffffff;
+      --border:     rgba(0,0,0,0.08);
+      --border-mid: rgba(0,0,0,0.14);
+      --text:       #1a1714;
+      --text-mid:   #5c5650;
+      --text-soft:  #9e9890;
+      --gold:       #2557b8;
+      --gold-dim:   rgba(37,87,184,0.08);
+      --gold-glow:  rgba(37,87,184,0.20);
+      --green:      #2e7a52;
+      --green-dim:  rgba(46,122,82,0.10);
+      --red:        #a03030;
+      --red-dim:    rgba(160,48,48,0.10);
+      --radius:     12px;
+      --radius-sm:  8px;
+      --radius-lg:  18px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      font-family: 'Lora', serif;
+      font-size: 22px;
+      font-weight: 500;
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo img { height: 24px; width: auto; display: block; }
+    .logo-tag { font-size: 13px; color: var(--text-soft); margin-left: 8px; font-family: 'Inter', sans-serif; }
+
+    #signOutBtn {
+      background: transparent;
+      color: var(--text-soft);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    #signOutBtn:hover { border-color: var(--border-mid); color: var(--text-mid); }
+
+    nav {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      padding: 0 16px;
+      gap: 4px;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: 14px 16px;
+      font-size: 14px;
+      color: var(--text-soft);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+    }
+    .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .tab:hover:not(.active) { color: var(--text-mid); }
+
+    .badge-count {
+      display: inline-block;
+      background: var(--red-dim);
+      color: var(--red);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 10px;
+      margin-left: 6px;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 28px 16px 80px;
+    }
+
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    #loginScreen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+      padding: 40px 24px;
+    }
+    .login-mark {
+      width: 100px; height: 100px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .login-mark img { width: 100%; height: 100%; object-fit: contain; }
+    .login-title {
+      font-family: 'Lora', serif;
+      font-size: 32px;
+      font-weight: 500;
+      color: var(--gold);
+      margin-bottom: 10px;
+    }
+    .login-sub {
+      font-size: 15px;
+      color: var(--text-mid);
+      margin-bottom: 36px;
+      max-width: 300px;
+    }
+    #googleSignInBtn {
+      background: var(--gold);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 16px 36px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      max-width: 300px;
+    }
+
+    .access-denied {
+      text-align: center;
+      padding: 60px 24px;
+    }
+    .access-denied .title { font-family: 'Lora', serif; font-size: 22px; color: var(--red); margin-bottom: 10px; }
+    .access-denied .sub { color: var(--text-mid); font-size: 15px; }
+
+    .section-title {
+      font-family: 'Lora', serif;
+      font-size: 20px;
+      font-weight: 500;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .card-title { font-family: 'Lora', serif; font-size: 17px; font-weight: 500; margin-bottom: 3px; }
+    .card-sub { font-size: 13px; color: var(--gold); margin-bottom: 4px; font-weight: 500; }
+    .card-text { font-size: 14px; color: var(--text-mid); margin-bottom: 8px; }
+    .card-meta { font-size: 12px; color: var(--text-soft); margin-bottom: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    .tag {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+    .tag-hospital { background: var(--gold-dim); color: var(--gold); }
+    .tag-general  { background: rgba(100,100,180,0.1); color: #5a5ab0; }
+    .tag-pending  { background: var(--red-dim); color: var(--red); }
+    .tag-public   { background: var(--green-dim); color: var(--green); }
+    .tag-hidden   { background: rgba(0,0,0,0.06); color: var(--text-soft); }
+
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .btn {
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      border: none;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+    }
+    .btn-approve { background: var(--green-dim); color: var(--green); border: 1px solid rgba(46,122,82,0.25); }
+    .btn-approve:hover { background: rgba(46,122,82,0.18); }
+    .btn-hide { background: var(--red-dim); color: var(--red); border: 1px solid rgba(160,48,48,0.2); }
+    .btn-hide:hover { background: rgba(160,48,48,0.16); }
+    .btn-unhide { background: var(--bg-raised); color: var(--text-mid); border: 1px solid var(--border-mid); }
+    .btn-edit { background: transparent; color: var(--text-mid); border: 1px solid var(--border-mid); }
+    .btn-edit:hover { color: var(--text); border-color: var(--text-soft); }
+    .btn-delete { background: transparent; color: var(--red); border: 1px solid rgba(160,48,48,0.2); }
+
+    .btn-primary-full {
+      width: 100%;
+      background: var(--gold);
+      color: #fff;
+      padding: 14px 20px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+
+    .form-group { margin-bottom: 16px; }
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-soft);
+      margin-bottom: 7px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    input[type="text"], textarea, select {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+    }
+    input:focus, textarea:focus { outline: none; border-color: var(--gold); }
+    textarea { min-height: 80px; resize: vertical; }
+
+    .empty-state { text-align: center; padding: 50px 20px; color: var(--text-soft); }
+    .loading { text-align: center; padding: 40px; color: var(--text-soft); font-size: 15px; }
+
+    .banner {
+      display: none;
+      padding: 14px 20px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 500;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 300;
+    }
+    .banner.show { display: block; }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      text-align: center;
+    }
+    .stat-num { font-family: 'Lora', serif; font-size: 28px; color: var(--gold); }
+    .stat-label { font-size: 12px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<div class="banner" id="banner"></div>
+
+<div id="loginScreen">
+  <div class="login-mark"><img src="rcc-logo.png" alt="RCC — Love God. Love People."></div>
+  <div class="login-title">Bedside Admin</div>
+  <p class="login-sub">Sign in to manage visits and prayer requests</p>
+  <button id="googleSignInBtn">Sign in with Google</button>
+</div>
+
+<div id="appShell" style="display:none;">
+
+  <header>
+    <div class="logo"><img src="rcc-logo-plain.png" alt="RCC">Bedside <span class="logo-tag">Admin</span></div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <a href="../index.html" style="font-size:13px; color:var(--text-soft); text-decoration:none;">← All apps</a>
+      <a href="index.html" id="backToAppLink" style="font-size:13px; color:var(--text-soft); text-decoration:none;">← Back to Bedside</a>
+      <button id="signOutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <div id="accessCheck" class="screen active">
+    <div class="loading">Checking access...</div>
+  </div>
+
+  <div id="adminUI" style="display:none;">
+    <nav>
+      <div class="tab active" data-tab="pending">Pending review <span class="badge-count" id="pendingCount" style="display:none;"></span></div>
+      <div class="tab" data-tab="updateApprovals">Update approvals <span class="badge-count" id="updateApprovalsCount" style="display:none;"></span></div>
+      <div class="tab" data-tab="visits">Manage visits</div>
+      <div class="tab" data-tab="discharged">Discharged</div>
+      <div class="tab" data-tab="wall">Prayer wall</div>
+      <div class="tab" data-tab="addvisit">Add visit</div>
+      <div class="tab" data-tab="admins">Manage admins</div>
+      <div class="tab" data-tab="modules">App access</div>
+    </nav>
+
+    <main>
+      <!-- PENDING REVIEW -->
+      <div class="screen active" id="tab-pending">
+        <h2 class="section-title">Pending Review</h2>
+        <div id="pendingList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- UPDATE APPROVALS -->
+      <div class="screen" id="tab-updateApprovals">
+        <h2 class="section-title">Visit Update Approvals</h2>
+        <div class="card" style="background:var(--gold-dim); border-color:var(--gold-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">
+            Notes team members log after a visit land here before showing up on the visit card for everyone else to see.
+          </div>
+        </div>
+        <div id="updateApprovalsList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- MANAGE VISITS -->
+      <div class="screen" id="tab-visits">
+        <h2 class="section-title">All Active Care Visits</h2>
+        <div id="adminVisitsList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- DISCHARGED VISITS -->
+      <div class="screen" id="tab-discharged">
+        <h2 class="section-title">Discharged Visits</h2>
+        <div id="dischargedList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- PRAYER WALL MANAGEMENT -->
+      <div class="screen" id="tab-wall">
+        <h2 class="section-title">Public Prayer Wall</h2>
+
+        <div class="card" style="background:var(--gold-dim); border-color:var(--gold-glow);">
+          <div class="card-title" style="font-size:17px;">Weekly Prayer Sheet</div>
+          <div class="card-text" style="margin-bottom:12px;">
+            A Google Doc with all public prayer requests is generated and emailed automatically every week.
+            Need it sooner? Generate it right now.
+          </div>
+          <button class="btn-primary-full" id="generateNowBtn" style="margin-top:0;">Generate &amp; email now</button>
+          <div id="generateStatus" style="font-size:13px; color:var(--text-soft); margin-top:10px; display:none;"></div>
+        </div>
+
+        <div id="wallList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- ADD VISIT (admin) -->
+      <div class="screen" id="tab-addvisit">
+        <h2 class="section-title">Add a Care Visit</h2>
+        <div class="card">
+          <div class="form-group">
+            <label for="aVisitType">Visit type</label>
+            <select id="aVisitType">
+              <option value="hospital">Hospital</option>
+              <option value="homebound">Home-bound</option>
+              <option value="nursing_home">Nursing Home</option>
+              <option value="bereavement">Bereavement</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="aPatientName">Person's name</label>
+            <input type="text" id="aPatientName" placeholder="Mary Johnson" />
+          </div>
+          <div class="form-group">
+            <label for="aHospital" id="aLocationLabel">Hospital</label>
+            <input type="text" id="aHospital" placeholder="Rochester General" />
+          </div>
+          <div class="form-group">
+            <label for="aReason" id="aReasonLabel">Reason</label>
+            <input type="text" id="aReason" placeholder="Hip surgery" />
+          </div>
+          <div class="form-group">
+            <label for="aNotes">Notes <span style="text-transform:none;font-weight:400;">(optional — room number, address, etc.)</span></label>
+            <textarea id="aNotes" placeholder="Anything the team should know..."></textarea>
+          </div>
+          <button class="btn-primary-full" id="adminAddVisitBtn">Add visit</button>
+        </div>
+      </div>
+
+      <!-- MANAGE ADMINS -->
+      <div class="screen" id="tab-admins">
+        <h2 class="section-title">Manage Admins</h2>
+        <div class="card" style="background:var(--gold-dim); border-color:var(--gold-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">
+            Anyone toggled on here gets full admin access to this dashboard — including the ability to grant or remove admin access for others. Only toggle this on for people you trust with that.
+          </div>
+        </div>
+        <div id="adminManageList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- APP ACCESS (modules) -->
+      <div class="screen" id="tab-modules">
+        <h2 class="section-title">App Access</h2>
+        <div class="card" style="background:var(--gold-dim); border-color:var(--gold-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">
+            Controls which apps show up as tiles on each person's RCC hub dashboard. Turning something off here doesn't delete any of their data — it just hides that app from their dashboard.
+          </div>
+        </div>
+        <div id="moduleManageList"><div class="loading">Loading...</div></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="accessDenied" class="access-denied" style="display:none;">
+    <div class="title">Access Restricted</div>
+    <p class="sub">This area is limited to designated administrators.<br>Contact your church admin if you believe this is a mistake.</p>
+  </div>
+
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey:            "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+    authDomain:        "bedsidercc.firebaseapp.com",
+    projectId:         "bedsidercc",
+    storageBucket:     "bedsidercc.firebasestorage.app",
+    messagingSenderId: "950958384975",
+    appId:             "1:950958384975:web:6f43dec5a7ba842c69c73a"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
+
+  const ADMIN_TRIGGER_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
+
+  let currentUser = null;
+
+  const VISIT_TYPE_CONFIG = {
+    hospital:      { locationLabel: 'Hospital',          locationPlaceholder: 'Rochester General',     reasonLabel: 'Reason for stay',  reasonPlaceholder: 'Hip surgery',          icon: '🏥' },
+    homebound:     { locationLabel: 'Address / area',    locationPlaceholder: '123 Main St',           reasonLabel: 'Reason for visit', reasonPlaceholder: 'Recovering from a fall', icon: '🏠' },
+    nursing_home:  { locationLabel: 'Facility name',     locationPlaceholder: 'Sunrise Senior Living',  reasonLabel: 'Reason for visit', reasonPlaceholder: 'Long-term care',        icon: '🛏️' },
+    bereavement:   { locationLabel: 'Family / location', locationPlaceholder: 'The Johnson family',     reasonLabel: 'Context',          reasonPlaceholder: 'Loss of a spouse',      icon: '🕊️' }
+  };
+  const VISIT_TYPE_LABELS = {
+    hospital: 'Hospital', homebound: 'Home-bound', nursing_home: 'Nursing Home', bereavement: 'Bereavement'
+  };
+
+  function updateAdminVisitTypeLabels() {
+    const type = document.getElementById('aVisitType').value;
+    const cfg = VISIT_TYPE_CONFIG[type];
+    document.getElementById('aLocationLabel').textContent = cfg.locationLabel;
+    document.getElementById('aHospital').placeholder = cfg.locationPlaceholder;
+    document.getElementById('aReasonLabel').textContent = cfg.reasonLabel;
+    document.getElementById('aReason').placeholder = cfg.reasonPlaceholder;
+  }
+  document.getElementById('aVisitType').addEventListener('change', updateAdminVisitTypeLabels);
+
+  document.getElementById('googleSignInBtn').addEventListener('click', () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err => showBanner('Sign-in failed: ' + err.message, true));
+  });
+
+  document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+
+  auth.onAuthStateChanged(async user => {
+    if (user) {
+      currentUser = user;
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appShell').style.display = 'block';
+
+      const userDoc = await db.collection('users').doc(user.uid).get();
+      const isAdmin = userDoc.exists && userDoc.data().isAdmin === true;
+      document.getElementById('accessCheck').style.display = 'none';
+
+      if (isAdmin) {
+        document.getElementById('adminUI').style.display = 'block';
+        document.getElementById('accessDenied').style.display = 'none';
+        loadPending();
+        loadAdminVisits();
+        loadDischarged();
+        loadWall();
+        loadAdminManagement();
+        loadUpdateApprovals();
+        loadModuleManagement();
+      } else {
+        document.getElementById('adminUI').style.display = 'none';
+        document.getElementById('accessDenied').style.display = 'block';
+      }
+    } else {
+      currentUser = null;
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('appShell').style.display = 'none';
+    }
+  });
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── PENDING REVIEW ──
+  function loadPending() {
+    db.collection('prayerRequests')
+      .where('status', '==', 'pending')
+      .orderBy('createdAt', 'desc')
+      .onSnapshot(snapshot => {
+        const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderPending(items);
+        const badge = document.getElementById('pendingCount');
+        if (items.length) {
+          badge.textContent = items.length;
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
+      });
+  }
+
+  function loadUpdateApprovals() {
+    db.collection('visits').onSnapshot(snapshot => {
+      const pendingUpdates = [];
+      snapshot.docs.forEach(d => {
+        const visit = d.data();
+        (visit.updates || []).forEach(u => {
+          if (u.status === 'pending') {
+            pendingUpdates.push({ visitId: d.id, patientName: visit.patientName, ...u });
+          }
+        });
+      });
+      pendingUpdates.sort((a, b) => new Date(b.at) - new Date(a.at));
+      renderUpdateApprovals(pendingUpdates);
+
+      const badge = document.getElementById('updateApprovalsCount');
+      if (pendingUpdates.length) {
+        badge.textContent = pendingUpdates.length;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    });
+  }
+
+  function renderUpdateApprovals(items) {
+    const container = document.getElementById('updateApprovalsList');
+    if (!items.length) {
+      container.innerHTML = `<div class="empty-state">Nothing waiting for review. 🎉</div>`;
+      return;
+    }
+
+    container.innerHTML = items.map(u => `
+      <div class="card">
+        <div class="card-title">${escHtml(u.patientName)}</div>
+        <div class="card-text">${escHtml(u.text)}</div>
+        <div class="card-meta">
+          <span>${escHtml(u.byName)} · ${formatAdminDate(u.at)}</span>
+        </div>
+        <div class="actions">
+          <button class="btn btn-approve" onclick="approveVisitUpdate('${u.visitId}', '${u.id}')">Approve</button>
+          <button class="btn btn-delete" onclick="rejectVisitUpdate('${u.visitId}', '${u.id}')">Delete</button>
+        </div>
+      </div>`).join('');
+  }
+
+  function formatAdminDate(iso) {
+    try { return new Date(iso).toLocaleString(); } catch (e) { return ''; }
+  }
+
+  async function approveVisitUpdate(visitId, updateId) {
+    const doc = await db.collection('visits').doc(visitId).get();
+    const updates = (doc.data().updates || []).map(u =>
+      u.id === updateId ? { ...u, status: 'approved' } : u
+    );
+    await db.collection('visits').doc(visitId).update({ updates });
+    showBanner('Update approved and now visible on the visit card.');
+  }
+
+  async function rejectVisitUpdate(visitId, updateId) {
+    if (!confirm('Delete this update? It will not be shown to the team.')) return;
+    const doc = await db.collection('visits').doc(visitId).get();
+    const updates = (doc.data().updates || []).filter(u => u.id !== updateId);
+    await db.collection('visits').doc(visitId).update({ updates });
+    showBanner('Update deleted.');
+  }
+  window.approveVisitUpdate = approveVisitUpdate;
+  window.rejectVisitUpdate = rejectVisitUpdate;
+
+  function renderPending(items) {
+    const container = document.getElementById('pendingList');
+    if (!items.length) {
+      container.innerHTML = `<div class="empty-state">Nothing waiting for review. 🎉</div>`;
+      return;
+    }
+
+    container.innerHTML = items.map(r => {
+      const tagClass = r.type === 'hospital_visit' ? 'tag-hospital' : 'tag-general';
+      const tagLabel = r.type === 'hospital_visit' ? 'Care Visit' : 'General Request';
+      const byline = r.anonymous ? 'Anonymous' : (r.submittedBy?.name || '');
+
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(r.patientName)}</div>
+          <div class="card-text">${escHtml(r.text)}</div>
+          <div class="card-meta">
+            <span class="tag ${tagClass}">${tagLabel}</span>
+            <span>${byline}</span>
+          </div>
+          <div class="actions">
+            <button class="btn btn-approve" onclick="approveRequest('${r.id}')">Approve &amp; post publicly</button>
+            <button class="btn btn-hide" onclick="hideRequest('${r.id}')">Keep private</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function approveRequest(id) {
+    await db.collection('prayerRequests').doc(id).update({ status: 'public', reviewedAt: new Date().toISOString() });
+    showBanner('Posted to the prayer wall.');
+  }
+
+  async function hideRequest(id) {
+    await db.collection('prayerRequests').doc(id).update({ status: 'hidden', reviewedAt: new Date().toISOString() });
+    showBanner('Kept private.');
+  }
+
+  async function unhideRequest(id) {
+    await db.collection('prayerRequests').doc(id).update({ status: 'public' });
+    showBanner('Now visible on the prayer wall.');
+  }
+
+  async function deleteRequest(id) {
+    if (!confirm('Permanently delete this prayer request?')) return;
+    await db.collection('prayerRequests').doc(id).delete();
+    showBanner('Deleted.');
+  }
+
+  // ── PRAYER WALL MANAGEMENT (public + hidden) ──
+  function loadWall() {
+    db.collection('prayerRequests')
+      .where('status', 'in', ['public', 'hidden'])
+      .orderBy('createdAt', 'desc')
+      .onSnapshot(snapshot => {
+        renderWall(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+  }
+
+  function loadAdminManagement() {
+    db.collection('users').onSnapshot(snapshot => {
+      renderAdminManagement(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  }
+
+  function renderAdminManagement(users) {
+    const container = document.getElementById('adminManageList');
+    if (!users.length) {
+      container.innerHTML = `<div class="empty-state">No users found yet — people show up here once they sign in and save a profile.</div>`;
+      return;
+    }
+
+    users.sort((a, b) => {
+      if (!!a.isAdmin !== !!b.isAdmin) return a.isAdmin ? -1 : 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    container.innerHTML = users.map(u => {
+      const isAdmin = u.isAdmin === true;
+      const isSelf = u.id === currentUser.uid;
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(u.name || '(no name set)')}</div>
+          <div class="card-text" style="margin-bottom:8px;">${escHtml(u.email || '')}</div>
+          <div class="actions">
+            ${isSelf
+              ? `<span class="tag tag-public">You (admin)</span>`
+              : isAdmin
+                ? `<button class="btn btn-hide" onclick="toggleAdmin('${u.id}', false)">Remove admin access</button>`
+                : `<button class="btn btn-unhide" onclick="toggleAdmin('${u.id}', true)">Make admin</button>`}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function toggleAdmin(uid, makeAdmin) {
+    if (makeAdmin && !confirm('Give this person full admin access, including the ability to manage other admins?')) return;
+    if (!makeAdmin && !confirm('Remove admin access for this person?')) return;
+    try {
+      await db.collection('users').doc(uid).set({ isAdmin: makeAdmin }, { merge: true });
+    } catch (e) {
+      showBanner('Could not update admin access: ' + e.message, true);
+    }
+  }
+  window.toggleAdmin = toggleAdmin;
+
+  // ── APP ACCESS (modules) ──
+  const MODULE_LABELS = {
+    bedside: 'Bedside',
+    incidentReport: 'Incident Report',
+    vanRental: 'Van Usage',
+  };
+
+  function loadModuleManagement() {
+    db.collection('users').onSnapshot(snapshot => {
+      renderModuleManagement(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  }
+
+  function renderModuleManagement(users) {
+    const container = document.getElementById('moduleManageList');
+    if (!users.length) {
+      container.innerHTML = `<div class="empty-state">No users found yet.</div>`;
+      return;
+    }
+
+    users.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    container.innerHTML = users.map(u => {
+      const modules = u.modules || {};
+      const toggles = Object.keys(MODULE_LABELS).map(key => {
+        const on = modules[key] === true;
+        return `
+          <button class="btn ${on ? 'btn-approve' : 'btn-unhide'}" style="margin-right:6px; margin-bottom:6px;"
+            onclick="toggleModule('${u.id}', '${key}', ${!on})">
+            ${MODULE_LABELS[key]}: ${on ? 'On' : 'Off'}
+          </button>`;
+      }).join('');
+
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(u.name || '(no name set)')}</div>
+          <div class="card-text" style="margin-bottom:10px;">${escHtml(u.email || '')}</div>
+          <div class="actions">${toggles}</div>
+        </div>`;
+    }).join('');
+  }
+
+  async function toggleModule(uid, moduleKey, newValue) {
+    try {
+      await db.collection('users').doc(uid).set({
+        modules: { [moduleKey]: newValue }
+      }, { merge: true });
+      showBanner(`${MODULE_LABELS[moduleKey]} ${newValue ? 'enabled' : 'disabled'}.`);
+    } catch (e) {
+      showBanner('Could not update app access: ' + e.message, true);
+    }
+  }
+  window.toggleModule = toggleModule;
+
+  function renderWall(items) {
+    const container = document.getElementById('wallList');
+    if (!items.length) {
+      container.innerHTML = `<div class="empty-state">No prayer wall entries yet.</div>`;
+      return;
+    }
+
+    container.innerHTML = items.map(r => {
+      const statusTag = r.status === 'public' ? 'tag-public' : 'tag-hidden';
+      const statusLabel = r.status === 'public' ? 'Public' : 'Hidden';
+      const byline = r.anonymous ? 'Anonymous' : (r.submittedBy?.name || '');
+
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(r.patientName)}</div>
+          <div class="card-text">${escHtml(r.text)}</div>
+          <div class="card-meta">
+            <span class="tag ${statusTag}">${statusLabel}</span>
+            <span>${byline}</span>
+          </div>
+          <div class="actions">
+            ${r.status === 'public'
+              ? `<button class="btn btn-hide" onclick="hideRequest('${r.id}')">Hide from wall</button>`
+              : `<button class="btn btn-unhide" onclick="unhideRequest('${r.id}')">Show on wall</button>`}
+            <button class="btn btn-delete" onclick="deleteRequest('${r.id}')">Delete</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  document.getElementById('generateNowBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('generateNowBtn');
+    const status = document.getElementById('generateStatus');
+
+    if (ADMIN_TRIGGER_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
+      showBanner('Set up the Apps Script Web App URL first — see SETUP.md', true);
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    status.style.display = 'block';
+    status.textContent = 'This may take a few seconds...';
+
+    try {
+      const res = await fetch(`${ADMIN_TRIGGER_URL}?action=generatePrayerSheet`);
+      const data = await res.json();
+
+      if (data.success) {
+        status.textContent = 'Done! Doc emailed and ready: ' + data.url;
+        showBanner('Prayer sheet generated and emailed.');
+      } else {
+        status.textContent = 'Something went wrong: ' + data.error;
+        showBanner('Generation failed — check the log.', true);
+      }
+    } catch (err) {
+      status.textContent = 'Could not reach the generator. Check the Apps Script URL.';
+      showBanner('Could not reach the generator.', true);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Generate & email now';
+  });
+
+  function loadAdminVisits() {
+    db.collection('visits')
+      .where('active', '==', true)
+      .orderBy('createdAt', 'desc')
+      .onSnapshot(snapshot => {
+        renderAdminVisits(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+  }
+
+  function renderAdminVisits(visits) {
+    const container = document.getElementById('adminVisitsList');
+    if (!visits.length) {
+      container.innerHTML = `<div class="empty-state">No active visits.</div>`;
+      return;
+    }
+
+    container.innerHTML = visits.map(v => {
+      const claimedNames = (v.claimedBy || []).map(c => c.name).join(', ') || 'No one yet';
+      const visitedNames = (v.visitedBy || []).map(c => c.name).join(', ') || 'Not yet';
+      const type = v.visitType || 'hospital';
+      const cfg = VISIT_TYPE_CONFIG[type];
+
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(v.patientName)}</div>
+          <div class="card-meta" style="margin-bottom:6px;">
+            <span class="tag tag-hospital">${cfg.icon} ${VISIT_TYPE_LABELS[type]}</span>
+          </div>
+          <div class="card-sub">${escHtml(v.hospital)}</div>
+          <div class="card-text">${escHtml(v.reason)}</div>
+          <div class="card-meta">
+            <span>Claimed by: ${escHtml(claimedNames)}</span>
+          </div>
+          <div class="card-meta">
+            <span>Visited by: ${escHtml(visitedNames)}</span>
+          </div>
+          <div class="actions">
+            <button class="btn btn-delete" onclick="adminArchiveVisit('${v.id}')">Mark discharged</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function adminArchiveVisit(id) {
+    if (!confirm('Mark this visit as discharged?')) return;
+    await db.collection('visits').doc(id).update({ active: false, dischargedAt: new Date().toISOString() });
+    showBanner('Visit closed.');
+  }
+
+  function loadDischarged() {
+    db.collection('visits')
+      .where('active', '==', false)
+      .orderBy('dischargedAt', 'desc')
+      .onSnapshot(snapshot => {
+        renderDischarged(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, err => {
+        document.getElementById('dischargedList').innerHTML =
+          '<div class="empty-state">Could not load discharged visits. Check the browser console for a Firestore index link if this persists.</div>';
+        console.error(err);
+      });
+  }
+
+  function renderDischarged(visits) {
+    const container = document.getElementById('dischargedList');
+    if (!visits.length) {
+      container.innerHTML = `<div class="empty-state">No discharged visits yet.</div>`;
+      return;
+    }
+
+    container.innerHTML = visits.map(v => {
+      const type = v.visitType || 'hospital';
+      const cfg = VISIT_TYPE_CONFIG[type];
+      const visitedNames = (v.visitedBy || []).map(c => c.name).join(', ') || 'Not recorded';
+      const dischargedDate = v.dischargedAt
+        ? new Date(v.dischargedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : '';
+
+      return `
+        <div class="card" style="opacity:0.75;">
+          <div class="card-title">${escHtml(v.patientName)}</div>
+          <div class="card-meta" style="margin-bottom:6px;">
+            <span class="tag tag-hidden">${cfg.icon} ${VISIT_TYPE_LABELS[type]}</span>
+            ${dischargedDate ? '<span>Discharged ' + dischargedDate + '</span>' : ''}
+          </div>
+          <div class="card-sub">${escHtml(v.hospital)}</div>
+          <div class="card-text">${escHtml(v.reason)}</div>
+          <div class="card-meta">
+            <span>Visited by: ${escHtml(visitedNames)}</span>
+          </div>
+          <div class="actions">
+            <button class="btn btn-unhide" onclick="restoreVisit('${v.id}')">Restore to active</button>
+            <button class="btn btn-delete" onclick="permanentlyDeleteVisit('${v.id}')">Delete permanently</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function restoreVisit(id) {
+    await db.collection('visits').doc(id).update({ active: true, dischargedAt: firebase.firestore.FieldValue.delete() });
+    showBanner('Visit restored to active list.');
+  }
+
+  async function permanentlyDeleteVisit(id) {
+    if (!confirm('Permanently delete this visit record? This cannot be undone.')) return;
+    await db.collection('visits').doc(id).delete();
+    showBanner('Visit permanently deleted.');
+  }
+
+  document.getElementById('adminAddVisitBtn').addEventListener('click', async () => {
+    const visitType    = document.getElementById('aVisitType').value;
+    const patientName  = document.getElementById('aPatientName').value.trim();
+    const hospital      = document.getElementById('aHospital').value.trim();
+    const reason         = document.getElementById('aReason').value.trim();
+    const notes            = document.getElementById('aNotes').value.trim();
+
+    if (!patientName || !hospital || !reason) {
+      showBanner('Please fill in name, location, and reason.', true);
+      return;
+    }
+
+    await db.collection('visits').add({
+      visitType, patientName, hospital, reason, notes,
+      active: true, claimedBy: [], visitedBy: [], updates: [],
+      createdBy: { uid: currentUser.uid, name: currentUser.displayName || currentUser.email },
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    ['aPatientName','aHospital','aReason','aNotes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('aVisitType').value = 'hospital';
+    updateAdminVisitTypeLabels();
+    showBanner(`${patientName} added.`);
+
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelector('[data-tab="visits"]').classList.add('active');
+    document.getElementById('tab-visits').classList.add('active');
+  });
+
+  function showBanner(msg, isError = false) {
+    const b = document.getElementById('banner');
+    b.textContent = msg;
+    b.style.background = isError ? '#fdecea' : '#eaf4ee';
+    b.style.color = isError ? '#a03030' : '#2e7a52';
+    b.classList.add('show');
+    setTimeout(() => b.classList.remove('show'), 3200);
+  }
+
+  function escHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>
