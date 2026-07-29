@@ -464,13 +464,18 @@
       if (!pending.length) { c.innerHTML = '<div class="empty-state">No pending driver applications.</div>'; return; }
       c.innerHTML = pending.map(u => {
         const vr = u.vanRentalProfile;
+        const needsVerify = !vr.licenseVerifiedInPerson;
         return `
         <div class="card">
           <div class="card-title">${escHtml(u.name||'Unnamed')}</div>
-          <div class="card-text">${escHtml(u.phone||'')} · License #${escHtml(vr.licenseNumber||'')} (${escHtml(vr.licenseState||'')})</div>
+          <div class="card-text">${escHtml(u.phone||'')} · License expires: ${escHtml(vr.licenseExp||'(not set)')}
+            <button class="btn btn-unhide" style="padding:2px 8px;font-size:12px;" onclick="vanEditExp('${u.id}','${escHtml(vr.licenseExp||'')}')">Edit</button>
+          </div>
+          <div class="card-meta"><span>License check: <strong style="color:${vr.licenseVerifiedInPerson ? 'var(--green)' : 'var(--red)'}">${vr.licenseVerifiedInPerson ? 'Verified in person ✓' : 'Not yet verified in person'}</strong></span></div>
           <div class="card-meta"><span>Insurance cancelled: ${vr.insuranceCancelled ? 'YES' : 'No'} · License revoked/suspended: ${vr.licenseRevokedSuspended ? 'YES' : 'No'}</span></div>
           <div class="actions">
-            <button class="btn btn-approve" onclick="vanApprove('${u.id}')">Approve</button>
+            ${needsVerify ? `<button class="btn btn-unhide" onclick="vanVerifyInPerson('${u.id}')">Mark license verified in person</button>` : ''}
+            <button class="btn btn-approve" ${needsVerify ? 'disabled style="opacity:0.5;cursor:default;"' : ''} onclick="vanApprove('${u.id}')">Approve</button>
             <button class="btn btn-hide" onclick="vanDeny('${u.id}')">Deny</button>
           </div>
         </div>`;
@@ -479,6 +484,13 @@
   }
   window.vanApprove = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.status':'approved'}); showBanner('Driver approved.'); };
   window.vanDeny = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.status':'denied'}); showBanner('Application denied.'); };
+  window.vanEditExp = async (uid, currentExp) => {
+    const newExp = prompt('New license expiration date (YYYY-MM-DD):', currentExp || '');
+    if (newExp === null) return;
+    await db.collection('users').doc(uid).update({'vanRentalProfile.licenseExp': newExp});
+    showBanner('Expiration date updated.');
+  };
+  window.vanVerifyInPerson = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.licenseVerifiedInPerson':true}); showBanner('License marked verified.'); };
 
   function loadVans() {
     db.collection('vans').onSnapshot(snap => {
