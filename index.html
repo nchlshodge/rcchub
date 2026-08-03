@@ -223,6 +223,61 @@
     .module-desc { font-size: 13px; color: var(--text-soft); }
     .module-arrow { color: var(--text-soft); font-size: 18px; flex-shrink: 0; }
 
+    .request-access-link {
+      display: block;
+      width: 100%;
+      background: none;
+      border: none;
+      color: var(--text-soft);
+      font-size: 13px;
+      text-decoration: underline;
+      cursor: pointer;
+      text-align: center;
+      margin-top: 24px;
+      font-family: 'Inter', sans-serif;
+    }
+    .request-access-link:hover { color: var(--text-mid); }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 200;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg-card);
+      border-radius: var(--radius) var(--radius) 0 0;
+      border: 1px solid var(--border-mid);
+      border-bottom: none;
+      padding: 24px 20px 40px;
+      width: 100%;
+      max-width: 480px;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .modal-title { font-family: 'Playfair Display', serif; font-size: 19px; color: var(--text); }
+    .modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-soft); line-height: 1; padding: 4px; }
+    .modal-sub { font-size: 13px; color: var(--text-soft); margin-bottom: 18px; line-height: 1.6; }
+    .modal input, .modal textarea {
+      width: 100%; padding: 12px 14px; margin-bottom: 14px;
+      border: 1px solid #d1cdc4; border-radius: 8px; font-size: 15px; font-family: 'Inter', sans-serif;
+    }
+    .modal input:focus, .modal textarea:focus { outline: none; border-color: var(--blue); }
+    .modal label { display: block; font-size: 13px; font-weight: 500; color: var(--text-mid); margin-bottom: 6px; }
+    .modal textarea { min-height: 70px; resize: vertical; }
+    .module-checks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .module-check { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 400; color: var(--text); cursor: pointer; }
+    .module-check input { width: auto; margin: 0; }
+    .btn-submit-request {
+      width: 100%; background: var(--blue); color: #fff; border: none; border-radius: 10px;
+      padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
+    }
+
     .empty-state {
       text-align: center;
       padding: 60px 20px;
@@ -296,7 +351,36 @@
     <div id="moduleGrid" class="module-grid">
       <div class="loading">Loading your apps...</div>
     </div>
+
+    <button id="openRequestModal" class="request-access-link">Request access for someone else →</button>
   </main>
+</div>
+
+<div class="modal-overlay" id="requestModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Request App Access</div>
+      <button class="modal-close" id="closeRequestModal">×</button>
+    </div>
+    <p class="modal-sub">Know someone who needs access to one of these apps? Let an admin know and they'll set it up.</p>
+
+    <label>Their Name</label>
+    <input type="text" id="reqName" placeholder="Full name">
+    <label>Their Email</label>
+    <input type="email" id="reqEmail" placeholder="name@example.com">
+
+    <label>Which app(s) do they need?</label>
+    <div class="module-checks">
+      <label class="module-check"><input type="checkbox" value="bedside"> Bedside</label>
+      <label class="module-check"><input type="checkbox" value="incidentReport"> Incident Report</label>
+      <label class="module-check"><input type="checkbox" value="vanRental"> Van Usage</label>
+    </div>
+
+    <label>Note (optional)</label>
+    <textarea id="reqNote" placeholder="Any context that would help — e.g. their role, why they need it"></textarea>
+
+    <button class="btn-submit-request" id="submitRequestBtn">Send Request</button>
+  </div>
 </div>
 
 <script>
@@ -363,16 +447,28 @@
   });
 
   // Create a baseline users/{uid} doc on first sign-in without clobbering
-  // fields other apps (Bedside, etc.) may already have written.
+  // fields other apps (Bedside, etc.) may already have written. If an
+  // admin pre-approved an access request for this email before the
+  // person ever signed in, apply those modules instead of the defaults.
   async function ensureUserDoc(user) {
     const ref = db.collection('users').doc(user.uid);
     const doc = await ref.get();
+
     if (!doc.exists) {
+      let modules = { bedside: true, incidentReport: true, vanRental: false };
+      if (user.email) {
+        const inviteRef = db.collection('hubInvites').doc(user.email.toLowerCase());
+        const inviteDoc = await inviteRef.get();
+        if (inviteDoc.exists && !inviteDoc.data().claimed) {
+          modules = { ...modules, ...inviteDoc.data().modules };
+          await inviteRef.set({ claimed: true, claimedBy: user.uid, claimedAt: Date.now() }, { merge: true });
+        }
+      }
       await ref.set({
         name: user.displayName || '',
         email: user.email || '',
         uid: user.uid,
-        modules: { bedside: true, incidentReport: true, vanRental: false },
+        modules,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
     } else if (!doc.data().modules) {
@@ -475,6 +571,46 @@
     el.textContent = msg;
     el.style.display = 'block';
   }
+
+  // ── REQUEST ACCESS (for someone else) ──
+  document.getElementById('openRequestModal').addEventListener('click', () => {
+    document.getElementById('requestModal').classList.add('open');
+  });
+  document.getElementById('closeRequestModal').addEventListener('click', () => {
+    document.getElementById('requestModal').classList.remove('open');
+  });
+
+  document.getElementById('submitRequestBtn').addEventListener('click', async () => {
+    const name = document.getElementById('reqName').value.trim();
+    const email = document.getElementById('reqEmail').value.trim();
+    const note = document.getElementById('reqNote').value.trim();
+    const modules = Array.from(document.querySelectorAll('.module-check input:checked')).map(c => c.value);
+
+    if (!name || !email) { alert('Please enter their name and email.'); return; }
+    if (!modules.length) { alert('Please select at least one app.'); return; }
+    if (!currentUser) { alert('You need to be signed in to send a request.'); return; }
+
+    const btn = document.getElementById('submitRequestBtn');
+    btn.disabled = true; btn.textContent = 'Sending...';
+
+    try {
+      await db.collection('accessRequests').add({
+        name, email: email.toLowerCase(), note, modulesRequested: modules,
+        status: 'pending',
+        requestedBy: { uid: currentUser.uid, name: currentUser.displayName || currentUser.email },
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      document.getElementById('requestModal').classList.remove('open');
+      document.getElementById('reqName').value = '';
+      document.getElementById('reqEmail').value = '';
+      document.getElementById('reqNote').value = '';
+      document.querySelectorAll('.module-check input').forEach(c => c.checked = false);
+      alert('Request sent — an admin will follow up.');
+    } catch (e) {
+      alert('Could not send request: ' + e.message);
+    }
+    btn.disabled = false; btn.textContent = 'Send Request';
+  });
 </script>
 </body>
 </html>

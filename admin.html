@@ -205,6 +205,7 @@
       <div class="section-tab" data-section="incidents">Incident Reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="vans">Van Usage</div>
       <div class="section-tab" data-section="access">App Access</div>
+      <div class="section-tab" data-section="requests">Access Requests <span class="badge-count" id="requestsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="admins">Manage Admins</div>
     </nav>
 
@@ -255,6 +256,15 @@
           <div class="card-text" style="margin-bottom:0;">Controls which apps show up as tiles on each person's hub dashboard.</div>
         </div>
         <div id="moduleManageList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- ACCESS REQUESTS -->
+      <div class="section" id="section-requests">
+        <h2 class="section-title">Access Requests</h2>
+        <div class="card" style="background:var(--blue-dim); border-color:var(--blue-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">Anyone signed in can request access for someone else from the main hub page. Approving here creates or updates that person's account with the requested modules turned on.</div>
+        </div>
+        <div id="accessRequestsList"><div class="loading">Loading...</div></div>
       </div>
 
       <!-- MANAGE ADMINS -->
@@ -312,6 +322,7 @@
         loadVans();
         loadVanAlerts();
         loadModuleManagement();
+        loadAccessRequests();
         loadAdminManagement();
       } else {
         document.getElementById('accessDenied').style.display = 'block';
@@ -545,6 +556,67 @@
   window.toggleModule = async (uid, key, val) => {
     await db.collection('users').doc(uid).set({modules:{[key]:val}}, {merge:true});
     showBanner(`${MODULE_LABELS[key]} ${val?'enabled':'disabled'}.`);
+  };
+
+  // ── Access Requests ──
+  let allAccessRequests = [];
+  function loadAccessRequests() {
+    db.collection('accessRequests').where('status','==','pending').orderBy('createdAt','desc').onSnapshot(snap => {
+      allAccessRequests = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      renderAccessRequests();
+      const badge = document.getElementById('requestsCount');
+      if (allAccessRequests.length) { badge.textContent = allAccessRequests.length; badge.style.display = 'inline-block'; }
+      else { badge.style.display = 'none'; }
+    }, err => {
+      document.getElementById('accessRequestsList').innerHTML = '<div class="empty-state">Could not load requests.</div>';
+      console.error(err);
+    });
+  }
+
+  function renderAccessRequests() {
+    const c = document.getElementById('accessRequestsList');
+    if (!allAccessRequests.length) { c.innerHTML = '<div class="empty-state">No pending requests.</div>'; return; }
+    c.innerHTML = allAccessRequests.map(r => {
+      const modLabels = (r.modulesRequested||[]).map(k => MODULE_LABELS[k] || k).join(', ');
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(r.name)}</div>
+          <div class="card-text">${escHtml(r.email)}</div>
+          <div class="card-meta"><span class="tag tag-hospital">${escHtml(modLabels)}</span></div>
+          ${r.note ? `<div class="card-text">"${escHtml(r.note)}"</div>` : ''}
+          <div class="card-meta"><span>Requested by ${escHtml(r.requestedBy?.name||'unknown')}</span></div>
+          <div class="actions">
+            <button class="btn btn-approve" onclick="approveAccessRequest('${r.id}')">Approve &amp; grant access</button>
+            <button class="btn btn-delete" onclick="dismissAccessRequest('${r.id}')">Dismiss</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  window.approveAccessRequest = async (reqId) => {
+    const req = allAccessRequests.find(r => r.id === reqId);
+    if (!req) return;
+    const moduleUpdates = {};
+    (req.modulesRequested||[]).forEach(k => moduleUpdates[k] = true);
+
+    // If someone with this email already has an account, update it directly.
+    const existing = await db.collection('users').where('email','==',req.email).limit(1).get();
+    if (!existing.empty) {
+      await db.collection('users').doc(existing.docs[0].id).set({modules: moduleUpdates}, {merge:true});
+    } else {
+      // Otherwise, stash the requested modules so they're applied
+      // automatically the first time this email signs in.
+      await db.collection('hubInvites').doc(req.email).set({
+        email: req.email, name: req.name, modules: moduleUpdates, claimed:false, createdAt: Date.now(),
+      }, {merge:true});
+    }
+    await db.collection('accessRequests').doc(reqId).update({status:'approved', resolvedAt:new Date().toISOString(), resolvedBy: currentUser.uid});
+    showBanner('Access granted.');
+  };
+
+  window.dismissAccessRequest = async (reqId) => {
+    await db.collection('accessRequests').doc(reqId).update({status:'dismissed', resolvedAt:new Date().toISOString(), resolvedBy: currentUser.uid});
+    showBanner('Request dismissed.');
   };
 
   // ── Manage Admins ──
