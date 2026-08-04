@@ -523,18 +523,39 @@
   window.setVanStatus = async (vanId, status) => { await db.collection('vans').doc(vanId).update({status}); showBanner('Van updated.'); };
 
   function loadVanAlerts() {
-    db.collection('vanAlerts').onSnapshot(snap => {
-      const alerts = snap.docs.map(d => ({id:d.id, ...d.data()})).filter(a => !a.resolved);
+    db.collection('vanAlerts').onSnapshot(alertsSnap => {
+      const alerts = alertsSnap.docs.map(d => ({id:d.id, ...d.data()})).filter(a => !a.resolved);
       const c = document.getElementById('van-alerts');
       if (!alerts.length) { c.innerHTML = '<div class="empty-state">No open alerts.</div>'; return; }
-      c.innerHTML = alerts.map(a => `
-        <div class="card">
-          <div class="card-text">"${escHtml(a.description||'')}"</div>
-          <div class="actions"><button class="btn btn-approve" onclick="resolveVanAlert('${a.id}')">Mark Resolved</button></div>
-        </div>`).join('');
+
+      db.collection('vanRentals').get().then(rentalsSnap => {
+        const rentals = rentalsSnap.docs.map(d => ({id:d.id, ...d.data()}));
+        c.innerHTML = alerts.map(a => {
+          const rental = a.rentalId ? rentals.find(r => r.id === a.rentalId) : null;
+          const isBlock = a.type === 'safety_light_block' && rental && rental.checkoutBlocked && !rental.checkoutCleared;
+          const draft = rental?.checkoutDraft || {};
+          return `
+            <div class="card">
+              <div class="card-text">"${escHtml(a.description||'')}"</div>
+              ${isBlock ? `<div class="card-meta"><span>Recorded so far — Mileage: ${escHtml(draft.mileage||'—')} · Gas: ${draft.gas ?? '—'}%</span></div>` : ''}
+              <div class="actions">
+                ${isBlock ? `<button class="btn btn-approve" onclick="clearVanCheckout('${rental.id}','${a.id}')">Clear — let driver finish</button>
+                  <span class="card-text" style="align-self:center;">or use the <a href="van/index.html" style="color:var(--blue);">Van Usage admin</a> to complete it yourself</span>` : ''}
+                <button class="btn btn-hide" onclick="resolveVanAlert('${a.id}')">Mark Resolved</button>
+              </div>
+            </div>`;
+        }).join('');
+      });
     });
   }
   window.resolveVanAlert = async id => { await db.collection('vanAlerts').doc(id).update({resolved:true}); showBanner('Alert resolved.'); };
+  window.clearVanCheckout = async (rentalId, alertId) => {
+    await db.collection('vanRentals').doc(rentalId).update({
+      checkoutCleared: true, clearedBy: currentUser.uid, clearedAt: Date.now(),
+    });
+    await db.collection('vanAlerts').doc(alertId).update({resolved:true});
+    showBanner('Cleared — driver can finish checkout now.');
+  };
 
   // ── App Access ──
   const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage' };
