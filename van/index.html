@@ -363,24 +363,79 @@ function RequestRental({user,vans,rentals,onAssigned}){
 }
 
 // ---------- Checkout Flow ----------
+// Visual gas gauge selector — an arc from Empty to Full with 5 tap
+// zones. Picking a zone sets the needle to that position. Drivers pick
+// the closest reading at or below the actual needle (e.g. if it's
+// between 3/4 and Full, they pick 3/4).
+const GAS_LEVELS = [
+  {key:'empty', label:'Empty', angle:-90, value:5},
+  {key:'quarter', label:'1/4', angle:-45, value:25},
+  {key:'half', label:'1/2', angle:0, value:50},
+  {key:'threequarter', label:'3/4', angle:45, value:75},
+  {key:'full', label:'Full', angle:90, value:100},
+];
+function GasGauge({value, onChange}){
+  const selected = GAS_LEVELS.find(l=>l.value===value);
+  const needleAngle = selected ? selected.angle : -90;
+  const rad = (needleAngle-90) * Math.PI/180;
+  const cx=100, cy=100, r=70;
+  const needleX = cx + r*0.85*Math.cos(rad);
+  const needleY = cy + r*0.85*Math.sin(rad);
+
+  return (
+    <div style={{textAlign:'center'}}>
+      <svg viewBox="0 0 200 130" style={{width:'100%',maxWidth:280,margin:'0 auto',display:'block'}}>
+        <path d="M 30 100 A 70 70 0 0 1 170 100" fill="none" stroke="var(--border)" strokeWidth="14" strokeLinecap="round" />
+        <path d="M 30 100 A 70 70 0 0 1 170 100" fill="none" stroke="var(--blue)" strokeWidth="14" strokeLinecap="round"
+          strokeDasharray={`${selected ? (GAS_LEVELS.indexOf(selected)/4)*220 : 0} 999`} />
+        <line x1={cx} y1={cy} x2={needleX} y2={needleY} stroke="var(--danger)" strokeWidth="3" strokeLinecap="round" />
+        <circle cx={cx} cy={cy} r="6" fill="var(--danger)" />
+        <text x="30" y="118" fontSize="11" fill="var(--muted)" textAnchor="middle">E</text>
+        <text x="170" y="118" fontSize="11" fill="var(--muted)" textAnchor="middle">F</text>
+      </svg>
+      <div style={{display:'flex',gap:6,justifyContent:'center',flexWrap:'wrap',marginTop:10}}>
+        {GAS_LEVELS.map(l=>(
+          <button key={l.key} type="button"
+            onClick={()=>onChange(l.value)}
+            style={{
+              padding:'10px 14px', fontSize:14, fontWeight:600, borderRadius:10, cursor:'pointer',
+              border: value===l.value ? '2px solid var(--blue)' : '2px solid var(--border)',
+              background: value===l.value ? 'var(--blue-dim)' : '#fff',
+              color: value===l.value ? 'var(--blue)' : 'var(--text)',
+            }}>
+            {l.label}
+          </button>
+        ))}
+      </div>
+      <p className="muted" style={{marginTop:8}}>Pick the closest mark at or below the needle — e.g. between 3/4 and Full, pick 3/4.</p>
+    </div>
+  );
+}
+
 function CheckoutFlow({user,van,rental,warningLights,onDone}){
-  const [step,setStep] = useState(0);
+  const [keysConfirmed,setKeysConfirmed] = useState(false);
   const [mileage,setMileage] = useState('');
-  const [mileagePhoto,setMileagePhoto] = useState(null);
-  const [mileageUploading,setMileageUploading] = useState(false);
-  const [gas,setGas] = useState('');
-  const [gasPhoto,setGasPhoto] = useState(null);
-  const [gasUploading,setGasUploading] = useState(false);
+  const [gas,setGas] = useState(null);
+  const [dashPhoto,setDashPhoto] = useState(null);
+  const [dashUploading,setDashUploading] = useState(false);
+  const [checkedLights,setCheckedLights] = useState([]); // array of light ids
+  const [otherLightChecked,setOtherLightChecked] = useState(false);
+  const [otherLightDesc,setOtherLightDesc] = useState('');
   const [clean,setClean] = useState(null);
   const [cleanPhoto,setCleanPhoto] = useState(null);
   const [cleanUploading,setCleanUploading] = useState(false);
-  const [hasWarningLight,setHasWarningLight] = useState(null);
-  const [selectedLight,setSelectedLight] = useState('');
-  const [unknownLightDesc,setUnknownLightDesc] = useState('');
-  const [showFeedback,setShowFeedback] = useState(null);
   const [saving,setSaving] = useState(false);
+  const [confirmed,setConfirmed] = useState(false);
 
   const relevantLights = warningLights.filter(l=>!l.van || l.van===van.id);
+  const safetyLightsOn = checkedLights.filter(id => {
+    const l = relevantLights.find(x=>x.id===id);
+    return l && l.safety;
+  });
+  const nonSafetyLightsOn = checkedLights.filter(id => {
+    const l = relevantLights.find(x=>x.id===id);
+    return l && !l.safety;
+  });
 
   async function handlePhoto(file, setPhoto, setUploading){
     setUploading(true);
@@ -389,93 +444,129 @@ function CheckoutFlow({user,van,rental,warningLights,onDone}){
     setUploading(false);
   }
 
+  function toggleLight(id){
+    setCheckedLights(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
+  }
+
+  const canSubmit = keysConfirmed && mileage && gas!==null && dashPhoto
+    && (checkedLights.length===0 || safetyLightsOn.length===0) // block submit if a safety light is checked — must call first
+    && (!otherLightChecked || otherLightDesc)
+    && clean!==null && cleanPhoto && confirmed && !saving;
+
   async function finishCheckout(){
     setSaving(true);
+    const lightNames = checkedLights.map(id => relevantLights.find(l=>l.id===id)?.name).filter(Boolean);
     await db.collection('vanRentals').doc(rental.id).update({
-      checkout: {mileage,mileagePhoto,gas,gasPhoto,clean,cleanPhoto,hasWarningLight,selectedLight,unknownLightDesc,at:Date.now()}
+      checkout: {
+        mileage, gas, dashPhoto,
+        warningLightsOn: lightNames,
+        otherLightReported: otherLightChecked, otherLightDesc,
+        clean, cleanPhoto, at: Date.now(),
+      }
     });
     await db.collection('vans').doc(van.id).update({
-      mileage: Number(mileage)||van.mileage, gas: Number(gas)||van.gas,
+      mileage: Number(mileage)||van.mileage, gas,
     });
-    if(hasWarningLight && !selectedLight){
+    if(otherLightChecked && otherLightDesc){
       await db.collection('vanAlerts').add({
         type:'unknown_safety_light', driverId:user.uid, vanId:van.id, rentalId:rental.id,
-        description:unknownLightDesc, createdAt:Date.now(), resolved:false,
+        description:otherLightDesc, createdAt:Date.now(), resolved:false,
       });
     }
     setSaving(false);
     onDone();
   }
 
-  function handleLightSelect(lightId){
-    setSelectedLight(lightId);
-    const light = warningLights.find(l=>l.id===lightId);
-    if(light){
-      if(!light.safety) setShowFeedback({type:'safe', text: light.feedback});
-      else setShowFeedback({type:'danger', text: "This is a known safety issue. Please call Nicholas right now before taking the van."});
-    }
-  }
-
-  const steps = ['Get Keys','Mileage','Gas','Cleanliness','Warning Lights','Confirm'];
-
-  return (
-    <div className="content">
-      <div className="step-dot">{steps.map((s,i)=><span key={i} className={i<=step?'on':''}></span>)}</div>
-      <div className="card">
-        {step===0 && (<>
+  if(!keysConfirmed){
+    return (
+      <div className="content">
+        <div className="card">
           <h2>Get Your Keys</h2>
           <p>You've been assigned <strong>{van.name}</strong>.</p>
           <p>Keys are located in the church office key box, labeled with the van name. If the office is locked, keys are in the lockbox by the side door — ask an admin for the code if you don't have it.</p>
-          <button className="primary" onClick={()=>setStep(1)}>I Have the Keys</button>
-        </>)}
-        {step===1 && (<>
-          <h2>Verify Mileage</h2>
-          <label>Current Odometer Reading</label>
-          <input type="number" value={mileage} onChange={e=>setMileage(e.target.value)} placeholder={`Last known: ${van.mileage}`} />
-          <CameraCapture label="Take a photo of the odometer" photoUrl={mileagePhoto} uploading={mileageUploading} onCapture={f=>handlePhoto(f,setMileagePhoto,setMileageUploading)} />
-          <button className="primary" disabled={!mileage || !mileagePhoto || mileageUploading} onClick={()=>setStep(2)}>Next</button>
-        </>)}
-        {step===2 && (<>
-          <h2>Verify Gas Tank</h2>
-          <label>Gas Level (%)</label>
-          <input type="number" min="0" max="100" value={gas} onChange={e=>setGas(e.target.value)} />
-          <CameraCapture label="Take a photo of the gas gauge" photoUrl={gasPhoto} uploading={gasUploading} onCapture={f=>handlePhoto(f,setGasPhoto,setGasUploading)} />
-          <button className="primary" disabled={!gas || !gasPhoto || gasUploading} onClick={()=>setStep(3)}>Next</button>
-        </>)}
-        {step===3 && (<>
-          <h2>Cleanliness Check</h2>
-          <label>Is the van clean?</label>
-          <YesNo value={clean} onChange={setClean} />
-          <CameraCapture label="Take a photo of the van interior" photoUrl={cleanPhoto} uploading={cleanUploading} onCapture={f=>handlePhoto(f,setCleanPhoto,setCleanUploading)} />
-          <button className="primary" disabled={clean===null || !cleanPhoto || cleanUploading} onClick={()=>setStep(4)}>Next</button>
-        </>)}
-        {step===4 && (<>
-          <h2>Warning Lights</h2>
-          <label>Are any warning lights on?</label>
-          <YesNo value={hasWarningLight} onChange={v=>{setHasWarningLight(v); setShowFeedback(null); setSelectedLight('');}} />
-          {hasWarningLight && (<>
-            <label>Which light is it?</label>
-            <select value={selectedLight} onChange={e=>handleLightSelect(e.target.value)}>
-              <option value="">Select a light...</option>
-              {relevantLights.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
-              <option value="">Don't see it / not sure</option>
-            </select>
-            {!selectedLight && (<><label>Describe what you see</label><textarea value={unknownLightDesc} onChange={e=>setUnknownLightDesc(e.target.value)} placeholder="Describe the light or symbol" /></>)}
-            {showFeedback && <div className={showFeedback.type==='safe' ? 'banner-safe' : 'banner-danger'}>{showFeedback.text}</div>}
-            {hasWarningLight && !selectedLight && unknownLightDesc && (
-              <div className="banner-danger">We don't have this one on file. Please call Nicholas right now before driving. We've also notified the admin team.</div>
-            )}
-          </>)}
-          <button className="primary" disabled={hasWarningLight===null || (hasWarningLight && !selectedLight && !unknownLightDesc)} onClick={()=>setStep(5)}>Next</button>
-        </>)}
-        {step===5 && (<>
-          <h2>Confirm & Go</h2>
-          <p className="muted">Van: {van.name}</p>
-          <p className="muted">Mileage: {mileage} | Gas: {gas}%</p>
-          <p className="muted">Clean: {clean?'Yes':'No'}</p>
-          <p className="muted">Warning light: {hasWarningLight ? (selectedLight ? warningLights.find(l=>l.id===selectedLight)?.name : 'Unknown - reported') : 'None'}</p>
-          <button className="primary" disabled={saving} onClick={finishCheckout}>{saving?'Saving...':'Confirm & Drive Safely'}</button>
-        </>)}
+          <button className="primary" onClick={()=>setKeysConfirmed(true)}>I Have the Keys</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="content">
+      <div className="card">
+        <h2>Dashboard Check</h2>
+        <p className="muted">One photo of the full dashboard, then confirm what it shows below.</p>
+        <CameraCapture label="Take a photo of the full dashboard" photoUrl={dashPhoto} uploading={dashUploading} onCapture={f=>handlePhoto(f,setDashPhoto,setDashUploading)} />
+
+        <label>Current Odometer Reading</label>
+        <input type="number" value={mileage} onChange={e=>setMileage(e.target.value)} placeholder={`Last known: ${van.mileage}`} />
+
+        <label>Gas Level</label>
+        <GasGauge value={gas} onChange={setGas} />
+
+        <label>Warning Lights — check off anything lit on the dash</label>
+        {relevantLights.map(l=>{
+          const isChecked = checkedLights.includes(l.id);
+          return (
+            <div key={l.id} className="toggle-row" style={{marginTop:8}}>
+              <button type="button"
+                onClick={()=>toggleLight(l.id)}
+                style={{
+                  flex:1, textAlign:'left', padding:'12px 14px', borderRadius:10, cursor:'pointer',
+                  border: isChecked ? (l.safety ? '2px solid var(--danger)' : '2px solid var(--safe)') : '2px solid var(--border)',
+                  background: isChecked ? (l.safety ? 'var(--danger-dim)' : 'var(--safe-dim)') : '#fff',
+                  color: isChecked ? (l.safety ? 'var(--danger)' : 'var(--safe)') : 'var(--text)',
+                  fontWeight: isChecked ? 700 : 500, fontSize:15,
+                }}>
+                {isChecked ? '☑' : '☐'} {l.name}
+              </button>
+            </div>
+          );
+        })}
+        <div className="toggle-row" style={{marginTop:8}}>
+          <button type="button"
+            onClick={()=>setOtherLightChecked(v=>!v)}
+            style={{
+              flex:1, textAlign:'left', padding:'12px 14px', borderRadius:10, cursor:'pointer',
+              border: otherLightChecked ? '2px solid var(--danger)' : '2px solid var(--border)',
+              background: otherLightChecked ? 'var(--danger-dim)' : '#fff',
+              color: otherLightChecked ? 'var(--danger)' : 'var(--text)',
+              fontWeight: otherLightChecked ? 700 : 500, fontSize:15,
+            }}>
+            {otherLightChecked ? '☑' : '☐'} Something else / not on this list
+          </button>
+        </div>
+        {otherLightChecked && (
+          <>
+            <label>Describe what you see</label>
+            <textarea value={otherLightDesc} onChange={e=>setOtherLightDesc(e.target.value)} placeholder="Describe the light or symbol" />
+            {otherLightDesc && <div className="banner-danger">We don't have this one on file. Please call Nicholas right now before driving. We've also notified the admin team.</div>}
+          </>
+        )}
+        {nonSafetyLightsOn.length>0 && (
+          <div className="banner-safe">
+            {nonSafetyLightsOn.map(id => relevantLights.find(l=>l.id===id)?.feedback).filter(Boolean).join(' ')}
+          </div>
+        )}
+        {safetyLightsOn.length>0 && (
+          <div className="banner-danger">
+            {safetyLightsOn.map(id=>relevantLights.find(l=>l.id===id)?.name).join(', ')} — this is a known safety issue. Please call Nicholas right now before taking the van.
+          </div>
+        )}
+
+        <label style={{marginTop:20}}>Is the van clean?</label>
+        <YesNo value={clean} onChange={setClean} />
+        <CameraCapture label="Take a photo of the van interior" photoUrl={cleanPhoto} uploading={cleanUploading} onCapture={f=>handlePhoto(f,setCleanPhoto,setCleanUploading)} />
+
+        <div className="card" style={{background:'var(--blue-dim)', border:'1px solid var(--blue-glow)', marginTop:20, padding:14}}>
+          <label style={{marginTop:0, display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer'}}>
+            <input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)} style={{width:'auto', marginTop:3}} />
+            <span style={{fontWeight:400, fontSize:14}}>I confirm the mileage, gas level, and warning lights above match what I see on the dashboard.</span>
+          </label>
+        </div>
+
+        <button className="primary" disabled={!canSubmit} onClick={finishCheckout}>
+          {saving ? 'Saving...' : (safetyLightsOn.length>0 ? 'Call Nicholas before continuing' : 'Confirm & Drive Safely')}
+        </button>
       </div>
     </div>
   );
