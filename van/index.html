@@ -613,18 +613,34 @@ function CheckoutFlow({user,van,rental,warningLights,onDone}){
 }
 
 // ---------- Return Flow ----------
-function ReturnFlow({van,rental,onDone}){
+function ReturnFlow({user,van,rental,warningLights,onDone}){
   const [mileage,setMileage] = useState('');
-  const [gas,setGas] = useState('');
+  const [gas,setGas] = useState(null);
   const [clean,setClean] = useState(null);
   const [cleanPhoto,setCleanPhoto] = useState(null);
   const [cleanUploading,setCleanUploading] = useState(false);
-  const [cleanedBy,setCleanedBy] = useState('');
+  const [checkedLights,setCheckedLights] = useState([]);
+  const [otherLightChecked,setOtherLightChecked] = useState(false);
+  const [otherLightDesc,setOtherLightDesc] = useState('');
   const [problems,setProblems] = useState(null);
   const [problemDetails,setProblemDetails] = useState('');
   const [saving,setSaving] = useState(false);
 
-  const canSubmit = mileage && gas && clean!==null && cleanPhoto && cleanedBy && problems!==null && !saving;
+  const relevantLights = warningLights.filter(l=>!l.van || l.van===van.id);
+  const safetyLightsOn = checkedLights.filter(id => relevantLights.find(x=>x.id===id)?.safety);
+  const nonSafetyLightsOn = checkedLights.filter(id => {
+    const l = relevantLights.find(x=>x.id===id);
+    return l && !l.safety;
+  });
+
+  function toggleLight(id){
+    setCheckedLights(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
+  }
+
+  const canSubmit = mileage && gas!==null && clean!==null && cleanPhoto
+    && safetyLightsOn.length===0
+    && (!otherLightChecked || otherLightDesc)
+    && problems!==null && !saving;
 
   async function handlePhoto(file){
     setCleanUploading(true);
@@ -635,17 +651,28 @@ function ReturnFlow({van,rental,onDone}){
 
   async function finishReturn(){
     setSaving(true);
+    const lightNames = checkedLights.map(id => relevantLights.find(l=>l.id===id)?.name).filter(Boolean);
     await db.collection('vanRentals').doc(rental.id).update({
       status:'completed',
-      return: {mileage,gas,clean,cleanPhoto,cleanedBy,problems,problemDetails,at:Date.now()}
+      return: {
+        mileage, gas, clean, cleanPhoto,
+        warningLightsOn: lightNames, otherLightReported: otherLightChecked, otherLightDesc,
+        completedBy: user.uid, problems, problemDetails, at: Date.now(),
+      }
     });
     await db.collection('vans').doc(van.id).update({
-      mileage: Number(mileage)||van.mileage, gas: Number(gas)||van.gas, status:'available',
+      mileage: Number(mileage)||van.mileage, gas, status:'available',
     });
     if(problems && problemDetails){
       await db.collection('vanMaintenanceNotes').add({
         vanId:van.id, note:problemDetails, reportedBy:rental.driverId, rentalId:rental.id,
         createdAt:Date.now(), resolved:false,
+      });
+    }
+    if(otherLightChecked && otherLightDesc){
+      await db.collection('vanAlerts').add({
+        type:'unknown_safety_light', driverId:user.uid, vanId:van.id, rentalId:rental.id,
+        description:otherLightDesc, createdAt:Date.now(), resolved:false,
       });
     }
     setSaving(false);
@@ -656,19 +683,75 @@ function ReturnFlow({van,rental,onDone}){
     <div className="content">
       <div className="card">
         <h2>Return the Van</h2>
+        <p className="muted">Any approved driver can complete this check-in — doesn't have to be whoever originally checked it out.</p>
+
         <label>Final Odometer Reading</label>
         <input type="number" value={mileage} onChange={e=>setMileage(e.target.value)} />
-        <label>Final Gas Level (%)</label>
-        <input type="number" min="0" max="100" value={gas} onChange={e=>setGas(e.target.value)} />
+
+        <label>Final Gas Level</label>
+        <GasGauge value={gas} onChange={setGas} />
+
         <label>Is the van clean?</label>
         <YesNo value={clean} onChange={setClean} />
-        <CameraCapture label="Take a photo of the clean interior at turn-in" photoUrl={cleanPhoto} uploading={cleanUploading} onCapture={handlePhoto} />
-        <label>Who is responsible for making sure it was cleaned? (name)</label>
-        <input value={cleanedBy} onChange={e=>setCleanedBy(e.target.value)} placeholder="Full name" />
-        <label>Were there any problems?</label>
+        <CameraCapture label="Take a photo of the van interior at turn-in" photoUrl={cleanPhoto} uploading={cleanUploading} onCapture={handlePhoto} />
+
+        <label>Warning Lights — check off anything lit on the dash</label>
+        {relevantLights.map(l=>{
+          const isChecked = checkedLights.includes(l.id);
+          return (
+            <div key={l.id} className="toggle-row" style={{marginTop:8}}>
+              <button type="button"
+                onClick={()=>toggleLight(l.id)}
+                style={{
+                  flex:1, textAlign:'left', padding:'12px 14px', borderRadius:10, cursor:'pointer',
+                  border: isChecked ? (l.safety ? '2px solid var(--danger)' : '2px solid var(--safe)') : '2px solid var(--border)',
+                  background: isChecked ? (l.safety ? 'var(--danger-dim)' : 'var(--safe-dim)') : '#fff',
+                  color: isChecked ? (l.safety ? 'var(--danger)' : 'var(--safe)') : 'var(--text)',
+                  fontWeight: isChecked ? 700 : 500, fontSize:15,
+                }}>
+                {isChecked ? '☑' : '☐'} {l.name}
+              </button>
+            </div>
+          );
+        })}
+        <div className="toggle-row" style={{marginTop:8}}>
+          <button type="button"
+            onClick={()=>setOtherLightChecked(v=>!v)}
+            style={{
+              flex:1, textAlign:'left', padding:'12px 14px', borderRadius:10, cursor:'pointer',
+              border: otherLightChecked ? '2px solid var(--danger)' : '2px solid var(--border)',
+              background: otherLightChecked ? 'var(--danger-dim)' : '#fff',
+              color: otherLightChecked ? 'var(--danger)' : 'var(--text)',
+              fontWeight: otherLightChecked ? 700 : 500, fontSize:15,
+            }}>
+            {otherLightChecked ? '☑' : '☐'} Something else / not on this list
+          </button>
+        </div>
+        {otherLightChecked && (
+          <>
+            <label>Describe what you see</label>
+            <textarea value={otherLightDesc} onChange={e=>setOtherLightDesc(e.target.value)} placeholder="Describe the light or symbol" />
+            {otherLightDesc && <div className="banner-danger">We don't have this one on file. This will be flagged for an admin to review.</div>}
+          </>
+        )}
+        {nonSafetyLightsOn.length>0 && (
+          <div className="banner-safe">
+            {nonSafetyLightsOn.map(id => relevantLights.find(l=>l.id===id)?.feedback).filter(Boolean).join(' ')}
+          </div>
+        )}
+        {safetyLightsOn.length>0 && (
+          <div className="banner-danger">
+            {safetyLightsOn.map(id=>relevantLights.find(l=>l.id===id)?.name).join(', ')} — please call Nicholas and report this before finishing the return.
+          </div>
+        )}
+
+        <label style={{marginTop:20}}>Were there any other problems?</label>
         <YesNo value={problems} onChange={setProblems} />
         {problems && (<><label>Please describe</label><textarea value={problemDetails} onChange={e=>setProblemDetails(e.target.value)} /></>)}
-        <button className="primary" disabled={!canSubmit} onClick={finishReturn}>{saving?'Saving...':'Complete Return'}</button>
+
+        <button className="primary" disabled={!canSubmit} onClick={finishReturn}>
+          {saving ? 'Saving...' : (safetyLightsOn.length>0 ? 'Resolve safety light first' : 'Complete Return')}
+        </button>
       </div>
     </div>
   );
@@ -677,10 +760,22 @@ function ReturnFlow({van,rental,onDone}){
 // ---------- Driver Home ----------
 function DriverHome({user,profile,vans,rentals,warningLights,refreshProfile}){
   const [view,setView] = useState('home');
+  const [selectedReturnId,setSelectedReturnId] = useState(null);
   const vr = profile.vanRentalProfile || {};
   const myRentals = rentals.filter(r=>r.driverId===user.uid);
-  const activeRental = myRentals.find(r=>r.status==='assigned' && !r.checkout) || myRentals.find(r=>r.checkout && !r.return);
+  // Checkout is personal — only the driver who requested the van sees
+  // their own pending checkout. Returns are NOT personal — any
+  // approved driver can complete the check-in for ANY van that's
+  // currently out, since the person bringing it back (e.g. a
+  // department head wrapping up a group trip) isn't always the same
+  // person who originally checked it out.
+  const myPendingCheckout = myRentals.find(r=>r.status==='assigned' && !r.checkout);
+  const anyOutstandingReturn = selectedReturnId
+    ? rentals.find(r=>r.id===selectedReturnId)
+    : null;
+  const activeRental = myPendingCheckout || anyOutstandingReturn;
   const activeVan = activeRental ? vans.find(v=>v.id===activeRental.vanId) : null;
+  const outstandingReturns = rentals.filter(r=>r.checkout && !r.return);
 
   if(!vr.status){
     return <DriverApply user={user} onDone={refreshProfile} />;
@@ -719,10 +814,10 @@ function DriverHome({user,profile,vans,rentals,warningLights,refreshProfile}){
   if(view==='request') return <RequestRental user={user} vans={vans} rentals={rentals} onAssigned={()=>setView('home')} />;
 
   if(activeRental && activeVan && !activeRental.checkout){
-    return <CheckoutFlow user={user} van={activeVan} rental={activeRental} warningLights={warningLights} onDone={()=>setView('home')} />;
+    return <CheckoutFlow user={user} van={activeVan} rental={activeRental} warningLights={warningLights} onDone={()=>{setSelectedReturnId(null); setView('home');}} />;
   }
   if(activeRental && activeVan && activeRental.checkout && !activeRental.return){
-    return <ReturnFlow van={activeVan} rental={activeRental} onDone={()=>setView('home')} />;
+    return <ReturnFlow user={user} van={activeVan} rental={activeRental} warningLights={warningLights} onDone={()=>{setSelectedReturnId(null); setView('home');}} />;
   }
 
   return (
@@ -733,6 +828,23 @@ function DriverHome({user,profile,vans,rentals,warningLights,refreshProfile}){
         <button className="primary" onClick={()=>setView('request')}>Request a Van</button>
         <button className="secondary" onClick={()=>setView('renew')}>Renew My License</button>
       </div>
+
+      {outstandingReturns.length>0 && (
+        <div className="card">
+          <h3>Vans Still Out</h3>
+          <p className="muted">Anyone approved to drive can check one of these back in — doesn't have to be who checked it out.</p>
+          {outstandingReturns.map(r=>{
+            const van = vans.find(v=>v.id===r.vanId);
+            return (
+              <div key={r.id} className="list-item">
+                <div><div>{van?.name}</div><div className="muted">Out since {r.date} {r.time}</div></div>
+                <button className="secondary" style={{marginTop:0, width:'auto', padding:'8px 14px'}} onClick={()=>setSelectedReturnId(r.id)}>Check It In</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <div className="card">
         <h3>My Rental History</h3>
         {myRentals.length===0 && <p className="muted">No rentals yet.</p>}
@@ -1042,6 +1154,7 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
         <button className={tab==='adddriver'?'active':''} onClick={()=>setTab('adddriver')}>Add Driver</button>
         <button className={tab==='vans'?'active':''} onClick={()=>setTab('vans')}>Vans</button>
         <button className={tab==='schedule'?'active':''} onClick={()=>setTab('schedule')}>Schedule</button>
+        <button className={tab==='history'?'active':''} onClick={()=>setTab('history')}>History</button>
         <button className={tab==='repairs'?'active':''} onClick={()=>setTab('repairs')}>Repairs</button>
         <button className={tab==='lights'?'active':''} onClick={()=>setTab('lights')}>Lights</button>
         <button className={tab==='alerts'?'active':''} onClick={()=>setTab('alerts')}>Alerts{openAlerts.length>0?` (${openAlerts.length})`:''}</button>
@@ -1105,6 +1218,7 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
       )}
 
       {tab==='schedule' && <ScheduleAdmin vans={vans} approvedDrivers={approved} rentals={rentals} onAdd={addManualReservation} onCancel={cancelReservation} />}
+      {tab==='history' && <RentalHistoryAdmin vans={vans} rentals={rentals} allUsers={allUsers} />}
       {tab==='repairs' && <RepairsAdmin vans={vans} repairLog={repairLog} onAdd={addRepair} />}
       {tab==='lights' && <WarningLightsAdmin vans={vans} warningLights={warningLights} onAdd={addWarningLight} />}
 
@@ -1148,6 +1262,55 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function RentalHistoryAdmin({vans,rentals,allUsers}){
+  const [search,setSearch] = useState('');
+  const completed = rentals.filter(r=>r.status==='completed').sort((a,b)=>(b.return?.at||0)-(a.return?.at||0));
+
+  function nameFor(uid_){
+    if(!uid_) return 'Unknown';
+    const u = allUsers.find(u=>u.id===uid_);
+    return u?.name || u?.email || 'Unknown';
+  }
+
+  const filtered = completed.filter(r=>{
+    if(!search) return true;
+    const van = vans.find(v=>v.id===r.vanId);
+    const q = search.toLowerCase();
+    return (van?.name||'').toLowerCase().includes(q)
+      || nameFor(r.driverId).toLowerCase().includes(q)
+      || nameFor(r.return?.completedBy).toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="card">
+      <h3>Rental History</h3>
+      <p className="muted">Who checked each van out, and who checked it back in.</p>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by van or driver name..." style={{marginBottom:14}} />
+
+      {filtered.length===0 && <p className="muted">No completed rentals{search?' matching that search':''}.</p>}
+      {filtered.map(r=>{
+        const van = vans.find(v=>v.id===r.vanId);
+        const checkoutBy = nameFor(r.driverId);
+        const checkinBy = nameFor(r.return?.completedBy);
+        const differentPerson = r.return?.completedBy && r.return.completedBy !== r.driverId;
+        const adminCompleted = r.checkout?.completedByAdmin;
+        return (
+          <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+            <div><strong>{van?.name}</strong></div>
+            <div className="muted">{r.date} {r.time} → {r.endDate} {r.endTime}</div>
+            <div className="muted">Checked out by: {checkoutBy}{adminCompleted && ' (checkout completed by admin)'}</div>
+            <div className="muted">
+              Checked in by: {checkinBy}
+              {differentPerson && <span style={{color:'var(--blue)', fontWeight:600}}> — different from who checked it out</span>}
+            </div>
+            {r.return?.problems && <div className="muted" style={{color:'var(--danger)'}}>Problems reported at return</div>}
+          </div>
+        );
+      })}
     </div>
   );
 }
