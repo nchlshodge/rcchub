@@ -413,14 +413,15 @@ function GasGauge({value, onChange}){
 }
 
 function CheckoutFlow({user,van,rental,warningLights,onDone}){
-  const [keysConfirmed,setKeysConfirmed] = useState(false);
-  const [mileage,setMileage] = useState('');
-  const [gas,setGas] = useState(null);
-  const [dashPhoto,setDashPhoto] = useState(null);
+  const draft = rental.checkoutDraft || {};
+  const [keysConfirmed,setKeysConfirmed] = useState(true); // once a draft exists they've already gotten the keys
+  const [mileage,setMileage] = useState(draft.mileage || '');
+  const [gas,setGas] = useState(draft.gas ?? null);
+  const [dashPhoto,setDashPhoto] = useState(draft.dashPhoto || null);
   const [dashUploading,setDashUploading] = useState(false);
-  const [checkedLights,setCheckedLights] = useState([]); // array of light ids
-  const [otherLightChecked,setOtherLightChecked] = useState(false);
-  const [otherLightDesc,setOtherLightDesc] = useState('');
+  const [checkedLights,setCheckedLights] = useState(draft.checkedLights || []);
+  const [otherLightChecked,setOtherLightChecked] = useState(draft.otherLightChecked || false);
+  const [otherLightDesc,setOtherLightDesc] = useState(draft.otherLightDesc || '');
   const [clean,setClean] = useState(null);
   const [cleanPhoto,setCleanPhoto] = useState(null);
   const [cleanUploading,setCleanUploading] = useState(false);
@@ -437,6 +438,9 @@ function CheckoutFlow({user,van,rental,warningLights,onDone}){
     return l && !l.safety;
   });
 
+  const isBlocked = rental.checkoutBlocked && !rental.checkoutCleared;
+  const wasCleared = rental.checkoutBlocked && rental.checkoutCleared;
+
   async function handlePhoto(file, setPhoto, setUploading){
     setUploading(true);
     const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/${uid()}.jpg`);
@@ -445,11 +449,31 @@ function CheckoutFlow({user,van,rental,warningLights,onDone}){
   }
 
   function toggleLight(id){
-    setCheckedLights(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
+    const next = checkedLights.includes(id) ? checkedLights.filter(x=>x!==id) : [...checkedLights, id];
+    setCheckedLights(next);
+    const stillHasSafety = next.some(lid => relevantLights.find(l=>l.id===lid)?.safety);
+    if(stillHasSafety) saveDraftAndBlock(next);
+  }
+
+  // Saves everything entered so far and flags the rental as blocked,
+  // so an admin can see exactly what the driver already recorded and
+  // either clear them to continue or finish checkout on their behalf.
+  async function saveDraftAndBlock(lightsOverride){
+    const lightIds = lightsOverride || checkedLights;
+    await db.collection('vanRentals').doc(rental.id).update({
+      checkoutDraft: { mileage, gas, dashPhoto, checkedLights: lightIds, otherLightChecked, otherLightDesc },
+      checkoutBlocked: true, checkoutCleared: false,
+    });
+    const lightNames = lightIds.map(id => relevantLights.find(l=>l.id===id)?.name).filter(Boolean);
+    await db.collection('vanAlerts').add({
+      type:'safety_light_block', driverId:user.uid, vanId:van.id, rentalId:rental.id,
+      description:`Safety light(s) checked during checkout: ${lightNames.join(', ')}`,
+      createdAt:Date.now(), resolved:false,
+    });
   }
 
   const canSubmit = keysConfirmed && mileage && gas!==null && dashPhoto
-    && (checkedLights.length===0 || safetyLightsOn.length===0) // block submit if a safety light is checked — must call first
+    && safetyLightsOn.length===0
     && (!otherLightChecked || otherLightDesc)
     && clean!==null && cleanPhoto && confirmed && !saving;
 
@@ -462,7 +486,9 @@ function CheckoutFlow({user,van,rental,warningLights,onDone}){
         warningLightsOn: lightNames,
         otherLightReported: otherLightChecked, otherLightDesc,
         clean, cleanPhoto, at: Date.now(),
-      }
+      },
+      checkoutDraft: firebase.firestore.FieldValue.delete(),
+      checkoutBlocked: false, checkoutCleared: false,
     });
     await db.collection('vans').doc(van.id).update({
       mileage: Number(mileage)||van.mileage, gas,
@@ -475,6 +501,20 @@ function CheckoutFlow({user,van,rental,warningLights,onDone}){
     }
     setSaving(false);
     onDone();
+  }
+
+  if(isBlocked){
+    return (
+      <div className="content">
+        <div className="card">
+          <h2>Waiting on Admin</h2>
+          <div className="banner-danger">
+            A safety warning light was flagged during your dashboard check. An admin has been notified and needs to clear this before you can finish checking out. Please call Nicholas if you haven't already.
+          </div>
+          <p className="muted" style={{marginTop:14}}>What you entered so far is saved — once an admin clears this, you'll be able to pick up right where you left off.</p>
+        </div>
+      </div>
+    );
   }
 
   if(!keysConfirmed){
@@ -870,6 +910,83 @@ function PendingDriverCard({driverUser,onApprove,onDeny,onVerify,onUpdateExp}){
   );
 }
 
+function SafetyBlockAlertCard({alert,driver,van,rental,onResolveAlert}){
+  const draft = rental.checkoutDraft || {};
+  const [completing,setCompleting] = useState(false);
+  const [clean,setClean] = useState(null);
+  const [cleanPhoto,setCleanPhoto] = useState(null);
+  const [cleanUploading,setCleanUploading] = useState(false);
+  const [saving,setSaving] = useState(false);
+
+  async function clearForDriver(){
+    setSaving(true);
+    await db.collection('vanRentals').doc(rental.id).update({
+      checkoutCleared: true,
+      clearedBy: currentUserUid(), clearedAt: Date.now(),
+    });
+    await onResolveAlert(alert.id);
+    setSaving(false);
+  }
+
+  async function handlePhoto(file){
+    setCleanUploading(true);
+    const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/${uid()}.jpg`);
+    setCleanPhoto(url);
+    setCleanUploading(false);
+  }
+
+  async function completeAsAdmin(){
+    setSaving(true);
+    await db.collection('vanRentals').doc(rental.id).update({
+      checkout: {
+        mileage: draft.mileage, gas: draft.gas, dashPhoto: draft.dashPhoto,
+        warningLightsOn: draft.checkedLights || [],
+        otherLightReported: draft.otherLightChecked||false, otherLightDesc: draft.otherLightDesc||'',
+        clean, cleanPhoto, at: Date.now(), completedByAdmin: true,
+      },
+      checkoutDraft: firebase.firestore.FieldValue.delete(),
+      checkoutBlocked: false, checkoutCleared: false,
+    });
+    await db.collection('vans').doc(van.id).update({
+      mileage: Number(draft.mileage)||van.mileage, gas: draft.gas,
+    });
+    await onResolveAlert(alert.id);
+    setSaving(false);
+  }
+
+  return (
+    <div className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+      <div><strong>{driver?.name||'Unknown driver'}</strong> on {van?.name}</div>
+      <div className="muted">"{alert.description}"</div>
+      <div className="muted" style={{marginTop:6}}>Recorded so far — Mileage: {draft.mileage||'—'} · Gas: {draft.gas ?? '—'}%</div>
+      {draft.dashPhoto && <img src={draft.dashPhoto} alt="dashboard" style={{maxWidth:'100%',borderRadius:8,marginTop:8}} />}
+
+      {!completing && (
+        <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
+          <button className="secondary" style={{marginTop:0}} disabled={saving} onClick={clearForDriver}>
+            {saving ? 'Clearing...' : 'Clear — let driver finish'}
+          </button>
+          <button className="secondary" style={{marginTop:0}} onClick={()=>setCompleting(true)}>Complete checkout myself</button>
+        </div>
+      )}
+
+      {completing && (
+        <div style={{marginTop:14, paddingTop:14, borderTop:'1px solid var(--border)'}}>
+          <p className="muted">Finish the last step (cleanliness) on the driver's behalf to complete this checkout now.</p>
+          <label>Is the van clean?</label>
+          <YesNo value={clean} onChange={setClean} />
+          <CameraCapture label="Take a photo of the van interior" photoUrl={cleanPhoto} uploading={cleanUploading} onCapture={handlePhoto} />
+          <button className="primary" disabled={clean===null || !cleanPhoto || saving} onClick={completeAsAdmin}>
+            {saving ? 'Completing...' : 'Complete Checkout'}
+          </button>
+          <button className="link-btn" onClick={()=>setCompleting(false)}>Cancel</button>
+        </div>
+      )}
+    </div>
+  );
+}
+function currentUserUid(){ return auth.currentUser ? auth.currentUser.uid : null; }
+
 function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,repairLog,alerts}){
   const [tab,setTab] = useState('approvals');
   const driverUsers = allUsers.filter(u=>u.vanRentalProfile);
@@ -998,6 +1115,12 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
           {openAlerts.map(a=>{
             const driver = allUsers.find(u=>u.id===a.driverId);
             const van = vans.find(v=>v.id===a.vanId);
+            const rental = a.rentalId ? rentals.find(r=>r.id===a.rentalId) : null;
+            const isCheckoutBlock = a.type==='safety_light_block' && rental && rental.checkoutBlocked && !rental.checkoutCleared;
+
+            if(isCheckoutBlock){
+              return <SafetyBlockAlertCard key={a.id} alert={a} driver={driver} van={van} rental={rental} onResolveAlert={resolveAlert} />;
+            }
             return (
               <div key={a.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
                 <div><strong>{driver?.name||'Unknown driver'}</strong> on {van?.name}</div>
