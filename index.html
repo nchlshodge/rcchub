@@ -195,6 +195,22 @@
     }
     .incident-quick-link:hover { border-color: var(--red); box-shadow: 0 0 0 3px rgba(160,48,48,0.08); }
 
+    .share-link-btn {
+      display: block;
+      width: 100%;
+      background: none;
+      border: none;
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      margin-top: 14px;
+      padding: 4px;
+      font-family: 'Inter', sans-serif;
+    }
+    .share-link-btn:hover { text-decoration: underline; }
+
     /* ── DASHBOARD ── */
     .welcome {
       margin-bottom: 32px;
@@ -361,6 +377,7 @@
     <a href="incident/index.html" class="incident-quick-link">
       📋 Report an incident — no sign-in needed
     </a>
+    <button id="shareLoginBtn" class="share-link-btn">📤 Share this app</button>
   </div>
 </div>
 
@@ -385,6 +402,7 @@
     </div>
 
     <button id="openRequestModal" class="request-access-link">Request access for someone else →</button>
+    <button id="shareHomeBtn" class="share-link-btn">📤 Share this app with someone</button>
   </main>
 </div>
 
@@ -603,6 +621,36 @@
     el.textContent = msg;
     el.style.display = 'block';
   }
+
+  // ── SHARE THIS APP ──
+  const HUB_URL = 'https://nchlshodge.github.io/rcchub/';
+
+  async function shareApp(){
+    const shareData = {
+      title: 'RCC Ministry Apps',
+      text: 'Bedside, Incident Reports, and Van Usage — all in one place.',
+      url: HUB_URL,
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        // User cancelled the share sheet — not an error, do nothing.
+      }
+    } else if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(HUB_URL);
+        alert('Link copied! ' + HUB_URL);
+      } catch (err) {
+        prompt('Copy this link to share:', HUB_URL);
+      }
+    } else {
+      prompt('Copy this link to share:', HUB_URL);
+    }
+  }
+
+  document.getElementById('shareLoginBtn').addEventListener('click', shareApp);
+  document.getElementById('shareHomeBtn').addEventListener('click', shareApp);
 
   // ── REQUEST ACCESS (for someone else) ──
   document.getElementById('openRequestModal').addEventListener('click', () => {
