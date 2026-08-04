@@ -242,10 +242,12 @@
           <div class="subtab active" data-vtab="approvals">Driver Approvals</div>
           <div class="subtab" data-vtab="vans">Vans</div>
           <div class="subtab" data-vtab="alerts">Safety Alerts</div>
+          <div class="subtab" data-vtab="history">History</div>
         </div>
         <div id="van-approvals"><div class="loading">Loading...</div></div>
         <div id="van-vans" style="display:none;"><div class="loading">Loading...</div></div>
         <div id="van-alerts" style="display:none;"><div class="loading">Loading...</div></div>
+        <div id="van-history" style="display:none;"><div class="loading">Loading...</div></div>
         <p class="card-text" style="margin-top:16px;">For scheduling, repairs, warning lights, adding drivers, and adding vans (including borrowed ones), use the <a href="van/index.html" style="color:var(--blue);">Van Usage admin view →</a></p>
       </div>
 
@@ -321,6 +323,7 @@
         loadVanApprovals();
         loadVans();
         loadVanAlerts();
+        loadVanHistory();
         loadModuleManagement();
         loadAccessRequests();
         loadAdminManagement();
@@ -462,7 +465,7 @@
     t.addEventListener('click', () => {
       document.querySelectorAll('[data-vtab]').forEach(x => x.classList.remove('active'));
       t.classList.add('active');
-      ['approvals','vans','alerts'].forEach(k => {
+      ['approvals','vans','alerts','history'].forEach(k => {
         document.getElementById('van-' + k).style.display = (k === t.dataset.vtab) ? 'block' : 'none';
       });
     });
@@ -556,6 +559,39 @@
     await db.collection('vanAlerts').doc(alertId).update({resolved:true});
     showBanner('Cleared — driver can finish checkout now.');
   };
+
+  function loadVanHistory() {
+    Promise.all([
+      db.collection('vanRentals').where('status','==','completed').get(),
+      db.collection('vans').get(),
+      db.collection('users').get(),
+    ]).then(([rentalsSnap, vansSnap, usersSnap]) => {
+      const rentals = rentalsSnap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(b.return?.at||0)-(a.return?.at||0));
+      const vansById = {}; vansSnap.docs.forEach(d => vansById[d.id] = d.data());
+      const usersById = {}; usersSnap.docs.forEach(d => usersById[d.id] = d.data());
+      const nameFor = uid_ => uid_ ? (usersById[uid_]?.name || usersById[uid_]?.email || 'Unknown') : 'Unknown';
+
+      const c = document.getElementById('van-history');
+      if (!rentals.length) { c.innerHTML = '<div class="empty-state">No completed rentals yet.</div>'; return; }
+
+      c.innerHTML = rentals.map(r => {
+        const van = vansById[r.vanId];
+        const checkoutBy = nameFor(r.driverId);
+        const checkinBy = nameFor(r.return?.completedBy);
+        const differentPerson = r.return?.completedBy && r.return.completedBy !== r.driverId;
+        return `
+          <div class="card">
+            <div class="card-title">${escHtml(van?.name||'Unknown van')}</div>
+            <div class="card-meta"><span>${r.date||''} ${r.time||''} → ${r.endDate||''} ${r.endTime||''}</span></div>
+            <div class="card-text">Checked out by: ${escHtml(checkoutBy)}</div>
+            <div class="card-text">Checked in by: ${escHtml(checkinBy)}${differentPerson ? ' <strong style="color:var(--blue);">— different from who checked it out</strong>' : ''}</div>
+          </div>`;
+      }).join('');
+    }).catch(err => {
+      document.getElementById('van-history').innerHTML = '<div class="empty-state">Could not load rental history.</div>';
+      console.error(err);
+    });
+  }
 
   // ── App Access ──
   const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage' };
