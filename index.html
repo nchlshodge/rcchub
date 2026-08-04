@@ -170,6 +170,31 @@
     .email-form-links button { background: none; border: none; color: var(--text-soft); cursor: pointer; text-decoration: underline; padding: 0; font-family: 'Inter', sans-serif; }
     .auth-error { font-size: 13px; color: var(--red); max-width: 300px; display: none; }
 
+    .no-login-needed { width: 100%; max-width: 300px; margin-top: 8px; }
+    .no-login-divider {
+      display: flex; align-items: center; text-align: center;
+      color: var(--text-soft); font-size: 12px; margin: 18px 0;
+    }
+    .no-login-divider::before, .no-login-divider::after {
+      content: ''; flex: 1; border-bottom: 1px solid var(--border);
+    }
+    .no-login-divider span { padding: 0 12px; }
+    .incident-quick-link {
+      display: block;
+      width: 100%;
+      text-align: center;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-mid);
+      text-decoration: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .incident-quick-link:hover { border-color: var(--red); box-shadow: 0 0 0 3px rgba(160,48,48,0.08); }
+
     /* ── DASHBOARD ── */
     .welcome {
       margin-bottom: 32px;
@@ -329,6 +354,13 @@
       </div>
     </div>
     <div class="auth-error" id="authError"></div>
+  </div>
+
+  <div class="no-login-needed">
+    <div class="no-login-divider"><span>or</span></div>
+    <a href="incident/index.html" class="incident-quick-link">
+      📋 Report an incident — no sign-in needed
+    </a>
   </div>
 </div>
 
