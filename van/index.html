@@ -307,6 +307,8 @@ function RequestRental({user,vans,rentals,onAssigned}){
   const [purpose,setPurpose] = useState('');
   const [error,setError] = useState('');
   const [saving,setSaving] = useState(false);
+  const [isRecurring,setIsRecurring] = useState(false);
+  const [recurringDay,setRecurringDay] = useState('');
 
   async function autoAssign(){
     setError(''); setSaving(true);
@@ -341,22 +343,82 @@ function RequestRental({user,vans,rentals,onAssigned}){
     setSaving(false);
     onAssigned();
   }
+
+  async function submitRecurring(){
+    setError(''); setSaving(true);
+    if(!recurringDay || !time || !endTime || !date){
+      setError('Please fill in the day, start date, and times.'); setSaving(false); return;
+    }
+    const windowStart = date;
+    const windowEnd = addMonths(date, 3);
+    await db.collection('vanRecurringRequests').add({
+      driverId: user.uid, dayOfWeek: recurringDay, time, endTime, purpose,
+      windowStart, windowEnd,
+      status: 'pending', // pending | active | renewal_requested | ended | denied
+      createdAt: Date.now(),
+    });
+    setSaving(false);
+    onAssigned();
+  }
+
+  function addMonths(dateStr, months){
+    const d = new Date(dateStr+'T00:00:00');
+    d.setMonth(d.getMonth()+months);
+    return d.toISOString().split('T')[0];
+  }
+
+  const canSubmitOneTime = date && time && endDate && endTime && !saving;
+  const canSubmitRecurring = recurringDay && date && time && endTime && !saving;
+
   return (
     <div className="content">
       <div className="card">
         <h2>Request a Van</h2>
-        <label>Start Date</label>
-        <input type="date" value={date} onChange={e=>setDate(e.target.value)} />
-        <label>Start Time</label>
-        <input type="time" value={time} onChange={e=>setTime(e.target.value)} />
-        <label>Return Date</label>
-        <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} />
-        <label>Return Time</label>
-        <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} />
+
+        <div className="card" style={{background:'var(--blue-dim)', border:'1px solid var(--blue-glow)', padding:14, marginBottom:0}}>
+          <label style={{marginTop:0, display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer'}}>
+            <input type="checkbox" checked={isRecurring} onChange={e=>setIsRecurring(e.target.checked)} style={{width:'auto', marginTop:3}} />
+            <span style={{fontWeight:400, fontSize:14}}>Make this a weekly reservation (e.g. same time every week for a season). An admin approves this before it starts.</span>
+          </label>
+        </div>
+
+        {!isRecurring && (<>
+          <label>Start Date</label>
+          <input type="date" value={date} onChange={e=>setDate(e.target.value)} />
+          <label>Start Time</label>
+          <input type="time" value={time} onChange={e=>setTime(e.target.value)} />
+          <label>Return Date</label>
+          <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} />
+          <label>Return Time</label>
+          <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} />
+        </>)}
+
+        {isRecurring && (<>
+          <label>Which day of the week?</label>
+          <select value={recurringDay} onChange={e=>setRecurringDay(e.target.value)}>
+            <option value="">Select a day...</option>
+            <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+            <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
+          </select>
+          <label>Starting From</label>
+          <input type="date" value={date} onChange={e=>setDate(e.target.value)} />
+          <label>Time</label>
+          <input type="time" value={time} onChange={e=>setTime(e.target.value)} />
+          <label>Return Time (same day, each week)</label>
+          <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} />
+          <p className="muted">This requests the same day/time every week for 3 months. An admin will review and approve it, then you'll be prompted to renew before it runs out.</p>
+        </>)}
+
         <label>Purpose / Destination</label>
         <input value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="e.g. Youth group retreat" />
         {error && <div className="banner-danger">{error}</div>}
-        <button className="primary" disabled={!date || !time || !endDate || !endTime || saving} onClick={autoAssign}>{saving?'Finding a van...':'Find Me a Van'}</button>
+
+        {!isRecurring && (
+          <button className="primary" disabled={!canSubmitOneTime} onClick={autoAssign}>{saving?'Finding a van...':'Find Me a Van'}</button>
+        )}
+        {isRecurring && (
+          <button className="primary" disabled={!canSubmitRecurring} onClick={submitRecurring}>{saving?'Submitting...':'Request Weekly Reservation'}</button>
+        )}
       </div>
     </div>
   );
@@ -761,8 +823,36 @@ function ReturnFlow({user,van,rental,warningLights,onDone}){
 function DriverHome({user,profile,vans,rentals,warningLights,refreshProfile}){
   const [view,setView] = useState('home');
   const [selectedReturnId,setSelectedReturnId] = useState(null);
+  const [myRecurring,setMyRecurring] = useState([]);
   const vr = profile.vanRentalProfile || {};
   const myRentals = rentals.filter(r=>r.driverId===user.uid);
+
+  useEffect(()=>{
+    const unsub = db.collection('vanRecurringRequests').where('driverId','==',user.uid).onSnapshot(s=>{
+      setMyRecurring(s.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return unsub;
+  },[user.uid]);
+
+  // A recurring reservation is "renewal due" once its window ends
+  // within the next 7 days and the driver hasn't already asked to
+  // continue (or let it end). Since there's no backend scheduler,
+  // this only gets checked whenever the driver happens to open the
+  // app — there's no proactive email/text reminder.
+  const oneWeekFromNow = new Date(); oneWeekFromNow.setDate(oneWeekFromNow.getDate()+7);
+  const renewalDue = myRecurring.find(r=>{
+    if(r.status!=='active') return false;
+    const windowEnd = new Date(r.windowEnd+'T00:00:00');
+    return windowEnd <= oneWeekFromNow;
+  });
+
+  async function requestRenewal(reqId){
+    await db.collection('vanRecurringRequests').doc(reqId).update({status:'renewal_requested', renewalRequestedAt: Date.now()});
+  }
+  async function declineRenewal(reqId){
+    await db.collection('vanRecurringRequests').doc(reqId).update({status:'ended', endedAt: Date.now()});
+  }
+
   // Checkout is personal — only the driver who requested the van sees
   // their own pending checkout. Returns are NOT personal — any
   // approved driver can complete the check-in for ANY van that's
@@ -822,6 +912,16 @@ function DriverHome({user,profile,vans,rentals,warningLights,refreshProfile}){
 
   return (
     <div className="content">
+      {renewalDue && (
+        <div className="card" style={{background:'var(--blue-dim)', border:'1px solid var(--blue-glow)'}}>
+          <h3 style={{marginTop:0}}>Weekly Reservation Ending Soon</h3>
+          <p className="muted">Your {DAY_NAMES[renewalDue.dayOfWeek]} {renewalDue.time}–{renewalDue.endTime} reservation runs through {renewalDue.windowEnd}. Want to continue for another 3 months?</p>
+          <div style={{display:'flex',gap:8,marginTop:10}}>
+            <button className="primary" style={{marginTop:0}} onClick={()=>requestRenewal(renewalDue.id)}>Yes, Continue</button>
+            <button className="secondary" style={{marginTop:0}} onClick={()=>declineRenewal(renewalDue.id)}>No, Let It End</button>
+          </div>
+        </div>
+      )}
       <div className="card">
         <h2>Welcome, {(profile.name||user.displayName||'').split(' ')[0]}</h2>
         <p className="muted">License expires {vr.licenseExp}</p>
@@ -1099,15 +1199,93 @@ function SafetyBlockAlertCard({alert,driver,van,rental,onResolveAlert}){
 }
 function currentUserUid(){ return auth.currentUser ? auth.currentUser.uid : null; }
 
-function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,repairLog,alerts}){
+function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,repairLog,alerts,recurringRequests}){
   const [tab,setTab] = useState('approvals');
   const driverUsers = allUsers.filter(u=>u.vanRentalProfile);
   const pending = driverUsers.filter(u=>u.vanRentalProfile.status==='pending');
   const approved = driverUsers.filter(u=>u.vanRentalProfile.status==='approved');
   const openAlerts = alerts.filter(a=>!a.resolved);
+  const recurringPendingCount = recurringRequests.filter(r=>r.status==='pending'||r.status==='renewal_requested').length;
 
   async function approve(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'approved'}); }
   async function deny(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'denied'}); }
+
+  // Generates individual weekly vanRentals docs across a 3-month
+  // window for an approved recurring request, checking each week for
+  // van conflicts the same way a one-time request does.
+  async function approveRecurring(reqId){
+    const req = recurringRequests.find(r=>r.id===reqId);
+    if(!req) return;
+    const activeRentals = rentals.filter(r=>r.status!=='completed' && r.status!=='cancelled');
+    const start = new Date(req.windowStart+'T00:00:00');
+    const end = new Date(req.windowEnd+'T00:00:00');
+    let cursor = new Date(start);
+    // Move cursor to the first matching day-of-week on or after windowStart
+    while(cursor.getDay() !== Number(req.dayOfWeek)) cursor.setDate(cursor.getDate()+1);
+
+    const createdDates = [];
+    const skippedDates = [];
+    while(cursor <= end){
+      const dateStr = cursor.toISOString().split('T')[0];
+      const slotStart = new Date(`${dateStr}T${req.time}`);
+      const slotEnd = new Date(`${dateStr}T${req.endTime}`);
+      const conflictVanIds = new Set(
+        activeRentals.filter(r=>{
+          if(!r.date || !r.time) return false;
+          const rStart = new Date(`${r.date}T${r.time}`);
+          const rEnd = r.endDate && r.endTime ? new Date(`${r.endDate}T${r.endTime}`) : new Date(rStart.getTime()+4*60*60*1000);
+          return rentalOverlaps(slotStart,slotEnd,rStart,rEnd);
+        }).map(r=>r.vanId)
+      );
+      const available = vans.filter(v=>v.status!=='maintenance' && !conflictVanIds.has(v.id));
+      if(available.length>0){
+        const van = [...available].sort((a,b)=>{
+          if(!!a.lowPriority !== !!b.lowPriority) return a.lowPriority ? 1 : -1;
+          return a.mileage-b.mileage;
+        })[0];
+        await db.collection('vanRentals').add({
+          driverId: req.driverId, vanId: van.id, date: dateStr, time: req.time,
+          endDate: dateStr, endTime: req.endTime, purpose: req.purpose,
+          status:'assigned', createdAt: Date.now(), recurringRequestId: reqId,
+        });
+        createdDates.push(dateStr);
+      } else {
+        skippedDates.push(dateStr);
+      }
+      cursor.setDate(cursor.getDate()+7);
+    }
+
+    await db.collection('vanRecurringRequests').doc(reqId).update({
+      status:'active', approvedAt: Date.now(),
+      lastGeneratedDates: createdDates, skippedDates,
+    });
+  }
+
+  async function denyRecurring(reqId){
+    await db.collection('vanRecurringRequests').doc(reqId).update({status:'denied'});
+  }
+
+  async function endRecurring(reqId){
+    if(!confirm('End this recurring reservation? Already-scheduled weeks stay on the calendar, but no new weeks will be generated.')) return;
+    await db.collection('vanRecurringRequests').doc(reqId).update({status:'ended', endedAt: Date.now()});
+  }
+
+  // Approving a renewal extends the window another 3 months and
+  // generates the next batch of weekly slots, same conflict-checking
+  // as the initial approval.
+  async function approveRenewal(reqId){
+    const req = recurringRequests.find(r=>r.id===reqId);
+    if(!req) return;
+    const newWindowStart = req.windowEnd;
+    const d = new Date(newWindowStart+'T00:00:00');
+    d.setMonth(d.getMonth()+3);
+    const newWindowEnd = d.toISOString().split('T')[0];
+    await db.collection('vanRecurringRequests').doc(reqId).update({
+      windowStart: newWindowStart, windowEnd: newWindowEnd, status:'pending', renewalRequestedAt: null,
+    });
+    // Re-run the same generation logic against the new window.
+    await approveRecurring(reqId);
+  }
   async function verifyLicenseInPerson(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.licenseVerifiedInPerson':true}); }
   async function updateLicenseExp(uid_, newExp){ await db.collection('users').doc(uid_).update({'vanRentalProfile.licenseExp':newExp}); }
   async function resolveAlert(id){ await db.collection('vanAlerts').doc(id).update({resolved:true}); }
@@ -1155,6 +1333,7 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
         <button className={tab==='vans'?'active':''} onClick={()=>setTab('vans')}>Vans</button>
         <button className={tab==='schedule'?'active':''} onClick={()=>setTab('schedule')}>Schedule</button>
         <button className={tab==='history'?'active':''} onClick={()=>setTab('history')}>History</button>
+        <button className={tab==='recurring'?'active':''} onClick={()=>setTab('recurring')}>Recurring{recurringPendingCount>0?` (${recurringPendingCount})`:''}</button>
         <button className={tab==='repairs'?'active':''} onClick={()=>setTab('repairs')}>Repairs</button>
         <button className={tab==='lights'?'active':''} onClick={()=>setTab('lights')}>Lights</button>
         <button className={tab==='alerts'?'active':''} onClick={()=>setTab('alerts')}>Alerts{openAlerts.length>0?` (${openAlerts.length})`:''}</button>
@@ -1219,6 +1398,7 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
 
       {tab==='schedule' && <ScheduleAdmin vans={vans} approvedDrivers={approved} rentals={rentals} onAdd={addManualReservation} onCancel={cancelReservation} />}
       {tab==='history' && <RentalHistoryAdmin vans={vans} rentals={rentals} allUsers={allUsers} />}
+      {tab==='recurring' && <RecurringAdmin recurringRequests={recurringRequests} allUsers={allUsers} onApprove={approveRecurring} onDeny={denyRecurring} onEnd={endRecurring} onApproveRenewal={approveRenewal} />}
       {tab==='repairs' && <RepairsAdmin vans={vans} repairLog={repairLog} onAdd={addRepair} />}
       {tab==='lights' && <WarningLightsAdmin vans={vans} warningLights={warningLights} onAdd={addWarningLight} />}
 
@@ -1262,6 +1442,75 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+function RecurringAdmin({recurringRequests,allUsers,onApprove,onDeny,onEnd,onApproveRenewal}){
+  function nameFor(uid_){
+    const u = allUsers.find(u=>u.id===uid_);
+    return u?.name || u?.email || 'Unknown';
+  }
+
+  const pendingNew = recurringRequests.filter(r=>r.status==='pending');
+  const renewals = recurringRequests.filter(r=>r.status==='renewal_requested');
+  const active = recurringRequests.filter(r=>r.status==='active');
+  const ended = recurringRequests.filter(r=>r.status==='ended'||r.status==='denied');
+
+  return (
+    <div className="card">
+      <h3>Renewal Requests</h3>
+      <p className="muted">These are already active but the driver has asked to continue for another 3 months.</p>
+      {renewals.length===0 && <p className="muted">None right now.</p>}
+      {renewals.map(r=>(
+        <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+          <div><strong>{nameFor(r.driverId)}</strong> — {DAY_NAMES[r.dayOfWeek]}s, {r.time}–{r.endTime}</div>
+          <div className="muted">Current window ends {r.windowEnd}. Purpose: {r.purpose||'—'}</div>
+          <div style={{display:'flex',gap:8,marginTop:8}}>
+            <button className="primary" style={{marginTop:0}} onClick={()=>onApproveRenewal(r.id)}>Approve — Extend 3 More Months</button>
+            <button className="secondary" style={{marginTop:0}} onClick={()=>onEnd(r.id)}>Let It End</button>
+          </div>
+        </div>
+      ))}
+
+      <h3 style={{marginTop:24}}>New Recurring Requests</h3>
+      {pendingNew.length===0 && <p className="muted">None pending.</p>}
+      {pendingNew.map(r=>(
+        <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+          <div><strong>{nameFor(r.driverId)}</strong> — {DAY_NAMES[r.dayOfWeek]}s, {r.time}–{r.endTime}</div>
+          <div className="muted">Requested window: {r.windowStart} → {r.windowEnd}. Purpose: {r.purpose||'—'}</div>
+          <div style={{display:'flex',gap:8,marginTop:8}}>
+            <button className="primary" style={{marginTop:0}} onClick={()=>onApprove(r.id)}>Approve — Schedule 3 Months</button>
+            <button className="secondary" style={{marginTop:0}} onClick={()=>onDeny(r.id)}>Deny</button>
+          </div>
+        </div>
+      ))}
+
+      <h3 style={{marginTop:24}}>Active Recurring Reservations</h3>
+      {active.length===0 && <p className="muted">None active.</p>}
+      {active.map(r=>{
+        const skipped = r.skippedDates || [];
+        return (
+          <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+            <div><strong>{nameFor(r.driverId)}</strong> — {DAY_NAMES[r.dayOfWeek]}s, {r.time}–{r.endTime}</div>
+            <div className="muted">Window: {r.windowStart} → {r.windowEnd}</div>
+            {skipped.length>0 && <div className="muted" style={{color:'var(--danger)'}}>Couldn't find a van for: {skipped.join(', ')}</div>}
+            <button className="secondary" style={{marginTop:8}} onClick={()=>onEnd(r.id)}>End This Reservation</button>
+          </div>
+        );
+      })}
+
+      {ended.length>0 && (<>
+        <h3 style={{marginTop:24}}>Ended / Denied</h3>
+        {ended.map(r=>(
+          <div key={r.id} className="list-item">
+            <div><div>{nameFor(r.driverId)} — {DAY_NAMES[r.dayOfWeek]}s</div><div className="muted">{r.windowStart} → {r.windowEnd}</div></div>
+            <span className="badge maintenance">{r.status}</span>
+          </div>
+        ))}
+      </>)}
     </div>
   );
 }
@@ -1616,6 +1865,7 @@ function AdminDataLoader({vans,rentals,warningLights}){
   const [repairLog,setRepairLog] = useState([]);
   const [alerts,setAlerts] = useState([]);
   const [allUsers,setAllUsers] = useState([]);
+  const [recurringRequests,setRecurringRequests] = useState([]);
   const [ready,setReady] = useState(false);
 
   useEffect(()=>{
@@ -1623,6 +1873,7 @@ function AdminDataLoader({vans,rentals,warningLights}){
     unsubs.push(db.collection('vanMaintenanceNotes').onSnapshot(s=>setMaintenanceNotes(s.docs.map(d=>({id:d.id,...d.data()})))));
     unsubs.push(db.collection('vanRepairLog').onSnapshot(s=>setRepairLog(s.docs.map(d=>({id:d.id,...d.data()})))));
     unsubs.push(db.collection('vanAlerts').onSnapshot(s=>setAlerts(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vanRecurringRequests').onSnapshot(s=>setRecurringRequests(s.docs.map(d=>({id:d.id,...d.data()})))));
     unsubs.push(db.collection('users').onSnapshot(s=>{setAllUsers(s.docs.map(d=>({id:d.id,...d.data()}))); setReady(true);}));
     return ()=>unsubs.forEach(u=>u());
   },[]);
@@ -1630,7 +1881,7 @@ function AdminDataLoader({vans,rentals,warningLights}){
   if(!ready){
     return <div className="content"><div className="loading">Loading admin data...</div></div>;
   }
-  return <AdminDashboard allUsers={allUsers} vans={vans} rentals={rentals} warningLights={warningLights} maintenanceNotes={maintenanceNotes} repairLog={repairLog} alerts={alerts} />;
+  return <AdminDashboard allUsers={allUsers} vans={vans} rentals={rentals} warningLights={warningLights} maintenanceNotes={maintenanceNotes} repairLog={repairLog} alerts={alerts} recurringRequests={recurringRequests} />;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
