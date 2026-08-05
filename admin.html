@@ -205,6 +205,7 @@
       <div class="section-tab" data-section="incidents">Incident Reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="vans">Van Usage</div>
       <div class="section-tab" data-section="events">Event Requests <span class="badge-count" id="eventsCount" style="display:none;"></span></div>
+      <div class="section-tab" data-section="timeoff">Time Off <span class="badge-count" id="timeOffCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="access">App Access</div>
       <div class="section-tab" data-section="requests">Access Requests <span class="badge-count" id="requestsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="admins">Manage Admins</div>
@@ -246,6 +247,28 @@
           <div class="subtab" data-etab="denied">Denied</div>
         </div>
         <div id="eventRequestsList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- TIME OFF -->
+      <div class="section" id="section-timeoff">
+        <h2 class="section-title">Time Off Requests</h2>
+
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title" style="font-size:15px;">Notification Emails</div>
+          <div class="card-text" style="margin-bottom:10px;">Who gets emailed when a new time off request comes in.</div>
+          <label style="font-size:12px; font-weight:500; color:var(--text-soft); display:block; margin-bottom:4px;">Primary Email</label>
+          <input type="text" id="notifyEmail1" placeholder="you@rochesterchristian.church" style="width:100%; padding:9px 11px; border:1px solid #d1cdc4; border-radius:7px; font-size:14px; margin-bottom:10px;">
+          <label style="font-size:12px; font-weight:500; color:var(--text-soft); display:block; margin-bottom:4px;">Second Email (optional)</label>
+          <input type="text" id="notifyEmail2" placeholder="someone-else@rochesterchristian.church" style="width:100%; padding:9px 11px; border:1px solid #d1cdc4; border-radius:7px; font-size:14px; margin-bottom:10px;">
+          <button class="btn btn-approve" onclick="saveNotificationEmails()">Save</button>
+        </div>
+
+        <div class="subnav">
+          <div class="subtab active" data-totab="pending">Pending</div>
+          <div class="subtab" data-totab="approved">Approved</div>
+          <div class="subtab" data-totab="denied">Denied</div>
+        </div>
+        <div id="timeOffList"><div class="loading">Loading...</div></div>
       </div>
 
       <div class="section" id="section-vans">
@@ -334,6 +357,8 @@
         loadIncidentReports();
         loadVanApprovals();
         loadEventRequests();
+        loadTimeOffRequests();
+        loadNotificationEmails();
         loadVans();
         loadVanAlerts();
         loadVanHistory();
@@ -607,7 +632,7 @@
   }
 
   // ── App Access ──
-  const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage', eventRequest: 'Event Request' };
+  const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage', eventRequest: 'Event Request', timeOff: 'Time Off Request' };
   const ROLE_LABELS = { graphics: 'Graphics Team', marketing: 'Marketing Team' };
   function loadModuleManagement() {
     db.collection('users').onSnapshot(snap => {
@@ -809,6 +834,99 @@
   window.toggleEventField = async (id, field, val) => {
     await db.collection('eventRequests').doc(id).update({[field]: val});
   };
+
+  // ── Time Off Requests ──
+  let allTimeOffRequests = [];
+  let timeOffFilter = 'pending';
+  function loadTimeOffRequests() {
+    db.collection('timeOffRequests').orderBy('submittedAt','desc').onSnapshot(snap => {
+      allTimeOffRequests = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      renderTimeOffRequests();
+      const pendingCount = allTimeOffRequests.filter(r => (r.status||'pending')==='pending').length;
+      const badge = document.getElementById('timeOffCount');
+      if (pendingCount) { badge.textContent = pendingCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
+    }, err => {
+      document.getElementById('timeOffList').innerHTML = '<div class="empty-state">Could not load time off requests.</div>';
+      console.error(err);
+    });
+  }
+  document.querySelectorAll('[data-totab]').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('[data-totab]').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      timeOffFilter = t.dataset.totab;
+      renderTimeOffRequests();
+    });
+  });
+
+  function renderTimeOffRequests() {
+    const c = document.getElementById('timeOffList');
+    const filtered = allTimeOffRequests.filter(r => (r.status||'pending') === timeOffFilter);
+    if (!filtered.length) { c.innerHTML = '<div class="empty-state">Nothing here right now.</div>'; return; }
+
+    c.innerHTML = filtered.map(r => `
+      <div class="card">
+        <div class="card-title">${escHtml(r.name||'')}</div>
+        <div class="card-meta"><span class="tag tag-hospital">${escHtml(r.requestType||'')}</span><span>${escHtml(r.startDate||'')} → ${escHtml(r.endDate||'')}</span></div>
+        <div class="card-text">Amount off: ${escHtml(r.amountOff||'')}</div>
+        <div class="card-text">Coverage: ${escHtml(r.coverage||'')}</div>
+        ${r.officeReturnDate ? `<div class="card-meta"><span>Office return: ${escHtml(r.officeReturnDate)}</span></div>` : ''}
+        <div class="card-meta"><span>${escHtml(r.email||'')}</span></div>
+        <div class="actions" style="margin-top:10px;">
+          ${timeOffFilter==='pending' ? `
+            <button class="btn btn-approve" onclick="setTimeOffStatus('${r.id}','approved')">Approve</button>
+            <button class="btn btn-hide" onclick="setTimeOffStatus('${r.id}','denied')">Deny</button>
+          ` : `<button class="btn btn-unhide" onclick="setTimeOffStatus('${r.id}','pending')">Move back to Pending</button>`}
+        </div>
+      </div>`).join('');
+  }
+
+  window.setTimeOffStatus = async (id, status) => {
+    const req = allTimeOffRequests.find(r=>r.id===id);
+    await db.collection('timeOffRequests').doc(id).update({
+      status, approvedBy: status==='approved' ? currentUser.uid : null,
+      statusChangedAt: new Date().toISOString(),
+    });
+    // Notify the requester via the same Apps Script webhook — this is
+    // a separate call from the initial submission sync, fired the
+    // moment an admin approves/denies from inside the app.
+    if (req && TIME_OFF_WEBHOOK_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
+      fetch(TIME_OFF_WEBHOOK_URL, {
+        method: 'POST', mode: 'no-cors', headers: {'Content-Type':'text/plain'},
+        body: JSON.stringify({
+          action: 'statusChanged', requestId: id, status,
+          requesterEmail: req.email, requesterName: req.name,
+          startDate: req.startDate, endDate: req.endDate,
+        })
+      }).catch(() => {});
+    }
+    showBanner('Request updated.');
+  };
+  // 🔧 Same Apps Script Web App URL as time-off.html's SHEET_SYNC_URL
+  // — paste it here too once deployed, so approve/deny actions taken
+  // in the admin screen can trigger the requester notification email.
+  const TIME_OFF_WEBHOOK_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
+
+  // ── Notification Email Settings ──
+  // Stored in a single small doc so the Apps Script webhook can read
+  // it fresh on every submission, without needing code changes here
+  // whenever the emails change.
+  function loadNotificationEmails() {
+    db.collection('settings').doc('timeOffNotifications').get().then(doc => {
+      if (doc.exists) {
+        const data = doc.data();
+        document.getElementById('notifyEmail1').value = data.email1 || '';
+        document.getElementById('notifyEmail2').value = data.email2 || '';
+      }
+    });
+  }
+  window.saveNotificationEmails = async () => {
+    const email1 = document.getElementById('notifyEmail1').value.trim();
+    const email2 = document.getElementById('notifyEmail2').value.trim();
+    await db.collection('settings').doc('timeOffNotifications').set({ email1, email2 }, { merge: true });
+    showBanner('Notification emails saved.');
+  };
+
   window.cycleGraphicStatus = async (id, current) => {
     const order = ['', 'In Progress', 'Completed'];
     const next = order[(order.indexOf(current)+1) % order.length];

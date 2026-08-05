@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCC — Vacation / Leave of Absence Request</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: #f7f6f3; min-height: 100vh; color: #1a1a1a; }
+
+  .nav {
+    background: #fff; border-bottom: 1px solid #e8e4dc; padding: 0 2rem; height: 60px;
+    display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10;
+  }
+  .nav-brand { font-family: 'Playfair Display', serif; font-size: 22px; color: #2557b8; text-decoration: none; }
+  .nav-brand span { font-family: 'Inter', sans-serif; font-size: 13px; color: #aaa; margin-left: 6px; }
+  .nav-user { font-size: 13px; color: #666; }
+  .nav-signout { background:none; border:none; font-size:13px; color:#999; cursor:pointer; }
+
+  .page { max-width: 620px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  .page-title { font-family: 'Playfair Display', serif; font-size: 26px; margin-bottom: 6px; }
+  .page-sub { font-size: 14px; color: #888; margin-bottom: 2rem; line-height: 1.6; }
+  .page-sub span { color: #c0392b; }
+
+  .section { background: #fff; border: 1px solid #e8e4dc; border-radius: 10px; padding: 20px 22px; margin-bottom: 1.25rem; }
+  label.lbl { font-size: 12px; font-weight: 500; color: #666; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; margin-top: 16px; }
+  label.lbl:first-child { margin-top: 0; }
+  .req { color: #c0392b; margin-left: 2px; }
+  input[type=text], input[type=date], input[type=number], select, textarea {
+    width: 100%; background: #fff; border: 1px solid #d1cdc4; border-radius: 7px; padding: 10px 12px;
+    font-size: 14px; color: #1a1a1a; font-family: 'Inter', sans-serif;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #2557b8; box-shadow: 0 0 0 3px rgba(37,87,184,.1); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media(max-width:520px) { .row { grid-template-columns: 1fr; } }
+
+  .other-input { margin-top: 8px; }
+
+  .agree-box { background: #faf9f6; border: 1px solid #e8e4dc; border-radius: 10px; padding: 16px 18px; font-size: 13px; color: #666; line-height: 1.6; margin-top: 16px; }
+  .check-opt { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 14px; margin-top: 10px; }
+  .check-opt input { margin-top: 2px; accent-color: #2557b8; }
+
+  .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 1.25rem; }
+  .btn-primary { background: #2557b8; color: #fff; border: none; border-radius: 7px; padding: 12px 28px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .btn-primary:hover { background: #1e4694; }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; }
+
+  .success { background: #fff; border: 1px solid #e8e4dc; border-radius: 10px; padding: 3rem 2rem; text-align: center; display: none; }
+  .success h2 { font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 6px; }
+  .success p { font-size: 14px; color: #888; }
+
+  #loginScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px; text-align: center; }
+  #googleSignInBtn { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #d1cdc4; border-radius:12px; padding:14px 24px; font-size:15px; cursor:pointer; }
+  .access-denied { text-align: center; padding: 60px 24px; }
+  .access-denied .title { font-family: 'Playfair Display', serif; font-size: 22px; color: #a03030; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <h1 style="font-family:'Playfair Display',serif; font-size:28px; margin-bottom:20px;">RCC Vacation / Leave Request</h1>
+  <button id="googleSignInBtn">
+    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+    Sign in with Google
+  </button>
+</div>
+
+<div id="appShell" style="display:none;">
+  <nav class="nav">
+    <a href="index.html" class="nav-brand">RCC <span>· All apps</span></a>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span class="nav-user" id="navUser"></span>
+      <button class="nav-signout" id="signOutBtn">Sign out</button>
+    </div>
+  </nav>
+
+  <div class="page">
+    <div id="accessCheck" style="text-align:center; padding:60px; color:#999;">Checking access...</div>
+
+    <div id="formUI" style="display:none;">
+      <h1 class="page-title">Vacation / Leave of Absence</h1>
+      <p class="page-sub">Please submit the times you need to take off work and the type of leave you are taking. <span class="req">*</span> Required.</p>
+
+      <form id="lv-form" novalidate>
+        <div class="section">
+          <label class="lbl">Name <span class="req">*</span></label>
+          <input type="text" id="lv-name" required>
+
+          <div class="row">
+            <div>
+              <label class="lbl">Beginning On <span class="req">*</span></label>
+              <input type="date" id="lv-start" required>
+            </div>
+            <div>
+              <label class="lbl">Ending On <span class="req">*</span></label>
+              <input type="date" id="lv-end" required>
+            </div>
+          </div>
+
+          <label class="lbl">Office Return Date</label>
+          <input type="date" id="lv-return">
+
+          <label class="lbl">How many days/hours will you be off? <span class="req">*</span></label>
+          <input type="text" id="lv-amount" placeholder="e.g. 3 days, or 16 hours" required>
+
+          <label class="lbl">Who will be covering for you? <span class="req">*</span></label>
+          <input type="text" id="lv-coverage" required>
+
+          <label class="lbl">Type of Request <span class="req">*</span></label>
+          <select id="lv-type" required>
+            <option value="">Select...</option>
+            <option value="Vacation">Vacation</option>
+            <option value="Personal">Personal</option>
+            <option value="Bereavement leave">Bereavement leave</option>
+            <option value="Leave of Absence">Leave of Absence</option>
+            <option value="Unpaid">Unpaid</option>
+            <option value="Medical">Medical</option>
+            <option value="Maternity">Maternity</option>
+            <option value="Ministry">Ministry</option>
+            <option value="Sick">Sick</option>
+            <option value="Other">Other</option>
+          </select>
+          <input type="text" id="lv-type-other" class="other-input" placeholder="Please specify" style="display:none;">
+
+          <div class="agree-box">
+            I understand that my request has not been approved until the Administrative Pastor approves it.
+          </div>
+          <label class="check-opt">
+            <input type="checkbox" id="lv-understand" required> I understand <span class="req">*</span>
+          </label>
+        </div>
+
+        <div class="btn-row">
+          <button type="submit" class="btn-primary" id="lv-submit-btn">Submit Request</button>
+        </div>
+      </form>
+
+      <div class="success" id="lv-success">
+        <h2>Request submitted</h2>
+        <p>The Administrative Pastor will review it. You'll be informed once it's decided.</p>
+      </div>
+    </div>
+
+    <div id="accessDenied" class="access-denied" style="display:none;">
+      <div class="title">Access Restricted</div>
+      <p style="color:#888; font-size:14px;">This form is limited to staff. Contact an admin if you believe this is a mistake.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var firebaseConfig = {
+    apiKey: "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+    authDomain: "bedsidercc.firebaseapp.com",
+    projectId: "bedsidercc",
+    storageBucket: "bedsidercc.firebasestorage.app",
+    messagingSenderId: "950958384975",
+    appId: "1:950958384975:web:6f43dec5a7ba842c69c73a"
+  };
+  var fbApp; try { fbApp=firebase.app(); } catch(e) { fbApp=firebase.initializeApp(firebaseConfig); }
+  var auth = firebase.auth();
+  var db = firebase.firestore();
+  var currentUser = null;
+
+  // 🔧 Paste your Apps Script Web App URL here once deployed — this
+  // is what sends the new-submission notification email and syncs
+  // each request into your Google Sheet.
+  var SHEET_SYNC_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
+
+  document.getElementById('googleSignInBtn').addEventListener('click', function(){
+    var provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(function(err){ alert('Sign-in failed: ' + err.message); });
+  });
+  document.getElementById('signOutBtn').addEventListener('click', function(){ auth.signOut(); });
+
+  auth.onAuthStateChanged(function(user){
+    if(user){
+      currentUser = user;
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appShell').style.display = 'block';
+      document.getElementById('navUser').textContent = user.displayName || user.email;
+
+      db.collection('users').doc(user.uid).get().then(function(doc){
+        var data = doc.exists ? doc.data() : {};
+        var hasAccess = data.isAdmin === true || (data.modules && data.modules.timeOff === true);
+        document.getElementById('accessCheck').style.display = 'none';
+        if(hasAccess){
+          document.getElementById('formUI').style.display = 'block';
+          if(!document.getElementById('lv-name').value) document.getElementById('lv-name').value = user.displayName || '';
+        } else {
+          document.getElementById('accessDenied').style.display = 'block';
+        }
+      });
+    } else {
+      currentUser = null;
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('appShell').style.display = 'none';
+    }
+  });
+
+  document.getElementById('lv-type').addEventListener('change', function(){
+    document.getElementById('lv-type-other').style.display = this.value === 'Other' ? 'block' : 'none';
+  });
+
+  document.getElementById('lv-form').addEventListener('submit', function(e){
+    e.preventDefault();
+    if(!document.getElementById('lv-understand').checked){
+      alert('Please check "I understand" to submit.');
+      return;
+    }
+    var start = document.getElementById('lv-start').value;
+    var end = document.getElementById('lv-end').value;
+    if(start && end && new Date(end) < new Date(start)){
+      alert('Ending date must be on or after the beginning date.');
+      return;
+    }
+
+    var typeVal = document.getElementById('lv-type').value;
+    var typeOther = document.getElementById('lv-type-other').value;
+
+    var request = {
+      name: document.getElementById('lv-name').value,
+      startDate: start,
+      endDate: end,
+      officeReturnDate: document.getElementById('lv-return').value,
+      amountOff: document.getElementById('lv-amount').value,
+      coverage: document.getElementById('lv-coverage').value,
+      requestType: typeVal === 'Other' ? ('Other: ' + typeOther) : typeVal,
+      status: 'pending', // pending | approved | denied
+      submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      uid: currentUser.uid,
+      email: currentUser.email,
+    };
+
+    db.collection('timeOffRequests').add(request).then(function(docRef){
+      // Fetch the currently-configured notification emails, then
+      // fire the webhook — best-effort, doesn't block the success
+      // screen if the Sheet/email sync has an issue.
+      db.collection('settings').doc('timeOffNotifications').get().then(function(settingsDoc){
+        var settings = settingsDoc.exists ? settingsDoc.data() : {};
+        if(SHEET_SYNC_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL'){
+          fetch(SHEET_SYNC_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {'Content-Type':'text/plain'},
+            body: JSON.stringify(Object.assign({}, request, {
+              id: docRef.id,
+              submittedAt: new Date().toISOString(),
+              notifyEmail1: settings.email1 || '',
+              notifyEmail2: settings.email2 || '',
+            }))
+          }).catch(function(){ /* best-effort, don't block the user on it */ });
+        }
+      });
+      document.getElementById('lv-form').style.display = 'none';
+      document.getElementById('lv-success').style.display = 'block';
+    }).catch(function(err){
+      alert('Something went wrong submitting your request: ' + err.message);
+    });
+  });
+})();
+</script>
+</body>
+</html>
