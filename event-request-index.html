@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCC — Event &amp; Graphic Request</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: #f7f6f3; min-height: 100vh; color: #1a1a1a; }
+
+  .nav {
+    background: #fff; border-bottom: 1px solid #e8e4dc; padding: 0 2rem; height: 60px;
+    display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10;
+  }
+  .nav-brand { font-family: 'Playfair Display', serif; font-size: 22px; color: #2557b8; text-decoration: none; display:flex; align-items:center; gap:8px; }
+  .nav-brand span { font-family: 'Inter', sans-serif; font-size: 13px; color: #aaa; margin-left: 6px; }
+
+  .page { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  .page-title { font-family: 'Playfair Display', serif; font-size: 28px; margin-bottom: 4px; }
+  .page-sub { font-size: 14px; color: #888; margin-bottom: 2rem; }
+  .page-sub span { color: #c0392b; }
+
+  .section { background: #fff; border: 1px solid #e8e4dc; border-radius: 10px; margin-bottom: 1.25rem; overflow: hidden; }
+  .section-head { background: #faf9f6; padding: 11px 18px; border-bottom: 1px solid #e8e4dc; font-size: 14px; font-weight: 500; }
+  .section-body { padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+
+  label.lbl { font-size: 12px; font-weight: 500; color: #666; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; }
+  .req { color: #c0392b; margin-left: 2px; }
+  input[type=text], input[type=email], input[type=date], input[type=time], input[type=number], select, textarea {
+    width: 100%; background: #fff; border: 1px solid #d1cdc4; border-radius: 7px; padding: 9px 11px;
+    font-size: 14px; color: #1a1a1a; font-family: 'Inter', sans-serif;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #2557b8; box-shadow: 0 0 0 3px rgba(37,87,184,.1); }
+  textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+  .row { display: grid; gap: 12px; }
+  .row-2 { grid-template-columns: 1fr 1fr; }
+  @media(max-width:560px) { .row-2 { grid-template-columns: 1fr; } }
+
+  .radio-group, .check-group { display: flex; flex-direction: column; gap: 8px; }
+  .radio-opt, .check-opt {
+    display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 14px;
+    padding: 10px 12px; border: 1px solid #d1cdc4; border-radius: 7px;
+  }
+  .radio-opt:has(input:checked), .check-opt:has(input:checked) { border-color: #2557b8; background: #eef2fb; }
+  .radio-opt input, .check-opt input { margin-top: 2px; accent-color: #2557b8; }
+  .other-input { margin-top: 6px; }
+
+  .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem; }
+  .btn-primary { background: #2557b8; color: #fff; border: none; border-radius: 7px; padding: 12px 28px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .btn-primary:hover { background: #1e4694; }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; }
+
+  .agree-box { background: #faf9f6; border: 1px solid #e8e4dc; border-radius: 10px; padding: 16px 18px; font-size: 13px; color: #666; line-height: 1.6; }
+
+  .success { background: #fff; border: 1px solid #e8e4dc; border-radius: 10px; padding: 3rem 2rem; text-align: center; display: none; }
+  .success h2 { font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 6px; }
+  .success p { font-size: 14px; color: #888; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="../index.html" class="nav-brand">RCC <span>· All apps</span></a>
+</nav>
+
+<div class="page">
+  <h1 class="page-title">Event &amp; Graphic Request</h1>
+  <p class="page-sub">Fields marked <span>*</span> are required.</p>
+
+  <form id="ev-form" novalidate>
+
+    <!-- 1: Basics -->
+    <div class="section">
+      <div class="section-head">Request Basics</div>
+      <div class="section-body">
+        <div><label class="lbl" for="ev-email">Email <span class="req">*</span></label><input type="email" id="ev-email" required></div>
+        <div><label class="lbl" for="ev-name">Requester Name <span class="req">*</span></label><input type="text" id="ev-name" required></div>
+
+        <div>
+          <label class="lbl">Request Type <span class="req">*</span></label>
+          <div class="radio-group" id="ev-request-type">
+            <label class="radio-opt"><input type="radio" name="reqtype" value="church_event"> Church Event (goes on church calendar and has a graphic)</label>
+            <label class="radio-opt"><input type="radio" name="reqtype" value="media_only"> Media/Graphic Only (no event, no church calendar)</label>
+            <label class="radio-opt"><input type="radio" name="reqtype" value="facilities"> Facilities Rental (no graphic needed, no church calendar)</label>
+          </div>
+        </div>
+
+        <div>
+          <label class="lbl">Ministry Department <span class="req">*</span></label>
+          <div class="check-group" id="ev-dept">
+            <label class="check-opt"><input type="checkbox" value="Children's Ministry"> Children's Ministry</label>
+            <label class="check-opt"><input type="checkbox" value="Youth Ministry"> Youth Ministry</label>
+            <label class="check-opt"><input type="checkbox" value="Outreach/Missions"> Outreach/Missions</label>
+            <label class="check-opt"><input type="checkbox" value="Young Adults"> Young Adults</label>
+            <label class="check-opt"><input type="checkbox" value="Women's Ministry"> Women's Ministry</label>
+            <label class="check-opt"><input type="checkbox" value="Men's Ministry"> Men's Ministry</label>
+            <label class="check-opt"><input type="checkbox" value="Other"> Other</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2: Event Details (Church Event + Facilities Rental) -->
+    <div class="section" id="ev-section-eventdetails" style="display:none;">
+      <div class="section-head">Event Details</div>
+      <div class="section-body">
+        <div><label class="lbl" for="ev-title">Event Title</label><input type="text" id="ev-title"></div>
+        <div><label class="lbl" for="ev-desc">Event Details/Description</label><textarea id="ev-desc"></textarea></div>
+        <div class="row row-2">
+          <div><label class="lbl" for="ev-date">Event Date Requested</label><input type="date" id="ev-date"></div>
+          <div><label class="lbl" for="ev-start-time">Event Start Time <span class="req">*</span></label><input type="time" id="ev-start-time"></div>
+        </div>
+        <div><label class="lbl" for="ev-end-time">Event End Time</label><input type="time" id="ev-end-time"></div>
+
+        <div>
+          <label class="lbl">Event Location <span class="req">*</span></label>
+          <div class="radio-group" id="ev-location-type">
+            <label class="radio-opt"><input type="radio" name="loctype" value="at_rcc"> At Rochester Christian Church</label>
+            <label class="radio-opt"><input type="radio" name="loctype" value="other"> Other</label>
+          </div>
+          <input type="text" id="ev-location-other" class="other-input" placeholder="Address" style="display:none;">
+        </div>
+
+        <div id="ev-onsite-room-wrap" style="display:none;">
+          <label class="lbl">If OnSite, what room would you like to request?</label>
+          <div class="check-group" id="ev-room">
+            <label class="check-opt"><input type="checkbox" value="Fellowship Hall"> Fellowship Hall</label>
+            <label class="check-opt"><input type="checkbox" value="Living Room"> Living Room</label>
+            <label class="check-opt"><input type="checkbox" value="Meeting Room"> Meeting Room</label>
+            <label class="check-opt"><input type="checkbox" value="Sanctuary"> Sanctuary</label>
+            <label class="check-opt"><input type="checkbox" value="Entire Building"> Entire Building</label>
+            <label class="check-opt"><input type="checkbox" value="Other"> Other</label>
+          </div>
+          <input type="text" id="ev-room-other" class="other-input" placeholder="Other room" style="display:none;">
+        </div>
+      </div>
+    </div>
+
+    <!-- 3: Multimedia/Graphics (Church Event + Media Only) -->
+    <div class="section" id="ev-section-multimedia" style="display:none;">
+      <div class="section-head">Multimedia/Graphics</div>
+      <div class="section-body">
+        <div><label class="lbl" for="ev-project-title">Project/Graphic Title <span class="req">*</span></label><input type="text" id="ev-project-title"></div>
+
+        <div>
+          <label class="lbl">Multimedia Size(s) Needed <span class="req">*</span></label>
+          <div class="check-group" id="ev-media-size">
+            <label class="check-opt"><input type="checkbox" value="16x9 (Projector Size)"> 16x9 (Projector Size)</label>
+            <label class="check-opt"><input type="checkbox" value="Social Media Graphic"> Social Media Graphic</label>
+            <label class="check-opt"><input type="checkbox" value="Print/Flyer"> Print/Flyer</label>
+            <label class="check-opt"><input type="checkbox" value="Large Poster"> Large Poster</label>
+            <label class="check-opt"><input type="checkbox" value="16x9 Video (Projector and Website)"> 16x9 Video (Projector and Website)</label>
+            <label class="check-opt"><input type="checkbox" value="Social Media Video"> Social Media Video</label>
+            <label class="check-opt"><input type="checkbox" value="Other"> Other</label>
+          </div>
+          <input type="text" id="ev-media-size-other" class="other-input" placeholder="Other size/format" style="display:none;">
+        </div>
+
+        <div><label class="lbl" for="ev-media-desc">Details/Description of what's needed <span class="req">*</span></label><textarea id="ev-media-desc"></textarea></div>
+      </div>
+    </div>
+
+    <!-- 4: Logistics (Church Event only) -->
+    <div class="section" id="ev-section-logistics" style="display:none;">
+      <div class="section-head">Logistics</div>
+      <div class="section-body">
+        <div>
+          <label class="lbl">Church Van Needed? (check all that apply)</label>
+          <div class="check-group" id="ev-vans">
+            <label class="check-opt"><input type="checkbox" value="Ford"> Ford</label>
+            <label class="check-opt"><input type="checkbox" value="GMC"> GMC</label>
+            <label class="check-opt"><input type="checkbox" value="Chevy"> Chevy</label>
+            <label class="check-opt"><input type="checkbox" value="None"> None</label>
+          </div>
+        </div>
+
+        <div>
+          <label class="lbl">Ticket Sales Needed?</label>
+          <div class="radio-group" id="ev-tickets">
+            <label class="radio-opt"><input type="radio" name="tickets" value="yes"> Yes</label>
+            <label class="radio-opt"><input type="radio" name="tickets" value="no"> No</label>
+          </div>
+        </div>
+        <div id="ev-ticket-price-wrap" style="display:none;">
+          <label class="lbl" for="ev-ticket-price">Ticket Price (if applicable)</label>
+          <input type="text" id="ev-ticket-price" placeholder="$">
+        </div>
+      </div>
+    </div>
+
+    <!-- 5: Marketing Requests (Church Event + Media Only) -->
+    <div class="section" id="ev-section-marketing" style="display:none;">
+      <div class="section-head">Marketing Requests</div>
+      <div class="section-body">
+        <div class="check-group" id="ev-marketing">
+          <label class="check-opt"><input type="checkbox" value="Social Media Post"> Social Media Post</label>
+          <label class="check-opt"><input type="checkbox" value="Email Blast"> Email Blast</label>
+          <label class="check-opt"><input type="checkbox" value="Handout"> Handout</label>
+          <label class="check-opt"><input type="checkbox" value="PreService Announcements"> PreService Announcements</label>
+          <label class="check-opt"><input type="checkbox" value="Projector/Screens"> Projector/Screens</label>
+          <label class="check-opt"><input type="checkbox" value="Stage Announcement"> Stage Announcement</label>
+          <label class="check-opt"><input type="checkbox" value="Bathroom Signage"> Bathroom Signage</label>
+          <label class="check-opt"><input type="checkbox" value="Text Message"> Text Message</label>
+          <label class="check-opt"><input type="checkbox" value="Lobby Signage"> Lobby Signage</label>
+          <label class="check-opt"><input type="checkbox" value="None"> None</label>
+          <label class="check-opt"><input type="checkbox" value="Other"> Other</label>
+        </div>
+        <input type="text" id="ev-marketing-other" class="other-input" placeholder="Other marketing need" style="display:none;">
+      </div>
+    </div>
+
+    <!-- 6: Wrap up -->
+    <div class="section">
+      <div class="section-head">Wrap Up</div>
+      <div class="section-body">
+        <div class="agree-box">
+          By submitting this form you understand that all requests are subject to approval by the Administrative Pastor. You will be informed via email if the date has been approved.
+          <br><br>
+          All marketing and graphics requests may be denied or subject to change at the discretion of the Creative Arts Pastor.
+        </div>
+        <label class="check-opt" style="margin-top:4px;">
+          <input type="checkbox" id="ev-understand" required> I understand <span class="req">*</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button type="submit" class="btn-primary" id="ev-submit-btn">Submit Request</button>
+    </div>
+  </form>
+
+  <div class="success" id="ev-success">
+    <h2>Request submitted</h2>
+    <p>The team will review it and follow up by email.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  var firebaseConfig = {
+    apiKey: "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+    authDomain: "bedsidercc.firebaseapp.com",
+    projectId: "bedsidercc",
+    storageBucket: "bedsidercc.firebasestorage.app",
+    messagingSenderId: "950958384975",
+    appId: "1:950958384975:web:6f43dec5a7ba842c69c73a"
+  };
+  var fbApp; try { fbApp=firebase.app(); } catch(e) { fbApp=firebase.initializeApp(firebaseConfig); }
+  var auth = firebase.auth();
+  var db = firebase.firestore();
+
+  // 🔧 Paste your Apps Script Web App URL here once deployed (see
+  // apps-script-event-requests.gs / SETUP notes) — this is what pushes
+  // each new request into your Google Sheet automatically.
+  var SHEET_SYNC_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
+
+  auth.onAuthStateChanged(function(user){
+    if(user && user.email){
+      var emailEl = document.getElementById('ev-email');
+      if(!emailEl.value) emailEl.value = user.email;
+      var nameEl = document.getElementById('ev-name');
+      if(!nameEl.value && user.displayName) nameEl.value = user.displayName;
+    }
+  });
+
+  function requestType(){
+    var checked = document.querySelector('input[name="reqtype"]:checked');
+    return checked ? checked.value : null;
+  }
+
+  function updateVisibleSections(){
+    var type = requestType();
+    var eventDetails = document.getElementById('ev-section-eventdetails');
+    var multimedia = document.getElementById('ev-section-multimedia');
+    var logistics = document.getElementById('ev-section-logistics');
+    var marketing = document.getElementById('ev-section-marketing');
+
+    // Church Event: everything. Media Only: just multimedia + marketing.
+    // Facilities Rental: just event details (no graphics/marketing/van).
+    eventDetails.style.display = (type==='church_event' || type==='facilities') ? 'block' : 'none';
+    multimedia.style.display   = (type==='church_event' || type==='media_only') ? 'block' : 'none';
+    logistics.style.display    = (type==='church_event') ? 'block' : 'none';
+    marketing.style.display    = (type==='church_event' || type==='media_only') ? 'block' : 'none';
+  }
+  document.querySelectorAll('input[name="reqtype"]').forEach(function(r){
+    r.addEventListener('change', updateVisibleSections);
+  });
+
+  // Location "Other" reveal
+  document.querySelectorAll('input[name="loctype"]').forEach(function(r){
+    r.addEventListener('change', function(){
+      var isOther = document.querySelector('input[name="loctype"]:checked')?.value === 'other';
+      document.getElementById('ev-location-other').style.display = isOther ? 'block' : 'none';
+      document.getElementById('ev-onsite-room-wrap').style.display = isOther ? 'none' : 'block';
+    });
+  });
+
+  // Room "Other" reveal
+  document.querySelectorAll('#ev-room input').forEach(function(c){
+    c.addEventListener('change', function(){
+      var otherChecked = document.querySelector('#ev-room input[value="Other"]').checked;
+      document.getElementById('ev-room-other').style.display = otherChecked ? 'block' : 'none';
+    });
+  });
+
+  // Media size "Other" reveal
+  document.querySelectorAll('#ev-media-size input').forEach(function(c){
+    c.addEventListener('change', function(){
+      var otherChecked = document.querySelector('#ev-media-size input[value="Other"]').checked;
+      document.getElementById('ev-media-size-other').style.display = otherChecked ? 'block' : 'none';
+    });
+  });
+
+  // Marketing "Other" reveal
+  document.querySelectorAll('#ev-marketing input').forEach(function(c){
+    c.addEventListener('change', function(){
+      var otherChecked = document.querySelector('#ev-marketing input[value="Other"]').checked;
+      document.getElementById('ev-marketing-other').style.display = otherChecked ? 'block' : 'none';
+    });
+  });
+
+  // Ticket price reveal
+  document.querySelectorAll('input[name="tickets"]').forEach(function(r){
+    r.addEventListener('change', function(){
+      var isYes = document.querySelector('input[name="tickets"]:checked')?.value === 'yes';
+      document.getElementById('ev-ticket-price-wrap').style.display = isYes ? 'block' : 'none';
+    });
+  });
+
+  function checkedValues(containerId){
+    return Array.from(document.querySelectorAll('#'+containerId+' input:checked')).map(function(c){ return c.value; });
+  }
+
+  document.getElementById('ev-form').addEventListener('submit', function(e){
+    e.preventDefault();
+    var type = requestType();
+    if(!type){ alert('Please select a request type.'); return; }
+    if(!document.getElementById('ev-understand').checked){ alert('Please check "I understand" to submit.'); return; }
+
+    var locType = document.querySelector('input[name="loctype"]:checked')?.value || '';
+    var location = locType==='other' ? document.getElementById('ev-location-other').value : (locType==='at_rcc' ? 'At Rochester Christian Church' : '');
+
+    var request = {
+      email: document.getElementById('ev-email').value,
+      requesterName: document.getElementById('ev-name').value,
+      requestType: type,
+      department: checkedValues('ev-dept'),
+      eventTitle: document.getElementById('ev-title').value,
+      eventDesc: document.getElementById('ev-desc').value,
+      eventDate: document.getElementById('ev-date').value,
+      startTime: document.getElementById('ev-start-time').value,
+      endTime: document.getElementById('ev-end-time').value,
+      location: location,
+      onsiteRoom: checkedValues('ev-room'),
+      onsiteRoomOther: document.getElementById('ev-room-other').value,
+      projectTitle: document.getElementById('ev-project-title').value,
+      mediaSizes: checkedValues('ev-media-size'),
+      mediaSizeOther: document.getElementById('ev-media-size-other').value,
+      mediaDesc: document.getElementById('ev-media-desc').value,
+      vansNeeded: checkedValues('ev-vans'),
+      ticketsNeeded: document.querySelector('input[name="tickets"]:checked')?.value || '',
+      ticketPrice: document.getElementById('ev-ticket-price').value,
+      marketing: checkedValues('ev-marketing'),
+      marketingOther: document.getElementById('ev-marketing-other').value,
+      status: 'new', // new | approved | denied
+      calendarAdded: false,
+      graphicStatus: '', graphicDueDate: '',
+      marketingStatus: '', marketingDueDate: '',
+      vanConfirmed: false,
+      submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      uid: auth.currentUser ? auth.currentUser.uid : null,
+    };
+
+    db.collection('eventRequests').add(request).then(function(docRef){
+      // Fire-and-forget sync to Google Sheet — don't block success on this.
+      if(SHEET_SYNC_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL'){
+        fetch(SHEET_SYNC_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: {'Content-Type':'text/plain'},
+          body: JSON.stringify(Object.assign({}, request, {id: docRef.id, submittedAt: new Date().toISOString()}))
+        }).catch(function(){ /* sheet sync is best-effort, don't block the user on it */ });
+      }
+      document.getElementById('ev-form').style.display = 'none';
+      document.getElementById('ev-success').style.display = 'block';
+    }).catch(function(err){
+      alert('Something went wrong submitting your request: ' + err.message);
+    });
+  });
+})();
+</script>
+</body>
+</html>
