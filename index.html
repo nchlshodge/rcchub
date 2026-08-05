@@ -240,8 +240,26 @@
       text-decoration: none;
       color: inherit;
       transition: border-color .15s, transform .15s;
+      width: 100%;
+      text-align: left;
+      font-size: inherit;
     }
     .module-card:hover { border-color: var(--blue-glow); transform: translateY(-1px); }
+    .module-card-disabled {
+      font-family: inherit;
+      cursor: pointer;
+      opacity: 0.75;
+      border-style: dashed;
+    }
+    .module-card-disabled:hover { border-color: var(--text-soft); opacity: 1; transform: none; }
+    .locked-tag {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-left: 6px;
+    }
 
     .module-icon {
       width: 46px; height: 46px;
@@ -513,7 +531,7 @@
     const doc = await ref.get();
 
     if (!doc.exists) {
-      let modules = { bedside: true, incidentReport: true, vanRental: false, eventRequest: true };
+      let modules = { bedside: false, incidentReport: true, vanRental: true, eventRequest: true };
       if (user.email) {
         const inviteRef = db.collection('hubInvites').doc(user.email.toLowerCase());
         const inviteDoc = await inviteRef.get();
@@ -533,7 +551,7 @@
       // Existing user from before the hub existed — default them to the
       // two modules that predate Van Rental so nobody loses access.
       await ref.set({
-        modules: { bedside: true, incidentReport: true, vanRental: false, eventRequest: true }
+        modules: { bedside: false, incidentReport: true, vanRental: true, eventRequest: true }
       }, { merge: true });
     }
   }
@@ -552,29 +570,35 @@
   }
 
   function renderModules(modules, isAdmin, roles) {
-    const enabled = MODULES.filter(m => modules[m.key]);
     const hasWorkQueueAccess = roles && (roles.graphics || roles.marketing);
     const container = document.getElementById('moduleGrid');
 
-    if (!enabled.length && !isAdmin && !hasWorkQueueAccess) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">🔒</div>
-          <div class="empty-text">No apps enabled yet</div>
-          <div class="empty-sub">Ask an admin to turn on access for your account.</div>
-        </div>`;
-      return;
-    }
-
-    let html = enabled.map(m => `
-      <a class="module-card" href="${m.href}">
-        <div class="module-icon ${m.iconClass}">${m.icon}</div>
+    // Every module always shows a tile — enabled ones link straight
+    // in, disabled ones render grayed out and, when clicked, send an
+    // access request to admins instead of navigating anywhere.
+    let html = MODULES.map(m => {
+      const on = modules[m.key] === true;
+      if (on) {
+        return `
+        <a class="module-card" href="${m.href}">
+          <div class="module-icon ${m.iconClass}">${m.icon}</div>
+          <div class="module-info">
+            <div class="module-name">${m.name}</div>
+            <div class="module-desc">${m.desc}</div>
+          </div>
+          <div class="module-arrow">→</div>
+        </a>`;
+      }
+      return `
+      <button class="module-card module-card-disabled" onclick="requestAccessTo('${m.key}','${m.name}')">
+        <div class="module-icon ${m.iconClass}" style="opacity:0.4;">${m.icon}</div>
         <div class="module-info">
-          <div class="module-name">${m.name}</div>
-          <div class="module-desc">${m.desc}</div>
+          <div class="module-name" style="color: var(--text-soft);">${m.name} <span class="locked-tag">🔒 Locked</span></div>
+          <div class="module-desc">Tap to request access from an admin</div>
         </div>
         <div class="module-arrow">→</div>
-      </a>`).join('');
+      </button>`;
+    }).join('');
 
     if (hasWorkQueueAccess) {
       html += `
@@ -602,6 +626,33 @@
 
     container.innerHTML = html;
   }
+
+  // Clicking a locked module tile submits an access request for
+  // yourself, the same request an admin would see and approve from
+  // the "Request access for someone else" flow — just self-service
+  // and one click, instead of filling out the modal.
+  window.requestAccessTo = async (moduleKey, moduleName) => {
+    if (!currentUser) return;
+    const already = await db.collection('accessRequests')
+      .where('email','==',(currentUser.email||'').toLowerCase())
+      .where('modulesRequested','array-contains', moduleKey)
+      .where('status','==','pending')
+      .limit(1).get();
+    if (!already.empty) {
+      alert(`You've already requested access to ${moduleName} — an admin will follow up.`);
+      return;
+    }
+    await db.collection('accessRequests').add({
+      name: currentUser.displayName || currentUser.email,
+      email: (currentUser.email||'').toLowerCase(),
+      note: `Requested their own access to ${moduleName} by tapping the locked tile on the hub.`,
+      modulesRequested: [moduleKey],
+      status: 'pending',
+      requestedBy: { uid: currentUser.uid, name: currentUser.displayName || currentUser.email },
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    alert(`Request sent! An admin will review your request for ${moduleName} access.`);
+  };
 
   // ── AUTH ──
   document.getElementById('googleSignInBtn').addEventListener('click', () => {
