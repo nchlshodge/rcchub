@@ -204,6 +204,7 @@
       <div class="section-tab active" data-section="bedside">Bedside</div>
       <div class="section-tab" data-section="incidents">Incident Reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="vans">Van Usage</div>
+      <div class="section-tab" data-section="events">Event Requests <span class="badge-count" id="eventsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="access">App Access</div>
       <div class="section-tab" data-section="requests">Access Requests <span class="badge-count" id="requestsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="admins">Manage Admins</div>
@@ -236,6 +237,17 @@
       </div>
 
       <!-- VAN USAGE -->
+      <!-- EVENT REQUESTS -->
+      <div class="section" id="section-events">
+        <h2 class="section-title">Event Requests</h2>
+        <div class="subnav">
+          <div class="subtab active" data-etab="new">New</div>
+          <div class="subtab" data-etab="approved">Approved</div>
+          <div class="subtab" data-etab="denied">Denied</div>
+        </div>
+        <div id="eventRequestsList"><div class="loading">Loading...</div></div>
+      </div>
+
       <div class="section" id="section-vans">
         <h2 class="section-title">Van Usage</h2>
         <div class="subnav">
@@ -248,7 +260,7 @@
         <div id="van-vans" style="display:none;"><div class="loading">Loading...</div></div>
         <div id="van-alerts" style="display:none;"><div class="loading">Loading...</div></div>
         <div id="van-history" style="display:none;"><div class="loading">Loading...</div></div>
-        <p class="card-text" style="margin-top:16px;">For scheduling, repairs, warning lights, adding drivers, and adding vans (including borrowed ones), use the <a href="van/index.html" style="color:var(--blue);">Van Usage admin view →</a></p>
+        <p class="card-text" style="margin-top:16px;">For scheduling, repairs, warning lights, adding drivers, adding vans, and managing weekly recurring reservations, use the <a href="van/index.html" style="color:var(--blue);">Van Usage admin view →</a></p>
       </div>
 
       <!-- APP ACCESS -->
@@ -321,6 +333,7 @@
         loadBedsideWall();
         loadIncidentReports();
         loadVanApprovals();
+        loadEventRequests();
         loadVans();
         loadVanAlerts();
         loadVanHistory();
@@ -707,6 +720,94 @@
     b.classList.add('show');
     setTimeout(() => b.classList.remove('show'), 3200);
   }
+  // ── Event Requests ──
+  let allEventRequests = [];
+  let eventFilter = 'new';
+  function loadEventRequests() {
+    db.collection('eventRequests').orderBy('submittedAt','desc').onSnapshot(snap => {
+      allEventRequests = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      renderEventRequests();
+      const newCount = allEventRequests.filter(r => (r.status||'new')==='new').length;
+      const badge = document.getElementById('eventsCount');
+      if (newCount) { badge.textContent = newCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
+    }, err => {
+      document.getElementById('eventRequestsList').innerHTML = '<div class="empty-state">Could not load event requests.</div>';
+      console.error(err);
+    });
+  }
+  document.querySelectorAll('[data-etab]').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('[data-etab]').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      eventFilter = t.dataset.etab;
+      renderEventRequests();
+    });
+  });
+
+  const REQUEST_TYPE_LABELS = {
+    church_event: 'Church Event', media_only: 'Media/Graphic Only', facilities: 'Facilities Rental',
+  };
+
+  function renderEventRequests() {
+    const c = document.getElementById('eventRequestsList');
+    const filtered = allEventRequests.filter(r => (r.status||'new') === eventFilter);
+    if (!filtered.length) { c.innerHTML = '<div class="empty-state">Nothing here right now.</div>'; return; }
+
+    c.innerHTML = filtered.map(r => {
+      const typeLabel = REQUEST_TYPE_LABELS[r.requestType] || r.requestType || '';
+      const isEvent = r.requestType === 'church_event';
+      const isMedia = r.requestType === 'church_event' || r.requestType === 'media_only';
+
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(r.eventTitle || r.projectTitle || 'Untitled request')}</div>
+          <div class="card-meta">
+            <span class="tag tag-hospital">${escHtml(typeLabel)}</span>
+            <span>${escHtml((r.department||[]).join(', '))}</span>
+          </div>
+          <div class="card-text">Requested by ${escHtml(r.requesterName||'')} (${escHtml(r.email||'')})</div>
+          ${r.eventDate ? `<div class="card-meta"><span>${escHtml(r.eventDate)} ${escHtml(r.startTime||'')}${r.endTime ? ' – '+escHtml(r.endTime) : ''}</span></div>` : ''}
+          ${r.eventDesc ? `<div class="card-text">${escHtml(r.eventDesc)}</div>` : ''}
+          ${r.mediaDesc ? `<div class="card-text"><strong>Media needed:</strong> ${escHtml(r.mediaDesc)}</div>` : ''}
+          ${(r.vansNeeded||[]).length && !r.vansNeeded.includes('None') ? `<div class="card-meta"><span>Van requested: ${escHtml(r.vansNeeded.join(', '))} ${r.vanConfirmed ? '✓ confirmed' : '— not yet confirmed'}</span></div>` : ''}
+
+          <div class="actions" style="margin-top:10px;">
+            ${eventFilter==='new' ? `
+              <button class="btn btn-approve" onclick="setEventStatus('${r.id}','approved')">Approve</button>
+              <button class="btn btn-hide" onclick="setEventStatus('${r.id}','denied')">Deny</button>
+            ` : `<button class="btn btn-unhide" onclick="setEventStatus('${r.id}','new')">Move back to New</button>`}
+          </div>
+
+          ${eventFilter==='approved' ? `
+            <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:8px;">
+              <button class="btn ${r.calendarAdded?'btn-approve':'btn-unhide'}" onclick="toggleEventField('${r.id}','calendarAdded',${!r.calendarAdded})">Calendar Added: ${r.calendarAdded?'Yes':'No'}</button>
+              ${isMedia ? `<button class="btn ${r.graphicStatus==='Completed'?'btn-approve':'btn-unhide'}" onclick="cycleGraphicStatus('${r.id}','${r.graphicStatus||''}')">Graphic Status: ${escHtml(r.graphicStatus||'Not started')}</button>` : ''}
+              ${isMedia ? `<button class="btn ${r.marketingStatus==='Completed'?'btn-approve':'btn-unhide'}" onclick="cycleMarketingStatus('${r.id}','${r.marketingStatus||''}')">Marketing Status: ${escHtml(r.marketingStatus||'Not started')}</button>` : ''}
+              ${(r.vansNeeded||[]).length && !r.vansNeeded.includes('None') ? `<button class="btn ${r.vanConfirmed?'btn-approve':'btn-unhide'}" onclick="toggleEventField('${r.id}','vanConfirmed',${!r.vanConfirmed})">Van Confirmed: ${r.vanConfirmed?'Yes':'No'}</button>` : ''}
+            </div>
+          ` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  window.setEventStatus = async (id, status) => {
+    await db.collection('eventRequests').doc(id).update({status, statusChangedAt:new Date().toISOString(), statusChangedBy: currentUser.uid});
+    showBanner('Request updated.');
+  };
+  window.toggleEventField = async (id, field, val) => {
+    await db.collection('eventRequests').doc(id).update({[field]: val});
+  };
+  window.cycleGraphicStatus = async (id, current) => {
+    const order = ['', 'In Progress', 'Completed'];
+    const next = order[(order.indexOf(current)+1) % order.length];
+    await db.collection('eventRequests').doc(id).update({graphicStatus: next});
+  };
+  window.cycleMarketingStatus = async (id, current) => {
+    const order = ['', 'In Progress', 'Completed'];
+    const next = order[(order.indexOf(current)+1) % order.length];
+    await db.collection('eventRequests').doc(id).update({marketingStatus: next});
+  };
+
   function escHtml(str) { return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
 </body>
