@@ -474,6 +474,14 @@
       iconClass: 'vanrental',
       href: 'van/index.html',
     },
+    {
+      key: 'eventRequest',
+      name: 'Event Request',
+      desc: 'Request an event, graphic, or facilities use',
+      icon: '🎨',
+      iconClass: 'incident',
+      href: 'event-request/index.html',
+    },
   ];
 
   let currentUser = null;
@@ -505,7 +513,7 @@
     const doc = await ref.get();
 
     if (!doc.exists) {
-      let modules = { bedside: true, incidentReport: true, vanRental: false };
+      let modules = { bedside: true, incidentReport: true, vanRental: false, eventRequest: true };
       if (user.email) {
         const inviteRef = db.collection('hubInvites').doc(user.email.toLowerCase());
         const inviteDoc = await inviteRef.get();
@@ -525,7 +533,7 @@
       // Existing user from before the hub existed — default them to the
       // two modules that predate Van Rental so nobody loses access.
       await ref.set({
-        modules: { bedside: true, incidentReport: true, vanRental: false }
+        modules: { bedside: true, incidentReport: true, vanRental: false, eventRequest: true }
       }, { merge: true });
     }
   }
@@ -534,7 +542,8 @@
     db.collection('users').doc(uid).onSnapshot(doc => {
       const data = doc.data() || {};
       const modules = data.modules || {};
-      renderModules(modules, data.isAdmin === true);
+      const roles = data.roles || {};
+      renderModules(modules, data.isAdmin === true, roles);
     }, err => {
       document.getElementById('moduleGrid').innerHTML =
         '<div class="empty-state"><div class="empty-text">Could not load your apps.</div></div>';
@@ -542,11 +551,12 @@
     });
   }
 
-  function renderModules(modules, isAdmin) {
+  function renderModules(modules, isAdmin, roles) {
     const enabled = MODULES.filter(m => modules[m.key]);
+    const hasWorkQueueAccess = roles && (roles.graphics || roles.marketing);
     const container = document.getElementById('moduleGrid');
 
-    if (!enabled.length && !isAdmin) {
+    if (!enabled.length && !isAdmin && !hasWorkQueueAccess) {
       container.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">🔒</div>
@@ -565,6 +575,18 @@
         </div>
         <div class="module-arrow">→</div>
       </a>`).join('');
+
+    if (hasWorkQueueAccess) {
+      html += `
+      <a class="module-card" href="work-queue.html">
+        <div class="module-icon" style="background: var(--gold-dim);">🎯</div>
+        <div class="module-info">
+          <div class="module-name">Work Queue</div>
+          <div class="module-desc">Graphics/Marketing requests assigned to your team</div>
+        </div>
+        <div class="module-arrow">→</div>
+      </a>`;
+    }
 
     if (isAdmin) {
       html += `

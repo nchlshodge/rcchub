@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCC — Work Queue</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: #f7f6f3; min-height: 100vh; color: #1a1a1a; }
+
+  .nav {
+    background: #fff; border-bottom: 1px solid #e8e4dc; padding: 0 2rem; height: 60px;
+    display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10;
+  }
+  .nav-brand { font-family: 'Playfair Display', serif; font-size: 22px; color: #2557b8; text-decoration: none; }
+  .nav-brand span { font-family: 'Inter', sans-serif; font-size: 13px; color: #aaa; margin-left: 6px; }
+  .nav-user { font-size: 13px; color: #666; }
+  .nav-signout { background:none; border:none; font-size:13px; color:#999; cursor:pointer; }
+
+  .page { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  .page-title { font-family: 'Playfair Display', serif; font-size: 28px; margin-bottom: 4px; }
+  .page-sub { font-size: 14px; color: #888; margin-bottom: 1.5rem; }
+
+  .subnav { display: flex; border-bottom: 2px solid #e8e4dc; margin-bottom: 20px; gap: 4px; }
+  .subtab { padding: 10px 16px; font-size: 14px; font-weight: 600; color: #999; border-bottom: 3px solid transparent; cursor: pointer; }
+  .subtab.active { color: #2557b8; border-bottom-color: #2557b8; }
+
+  .card { background: #fff; border: 1px solid #e8e4dc; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .card-title { font-family: 'Playfair Display', serif; font-size: 17px; margin-bottom: 4px; }
+  .card-meta { font-size: 12px; color: #999; margin-bottom: 8px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .card-text { font-size: 14px; color: #555; margin-bottom: 6px; line-height: 1.5; }
+  .tag { font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 700; text-transform: uppercase; background: #eef2fb; color: #2557b8; }
+
+  .status-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e8e4dc; align-items: center; }
+  .status-btn { padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 2px solid #e8e4dc; background: #fff; }
+  .status-btn.not-started { color: #888; }
+  .status-btn.in-progress { border-color: #b5892a; background: #fdf8ee; color: #b5892a; }
+  .status-btn.completed { border-color: #2e7a52; background: #eaf4ee; color: #2e7a52; }
+  .due-date-input { border: 1px solid #d1cdc4; border-radius: 8px; padding: 7px 10px; font-size: 13px; font-family: 'Inter', sans-serif; }
+
+  .empty-state { text-align: center; padding: 50px 20px; color: #999; }
+  .loading { text-align: center; padding: 40px; color: #999; }
+  .access-denied { text-align: center; padding: 60px 24px; }
+  .access-denied .title { font-family: 'Playfair Display', serif; font-size: 22px; color: #a03030; margin-bottom: 10px; }
+
+  #loginScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px; text-align: center; }
+  #googleSignInBtn { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #d1cdc4; border-radius:12px; padding:14px 24px; font-size:15px; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <h1 style="font-family:'Playfair Display',serif; font-size:28px; margin-bottom:20px;">RCC Work Queue</h1>
+  <button id="googleSignInBtn">
+    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+    Sign in with Google
+  </button>
+</div>
+
+<div id="appShell" style="display:none;">
+  <nav class="nav">
+    <a href="index.html" class="nav-brand">RCC <span>· Work Queue</span></a>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span class="nav-user" id="navUser"></span>
+      <button class="nav-signout" id="signOutBtn">Sign out</button>
+    </div>
+  </nav>
+
+  <div class="page">
+    <div id="accessCheck" class="loading">Checking access...</div>
+
+    <div id="queueUI" style="display:none;">
+      <h1 class="page-title">Work Queue</h1>
+      <p class="page-sub">Event and graphic requests assigned to your team.</p>
+
+      <div class="subnav" id="teamTabs"></div>
+      <div id="queueList"><div class="loading">Loading...</div></div>
+    </div>
+
+    <div id="accessDenied" class="access-denied" style="display:none;">
+      <div class="title">No Work Queue Access</div>
+      <p style="color:#888; font-size:14px;">Ask an admin to add you to the Graphics or Marketing team to see this page.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+    authDomain: "bedsidercc.firebaseapp.com",
+    projectId: "bedsidercc",
+    storageBucket: "bedsidercc.firebasestorage.app",
+    messagingSenderId: "950958384975",
+    appId: "1:950958384975:web:6f43dec5a7ba842c69c73a"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  let currentUser = null;
+  let myRoles = { graphics: false, marketing: false };
+  let activeTeam = null;
+  let allRequests = [];
+
+  document.getElementById('googleSignInBtn').addEventListener('click', () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err => alert('Sign-in failed: ' + err.message));
+  });
+  document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+
+  auth.onAuthStateChanged(async user => {
+    if (user) {
+      currentUser = user;
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appShell').style.display = 'block';
+      document.getElementById('navUser').textContent = user.displayName || user.email;
+
+      const doc = await db.collection('users').doc(user.uid).get();
+      const data = doc.exists ? doc.data() : {};
+      myRoles = data.roles || {};
+      document.getElementById('accessCheck').style.display = 'none';
+
+      if (myRoles.graphics || myRoles.marketing) {
+        document.getElementById('queueUI').style.display = 'block';
+        setupTeamTabs();
+        loadRequests();
+      } else {
+        document.getElementById('accessDenied').style.display = 'block';
+      }
+    } else {
+      currentUser = null;
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('appShell').style.display = 'none';
+    }
+  });
+
+  function setupTeamTabs() {
+    const tabs = [];
+    if (myRoles.graphics) tabs.push({key:'graphics', label:'Graphics'});
+    if (myRoles.marketing) tabs.push({key:'marketing', label:'Marketing'});
+    activeTeam = tabs[0].key;
+
+    const container = document.getElementById('teamTabs');
+    if (tabs.length === 1) {
+      container.style.display = 'none';
+    } else {
+      container.innerHTML = tabs.map(t => `<div class="subtab ${t.key===activeTeam?'active':''}" data-team="${t.key}">${t.label}</div>`).join('');
+      container.querySelectorAll('.subtab').forEach(el => {
+        el.addEventListener('click', () => {
+          activeTeam = el.dataset.team;
+          container.querySelectorAll('.subtab').forEach(x => x.classList.remove('active'));
+          el.classList.add('active');
+          renderQueue();
+        });
+      });
+    }
+  }
+
+  function loadRequests() {
+    db.collection('eventRequests').orderBy('submittedAt','desc').onSnapshot(snap => {
+      allRequests = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      renderQueue();
+    }, err => {
+      document.getElementById('queueList').innerHTML = '<div class="empty-state">Could not load requests.</div>';
+      console.error(err);
+    });
+  }
+
+  function renderQueue() {
+    const c = document.getElementById('queueList');
+    // Graphics team sees anything with a real media size requested;
+    // Marketing team sees anything with a real marketing request
+    // (i.e. not empty and not just "None"). Both only see APPROVED
+    // requests — no point cluttering the work queue with things that
+    // haven't been approved yet.
+    const relevant = allRequests.filter(r => {
+      if (r.status !== 'approved') return false;
+      if (activeTeam === 'graphics') return r.mediaSizes && r.mediaSizes.length > 0;
+      if (activeTeam === 'marketing') return r.marketing && r.marketing.length > 0 && !(r.marketing.length===1 && r.marketing[0]==='None');
+      return false;
+    });
+
+    if (!relevant.length) { c.innerHTML = '<div class="empty-state">Nothing in your queue right now.</div>'; return; }
+
+    c.innerHTML = relevant.map(r => {
+      const statusField = activeTeam === 'graphics' ? 'graphicStatus' : 'marketingStatus';
+      const dueField = activeTeam === 'graphics' ? 'graphicDueDate' : 'marketingDueDate';
+      const currentStatus = r[statusField] || '';
+      const items = activeTeam === 'graphics' ? (r.mediaSizes||[]).join(', ') : (r.marketing||[]).join(', ');
+
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(r.eventTitle || r.projectTitle || 'Untitled request')}</div>
+          <div class="card-meta"><span class="tag">${escHtml(items)}</span><span>${escHtml(r.requesterName||'')}</span>${r.eventDate ? `<span>Event: ${escHtml(r.eventDate)}</span>` : ''}</div>
+          ${activeTeam==='graphics' && r.mediaDesc ? `<div class="card-text">${escHtml(r.mediaDesc)}</div>` : ''}
+          ${activeTeam==='marketing' && r.eventDesc ? `<div class="card-text">${escHtml(r.eventDesc)}</div>` : ''}
+
+          <div class="status-row">
+            <button class="status-btn ${currentStatus===''?'not-started':''}" onclick="setStatus('${r.id}','${statusField}','')">Not Started</button>
+            <button class="status-btn ${currentStatus==='In Progress'?'in-progress':''}" onclick="setStatus('${r.id}','${statusField}','In Progress')">In Progress</button>
+            <button class="status-btn ${currentStatus==='Completed'?'completed':''}" onclick="setStatus('${r.id}','${statusField}','Completed')">Completed</button>
+            <input type="date" class="due-date-input" value="${r[dueField]||''}" onchange="setDueDate('${r.id}','${dueField}', this.value)" title="Due date">
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  window.setStatus = async (id, field, value) => {
+    await db.collection('eventRequests').doc(id).update({[field]: value});
+  };
+  window.setDueDate = async (id, field, value) => {
+    await db.collection('eventRequests').doc(id).update({[field]: value});
+  };
+
+  function escHtml(str) { return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>

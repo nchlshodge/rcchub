@@ -607,7 +607,8 @@
   }
 
   // ── App Access ──
-  const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage' };
+  const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage', eventRequest: 'Event Request' };
+  const ROLE_LABELS = { graphics: 'Graphics Team', marketing: 'Marketing Team' };
   function loadModuleManagement() {
     db.collection('users').onSnapshot(snap => {
       const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
@@ -615,17 +616,28 @@
       if (!users.length) { c.innerHTML = '<div class="empty-state">No users found yet.</div>'; return; }
       c.innerHTML = users.map(u => {
         const modules = u.modules || {};
-        const toggles = Object.keys(MODULE_LABELS).map(key => {
+        const roles = u.roles || {};
+        const moduleToggles = Object.keys(MODULE_LABELS).map(key => {
           const on = modules[key] === true;
           return `<button class="btn ${on?'btn-approve':'btn-unhide'}" style="margin-right:6px;margin-bottom:6px;" onclick="toggleModule('${u.id}','${key}',${!on})">${MODULE_LABELS[key]}: ${on?'On':'Off'}</button>`;
         }).join('');
-        return `<div class="card"><div class="card-title">${escHtml(u.name||'(no name set)')}</div><div class="card-text">${escHtml(u.email||'')}</div><div class="actions">${toggles}</div></div>`;
+        const roleToggles = Object.keys(ROLE_LABELS).map(key => {
+          const on = roles[key] === true;
+          return `<button class="btn ${on?'btn-approve':'btn-unhide'}" style="margin-right:6px;margin-bottom:6px;" onclick="toggleRole('${u.id}','${key}',${!on})">${ROLE_LABELS[key]}: ${on?'On':'Off'}</button>`;
+        }).join('');
+        return `<div class="card"><div class="card-title">${escHtml(u.name||'(no name set)')}</div><div class="card-text">${escHtml(u.email||'')}</div>
+          <div class="card-meta" style="margin-bottom:4px;">Apps</div><div class="actions" style="margin-bottom:10px;">${moduleToggles}</div>
+          <div class="card-meta" style="margin-bottom:4px;">Work Queue Roles (Event Requests)</div><div class="actions">${roleToggles}</div></div>`;
       }).join('');
     });
   }
   window.toggleModule = async (uid, key, val) => {
     await db.collection('users').doc(uid).set({modules:{[key]:val}}, {merge:true});
     showBanner(`${MODULE_LABELS[key]} ${val?'enabled':'disabled'}.`);
+  };
+  window.toggleRole = async (uid, key, val) => {
+    await db.collection('users').doc(uid).set({roles:{[key]:val}}, {merge:true});
+    showBanner(`${ROLE_LABELS[key]} ${val?'enabled':'disabled'}.`);
   };
 
   // ── Access Requests ──
