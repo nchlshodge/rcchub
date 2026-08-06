@@ -290,7 +290,7 @@
       <div class="section" id="section-access">
         <h2 class="section-title">App Access</h2>
         <div class="card" style="background:var(--blue-dim); border-color:var(--blue-glow); margin-bottom:14px;">
-          <div class="card-text" style="margin-bottom:0;">Controls which apps show up as tiles on each person's hub dashboard.</div>
+          <div class="card-text" style="margin-bottom:0;">"Apps" controls which tiles show on each person's hub dashboard. "Roles" grants department-scoped admin access — e.g. Van Usage Admin can approve drivers and manage vans, but has no access to Bedside, Graphics, or Marketing, and vice versa. Full admin access is still managed separately under "Manage Admins."</div>
         </div>
         <div id="moduleManageList"><div class="loading">Loading...</div></div>
       </div>
@@ -633,7 +633,7 @@
 
   // ── App Access ──
   const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage', eventRequest: 'Event Request', timeOff: 'Time Off Request' };
-  const ROLE_LABELS = { graphics: 'Graphics Team', marketing: 'Marketing Team' };
+  const ROLE_LABELS = { vanAdmin: 'Van Usage Admin', bedsideAdmin: 'Bedside Admin', graphics: 'Graphics Team', marketing: 'Marketing Team' };
   function loadModuleManagement() {
     db.collection('users').onSnapshot(snap => {
       const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
@@ -652,7 +652,7 @@
         }).join('');
         return `<div class="card"><div class="card-title">${escHtml(u.name||'(no name set)')}</div><div class="card-text">${escHtml(u.email||'')}</div>
           <div class="card-meta" style="margin-bottom:4px;">Apps</div><div class="actions" style="margin-bottom:10px;">${moduleToggles}</div>
-          <div class="card-meta" style="margin-bottom:4px;">Work Queue Roles (Event Requests)</div><div class="actions">${roleToggles}</div></div>`;
+          <div class="card-meta" style="margin-bottom:4px;">Department Admin Roles</div><div class="actions">${roleToggles}</div></div>`;
       }).join('');
     });
   }

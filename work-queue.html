@@ -107,6 +107,7 @@
   let myRoles = { graphics: false, marketing: false };
   let activeTeam = null;
   let allRequests = [];
+  let allUsers = [];
 
   document.getElementById('googleSignInBtn').addEventListener('click', () => {
     const provider = new firebase.auth.GoogleAuthProvider();
@@ -124,9 +125,10 @@
       const doc = await db.collection('users').doc(user.uid).get();
       const data = doc.exists ? doc.data() : {};
       myRoles = data.roles || {};
+      myRoles.isAdmin = data.isAdmin === true;
       document.getElementById('accessCheck').style.display = 'none';
 
-      if (myRoles.graphics || myRoles.marketing) {
+      if (myRoles.graphics || myRoles.marketing || myRoles.isAdmin) {
         document.getElementById('queueUI').style.display = 'block';
         setupTeamTabs();
         loadRequests();
@@ -142,24 +144,21 @@
 
   function setupTeamTabs() {
     const tabs = [];
-    if (myRoles.graphics) tabs.push({key:'graphics', label:'Graphics'});
-    if (myRoles.marketing) tabs.push({key:'marketing', label:'Marketing'});
+    if (myRoles.graphics || myRoles.isAdmin) tabs.push({key:'graphics', label:'Graphics'});
+    if (myRoles.marketing || myRoles.isAdmin) tabs.push({key:'marketing', label:'Marketing'});
+    tabs.push({key:'team', label:'Team'});
     activeTeam = tabs[0].key;
 
     const container = document.getElementById('teamTabs');
-    if (tabs.length === 1) {
-      container.style.display = 'none';
-    } else {
-      container.innerHTML = tabs.map(t => `<div class="subtab ${t.key===activeTeam?'active':''}" data-team="${t.key}">${t.label}</div>`).join('');
-      container.querySelectorAll('.subtab').forEach(el => {
-        el.addEventListener('click', () => {
-          activeTeam = el.dataset.team;
-          container.querySelectorAll('.subtab').forEach(x => x.classList.remove('active'));
-          el.classList.add('active');
-          renderQueue();
-        });
+    container.innerHTML = tabs.map(t => `<div class="subtab ${t.key===activeTeam?'active':''}" data-team="${t.key}">${t.label}</div>`).join('');
+    container.querySelectorAll('.subtab').forEach(el => {
+      el.addEventListener('click', () => {
+        activeTeam = el.dataset.team;
+        container.querySelectorAll('.subtab').forEach(x => x.classList.remove('active'));
+        el.classList.add('active');
+        renderQueue();
       });
-    }
+    });
   }
 
   function loadRequests() {
@@ -170,10 +169,76 @@
       document.getElementById('queueList').innerHTML = '<div class="empty-state">Could not load requests.</div>';
       console.error(err);
     });
+    db.collection('users').onSnapshot(snap => {
+      allUsers = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      if (activeTeam === 'team') renderQueue();
+    });
   }
+
+  // Only shows toggles for departments the CURRENT user actually
+  // belongs to — a Graphics-only person can add/remove Graphics team
+  // members, but has no way to touch Marketing's roster, and vice
+  // versa. Full admins (isAdmin) can manage both from here too.
+  function renderTeamManagement() {
+    const c = document.getElementById('queueList');
+    const canManageGraphics = myRoles.graphics || myRoles.isAdmin;
+    const canManageMarketing = myRoles.marketing || myRoles.isAdmin;
+    let html = '';
+
+    if (canManageGraphics) {
+      const graphicsMembers = allUsers.filter(u => u.roles && u.roles.graphics === true);
+      html += `<h3 style="margin-bottom:8px;">Graphics Team</h3>`;
+      html += graphicsMembers.map(u => `
+        <div class="card">
+          <div class="card-title">${escHtml(u.name||u.email)}</div>
+          <div class="card-text">${escHtml(u.email||'')}</div>
+          <div class="actions">${u.id===currentUser.uid ? '' : `<button class="btn btn-hide" onclick="toggleTeamRole('${u.id}','graphics',false)">Remove</button>`}</div>
+        </div>`).join('') || '<p style="font-size:13px;color:#999;">No one else yet.</p>';
+      html += `<input type="text" id="searchGraphics" placeholder="Search to add someone..." oninput="searchTeam('graphics', this.value)" style="margin-top:10px;">`;
+      html += `<div id="resultsGraphics"></div>`;
+    }
+
+    if (canManageMarketing) {
+      const marketingMembers = allUsers.filter(u => u.roles && u.roles.marketing === true);
+      html += `<h3 style="margin:20px 0 8px;">Marketing Team</h3>`;
+      html += marketingMembers.map(u => `
+        <div class="card">
+          <div class="card-title">${escHtml(u.name||u.email)}</div>
+          <div class="card-text">${escHtml(u.email||'')}</div>
+          <div class="actions">${u.id===currentUser.uid ? '' : `<button class="btn btn-hide" onclick="toggleTeamRole('${u.id}','marketing',false)">Remove</button>`}</div>
+        </div>`).join('') || '<p style="font-size:13px;color:#999;">No one else yet.</p>';
+      html += `<input type="text" id="searchMarketing" placeholder="Search to add someone..." oninput="searchTeam('marketing', this.value)" style="margin-top:10px;">`;
+      html += `<div id="resultsMarketing"></div>`;
+    }
+
+    c.innerHTML = html || '<div class="empty-state">Nothing to manage here.</div>';
+  }
+
+  window.searchTeam = function(dept, q) {
+    const resultsEl = document.getElementById('results' + dept.charAt(0).toUpperCase() + dept.slice(1));
+    if (!q) { resultsEl.innerHTML = ''; return; }
+    const matches = allUsers.filter(u =>
+      !(u.roles && u.roles[dept] === true) &&
+      ((u.name||'').toLowerCase().includes(q.toLowerCase()) || (u.email||'').toLowerCase().includes(q.toLowerCase()))
+    );
+    if (!matches.length) { resultsEl.innerHTML = '<p style="font-size:13px;color:#999;margin-top:6px;">No matches.</p>'; return; }
+    resultsEl.innerHTML = matches.map(u => `
+      <div class="card" style="margin-top:8px;">
+        <div class="card-title" style="font-size:15px;">${escHtml(u.name||u.email)}</div>
+        <div class="card-text">${escHtml(u.email||'')}</div>
+        <div class="actions"><button class="btn btn-approve" onclick="toggleTeamRole('${u.id}','${dept}',true)">Add</button></div>
+      </div>`).join('');
+  };
+
+  window.toggleTeamRole = async function(uid, dept, val) {
+    await db.collection('users').doc(uid).set({roles:{[dept]: val}}, {merge:true});
+  };
 
   function renderQueue() {
     const c = document.getElementById('queueList');
+
+    if (activeTeam === 'team') { renderTeamManagement(); return; }
+
     // Graphics team sees anything with a real media size requested;
     // Marketing team sees anything with a real marketing request
     // (i.e. not empty and not just "None"). Both only see APPROVED
