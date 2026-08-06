@@ -1334,6 +1334,7 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
         <button className={tab==='schedule'?'active':''} onClick={()=>setTab('schedule')}>Schedule</button>
         <button className={tab==='history'?'active':''} onClick={()=>setTab('history')}>History</button>
         <button className={tab==='recurring'?'active':''} onClick={()=>setTab('recurring')}>Recurring{recurringPendingCount>0?` (${recurringPendingCount})`:''}</button>
+        <button className={tab==='team'?'active':''} onClick={()=>setTab('team')}>Team</button>
         <button className={tab==='repairs'?'active':''} onClick={()=>setTab('repairs')}>Repairs</button>
         <button className={tab==='lights'?'active':''} onClick={()=>setTab('lights')}>Lights</button>
         <button className={tab==='alerts'?'active':''} onClick={()=>setTab('alerts')}>Alerts{openAlerts.length>0?` (${openAlerts.length})`:''}</button>
@@ -1399,6 +1400,7 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
       {tab==='schedule' && <ScheduleAdmin vans={vans} approvedDrivers={approved} rentals={rentals} onAdd={addManualReservation} onCancel={cancelReservation} />}
       {tab==='history' && <RentalHistoryAdmin vans={vans} rentals={rentals} allUsers={allUsers} />}
       {tab==='recurring' && <RecurringAdmin recurringRequests={recurringRequests} allUsers={allUsers} onApprove={approveRecurring} onDeny={denyRecurring} onEnd={endRecurring} onApproveRenewal={approveRenewal} />}
+      {tab==='team' && <VanTeamAdmin allUsers={allUsers} />}
       {tab==='repairs' && <RepairsAdmin vans={vans} repairLog={repairLog} onAdd={addRepair} />}
       {tab==='lights' && <WarningLightsAdmin vans={vans} warningLights={warningLights} onAdd={addWarningLight} />}
 
@@ -1447,6 +1449,46 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
 }
 
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+function VanTeamAdmin({allUsers}){
+  const [search,setSearch] = useState('');
+  const vanAdmins = allUsers.filter(u => u.roles && u.roles.vanAdmin === true);
+  const others = allUsers.filter(u => !(u.roles && u.roles.vanAdmin === true))
+    .filter(u => search && ((u.name||'').toLowerCase().includes(search.toLowerCase()) || (u.email||'').toLowerCase().includes(search.toLowerCase())));
+
+  async function grant(uid_){
+    await db.collection('users').doc(uid_).set({roles:{vanAdmin:true}}, {merge:true});
+  }
+  async function revoke(uid_){
+    if(!confirm('Remove Van Usage admin access for this person?')) return;
+    await db.collection('users').doc(uid_).set({roles:{vanAdmin:false}}, {merge:true});
+  }
+
+  return (
+    <div className="card">
+      <h3>Van Usage Admins</h3>
+      <p className="muted">People with this role can approve drivers, manage vans, and handle scheduling — but nothing outside Van Usage (no Bedside, Graphics, Marketing, or other apps).</p>
+      {vanAdmins.length===0 && <p className="muted">No one else has this yet.</p>}
+      {vanAdmins.map(u=>(
+        <div key={u.id} className="list-item">
+          <div><div>{u.name||u.email}</div><div className="muted">{u.email}</div></div>
+          <button className="secondary" style={{marginTop:0,width:'auto',padding:'8px 14px'}} onClick={()=>revoke(u.id)}>Remove</button>
+        </div>
+      ))}
+
+      <h3 style={{marginTop:24}}>Add Someone</h3>
+      <p className="muted">Search by name or email among people who've already signed into the hub at least once.</p>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or email..." />
+      {search && others.length===0 && <p className="muted" style={{marginTop:10}}>No matches. They need to sign into the hub at least once first.</p>}
+      {others.map(u=>(
+        <div key={u.id} className="list-item">
+          <div><div>{u.name||u.email}</div><div className="muted">{u.email}</div></div>
+          <button className="secondary" style={{marginTop:0,width:'auto',padding:'8px 14px'}} onClick={()=>grant(u.id)}>Make Van Admin</button>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function RecurringAdmin({recurringRequests,allUsers,onApprove,onDeny,onEnd,onApproveRenewal}){
   function nameFor(uid_){
@@ -1731,6 +1773,7 @@ function App(){
   const [user,setUser] = useState(undefined); // undefined = checking, null = signed out
   const [profile,setProfile] = useState(null);
   const [isAdmin,setIsAdmin] = useState(false);
+  const [isFullAdmin,setIsFullAdmin] = useState(false);
   const [mode,setMode] = useState('driver'); // driver, admin
   const [vans,setVans] = useState([]);
   const [rentals,setRentals] = useState([]);
@@ -1753,9 +1796,10 @@ function App(){
         const doc = await db.collection('users').doc(u.uid).get();
         const data = doc.exists ? doc.data() : {};
         setProfile(data);
-        setIsAdmin(data.isAdmin===true);
+        setIsAdmin(data.isAdmin===true || (data.roles && data.roles.vanAdmin===true));
+        setIsFullAdmin(data.isAdmin===true);
       } else {
-        setProfile(null); setIsAdmin(false);
+        setProfile(null); setIsAdmin(false); setIsFullAdmin(false);
       }
     });
   },[]);
