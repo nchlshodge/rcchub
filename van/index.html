@@ -863,19 +863,14 @@ function DriverHome({user,profile,vans,rentals,warningLights,refreshProfile}){
   const anyOutstandingReturn = selectedReturnId
     ? rentals.find(r=>r.id===selectedReturnId)
     : null;
-  const activeRental = myPendingCheckout || anyOutstandingReturn;
+  // If the driver explicitly clicked "Check It In" on a specific van
+  // (selectedReturnId is set), that takes priority — otherwise a
+  // stray pending checkout of their own would silently block them
+  // from ever completing someone else's return.
+  const activeRental = selectedReturnId ? anyOutstandingReturn : (myPendingCheckout || anyOutstandingReturn);
   const activeVan = activeRental ? vans.find(v=>v.id===activeRental.vanId) : null;
   const outstandingReturns = rentals.filter(r=>r.checkout && !r.return);
 
-  // TEMPORARY DEBUG — remove once the Check It In issue is resolved.
-  console.log('[DEBUG DriverHome]', {
-    selectedReturnId,
-    myPendingCheckout: myPendingCheckout ? {id: myPendingCheckout.id, driverId: myPendingCheckout.driverId, hasCheckout: !!myPendingCheckout.checkout} : null,
-    anyOutstandingReturn: anyOutstandingReturn ? {id: anyOutstandingReturn.id, hasCheckout: !!anyOutstandingReturn.checkout, hasReturn: !!anyOutstandingReturn.return} : null,
-    activeRentalId: activeRental ? activeRental.id : null,
-    activeVanId: activeVan ? activeVan.id : null,
-    activeVanFound: !!activeVan,
-  });
 
   if(!vr.status){
     return <DriverApply user={user} onDone={refreshProfile} />;
