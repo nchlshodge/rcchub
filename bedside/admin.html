@@ -331,7 +331,8 @@
       <div class="tab" data-tab="wall">Prayer wall</div>
       <div class="tab" data-tab="addvisit">Add visit</div>
       <div class="tab" data-tab="admins">Manage admins</div>
-      <div class="tab" data-tab="modules">App access</div>
+      <div class="tab" data-tab="modules" data-fulladmin-only>App access</div>
+      <div class="tab" data-tab="incidents" data-fulladmin-only>Incident reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></div>
     </nav>
 
     <main>
@@ -416,8 +417,8 @@
 
       <!-- MANAGE ADMINS -->
       <div class="screen" id="tab-admins">
-        <h2 class="section-title">Manage Admins</h2>
-        <div class="card" style="background:var(--gold-dim); border-color:var(--gold-glow); margin-bottom:14px;">
+        <h2 class="section-title" id="adminManageTitle">Manage Admins</h2>
+        <div class="card" style="background:var(--gold-dim); border-color:var(--gold-glow); margin-bottom:14px;" data-fulladmin-only>
           <div class="card-text" style="margin-bottom:0;">
             Anyone toggled on here gets full admin access to this dashboard — including the ability to grant or remove admin access for others. Only toggle this on for people you trust with that.
           </div>
@@ -434,6 +435,22 @@
           </div>
         </div>
         <div id="moduleManageList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- INCIDENT REPORTS -->
+      <div class="screen" id="tab-incidents">
+        <h2 class="section-title">Incident Reports</h2>
+        <div class="card" style="background:var(--gold-dim); border-color:var(--gold-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">
+            These may include sensitive details (injuries, medical treatment). Visible to admins only.
+          </div>
+        </div>
+        <div class="nav-tabs" style="border-bottom:2px solid var(--border); margin-bottom:16px;">
+          <div class="tab active" data-itab="new" style="flex:1; text-align:center;">New</div>
+          <div class="tab" data-itab="followup" style="flex:1; text-align:center;">Needs Follow-up</div>
+          <div class="tab" data-itab="reviewed" style="flex:1; text-align:center;">Reviewed</div>
+        </div>
+        <div id="incidentsList"><div class="loading">Loading...</div></div>
       </div>
     </main>
   </div>
@@ -497,19 +514,32 @@
       document.getElementById('appShell').style.display = 'block';
 
       const userDoc = await db.collection('users').doc(user.uid).get();
-      const isAdmin = userDoc.exists && userDoc.data().isAdmin === true;
+      const userData = userDoc.exists ? userDoc.data() : {};
+      const isFullAdmin = userData.isAdmin === true;
+      const isBedsideAdmin = isFullAdmin || (userData.roles && userData.roles.bedsideAdmin === true);
+      window.currentUserIsFullAdmin = isFullAdmin; // used to gate cross-app tabs below
       document.getElementById('accessCheck').style.display = 'none';
 
-      if (isAdmin) {
+      if (isBedsideAdmin) {
         document.getElementById('adminUI').style.display = 'block';
         document.getElementById('accessDenied').style.display = 'none';
         loadPending();
         loadAdminVisits();
         loadDischarged();
         loadWall();
-        loadAdminManagement();
+        loadAdminManagement(); // this now shows Bedside team management for everyone, full Manage Admins only for full admins — see function below
         loadUpdateApprovals();
-        loadModuleManagement();
+        // App Access and Incident Reports are full-admin-only — these
+        // touch cross-app settings and sensitive data outside
+        // Bedside's own scope, so a Bedside-only admin shouldn't see
+        // them, even though they can see everything else here.
+        document.querySelectorAll('[data-fulladmin-only]').forEach(el => {
+          el.style.display = isFullAdmin ? '' : 'none';
+        });
+        if (isFullAdmin) {
+          loadModuleManagement();
+          loadIncidentReports();
+        }
       } else {
         document.getElementById('adminUI').style.display = 'none';
         document.getElementById('accessDenied').style.display = 'block';
@@ -521,10 +551,10 @@
     }
   });
 
-  document.querySelectorAll('.tab').forEach(tab => {
+  document.querySelectorAll('nav > .tab').forEach(tab => {
     tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('nav > .tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('main > .screen').forEach(s => s.classList.remove('active'));
       tab.classList.add('active');
       document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
     });
@@ -683,11 +713,40 @@
 
   function renderAdminManagement(users) {
     const container = document.getElementById('adminManageList');
+    const titleEl = document.getElementById('adminManageTitle');
+    const isFullAdmin = window.currentUserIsFullAdmin;
+
     if (!users.length) {
       container.innerHTML = `<div class="empty-state">No users found yet — people show up here once they sign in and save a profile.</div>`;
       return;
     }
 
+    if (!isFullAdmin) {
+      // Bedside-scoped admins only manage the bedsideAdmin role, not
+      // the master isAdmin flag — they can't see or grant full admin
+      // access, and can't touch other departments' rosters.
+      if (titleEl) titleEl.textContent = 'Bedside Team';
+      const bedsideAdmins = users.filter(u => u.roles && u.roles.bedsideAdmin === true);
+      const others = users.filter(u => !(u.roles && u.roles.bedsideAdmin === true));
+      container.innerHTML = `
+        <div class="card" style="background:var(--gold-dim); border-color:var(--gold-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">People with Bedside admin access can review prayer requests, manage visits, and approve visit updates — but nothing outside Bedside.</div>
+        </div>
+        ${bedsideAdmins.map(u => `
+          <div class="card">
+            <div class="card-title">${escHtml(u.name || '(no name set)')}</div>
+            <div class="card-text">${escHtml(u.email || '')}</div>
+            <div class="actions">${u.id === currentUser.uid ? '<span class="tag tag-public">You</span>' : `<button class="btn btn-hide" onclick="toggleBedsideAdmin('${u.id}', false)">Remove</button>`}</div>
+          </div>`).join('') || '<p style="font-size:14px;color:var(--text-soft);">No one else has this yet.</p>'}
+        <h3 style="margin-top:20px; font-family:'Lora',serif; font-size:16px;">Add Someone</h3>
+        <input type="text" id="bedsideTeamSearch" placeholder="Search name or email..." oninput="filterBedsideTeamSearch(this.value)" style="margin-top:8px;">
+        <div id="bedsideTeamSearchResults"></div>
+      `;
+      window._othersForBedsideSearch = others;
+      return;
+    }
+
+    if (titleEl) titleEl.textContent = 'Manage Admins';
     users.sort((a, b) => {
       if (!!a.isAdmin !== !!b.isAdmin) return a.isAdmin ? -1 : 1;
       return (a.name || '').localeCompare(b.name || '');
@@ -710,6 +769,27 @@
         </div>`;
     }).join('');
   }
+
+  window.filterBedsideTeamSearch = function(q) {
+    const el = document.getElementById('bedsideTeamSearchResults');
+    if (!q) { el.innerHTML = ''; return; }
+    const matches = (window._othersForBedsideSearch || []).filter(u =>
+      (u.name||'').toLowerCase().includes(q.toLowerCase()) || (u.email||'').toLowerCase().includes(q.toLowerCase())
+    );
+    if (!matches.length) { el.innerHTML = '<p style="font-size:13px;color:var(--text-soft);margin-top:8px;">No matches.</p>'; return; }
+    el.innerHTML = matches.map(u => `
+      <div class="card" style="margin-top:8px;">
+        <div class="card-title" style="font-size:15px;">${escHtml(u.name||u.email)}</div>
+        <div class="card-text">${escHtml(u.email||'')}</div>
+        <div class="actions"><button class="btn btn-approve" onclick="toggleBedsideAdmin('${u.id}', true)">Add to Bedside Team</button></div>
+      </div>`).join('');
+  };
+
+  window.toggleBedsideAdmin = async function(uid, val) {
+    if (val && !confirm('Give this person Bedside admin access?')) return;
+    if (!val && !confirm('Remove Bedside admin access for this person?')) return;
+    await db.collection('users').doc(uid).set({ roles: { bedsideAdmin: val } }, { merge: true });
+  };
 
   async function toggleAdmin(uid, makeAdmin) {
     if (makeAdmin && !confirm('Give this person full admin access, including the ability to manage other admins?')) return;
@@ -977,6 +1057,84 @@
     document.querySelector('[data-tab="visits"]').classList.add('active');
     document.getElementById('tab-visits').classList.add('active');
   });
+
+  // ── INCIDENT REPORTS ──
+  let allIncidents = [];
+  let incidentFilter = 'new';
+
+  function loadIncidentReports() {
+    db.collection('incidentReports').orderBy('submittedAt', 'desc').onSnapshot(snapshot => {
+      allIncidents = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderIncidents();
+      const newCount = allIncidents.filter(r => !r.reviewStatus || r.reviewStatus === 'new').length;
+      const badge = document.getElementById('incidentsCount');
+      if (newCount) { badge.textContent = newCount; badge.style.display = 'inline-block'; }
+      else { badge.style.display = 'none'; }
+    }, err => {
+      document.getElementById('incidentsList').innerHTML =
+        '<div class="empty-state">Could not load incident reports. You may need admin access, or a Firestore index — check the browser console.</div>';
+      console.error(err);
+    });
+  }
+
+  document.querySelectorAll('[data-itab]').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('[data-itab]').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      incidentFilter = t.dataset.itab;
+      renderIncidents();
+    });
+  });
+
+  function renderIncidents() {
+    const container = document.getElementById('incidentsList');
+    const filtered = allIncidents.filter(r => {
+      const status = r.reviewStatus || 'new';
+      return status === incidentFilter;
+    });
+
+    if (!filtered.length) {
+      container.innerHTML = `<div class="empty-state">Nothing here right now.</div>`;
+      return;
+    }
+
+    container.innerHTML = filtered.map(r => {
+      const date = r.submittedAt && r.submittedAt.toDate ? r.submittedAt.toDate().toLocaleString() : '';
+      const types = (r.incidentTypes || []).join(', ');
+      const hasInjury = r.injury === 'yes';
+
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(r.location || 'Unknown location')}</div>
+          <div class="card-meta" style="margin-bottom:6px;">
+            <span class="tag ${hasInjury ? 'tag-pending' : 'tag-general'}">${escHtml(types || 'Type not specified')}</span>
+            <span>${r.incidentDate || ''} ${r.incidentTime || ''}</span>
+          </div>
+          <div class="card-text">${escHtml(r.description || '')}</div>
+          ${hasInjury ? `<div class="card-text" style="color:var(--red);"><strong>Injury reported:</strong> ${escHtml(r.injuryDesc || 'no detail given')} — treatment: ${escHtml(r.treatment || 'not specified')}</div>` : ''}
+          ${r.involvedName ? `<div class="card-meta"><span>Involved: ${escHtml(r.involvedName)}${r.involvedRole ? ' · ' + escHtml(r.involvedRole) : ''}</span></div>` : ''}
+          <div class="card-meta">
+            <span>Reported by ${escHtml(r.reporterName || 'unknown')}${r.reporterPhone ? ' · ' + escHtml(r.reporterPhone) : ''}${r.reporterEmail ? ' · ' + escHtml(r.reporterEmail) : ''}</span>
+          </div>
+          <div class="card-meta"><span>Submitted ${date}</span></div>
+          <div class="actions">
+            ${incidentFilter !== 'reviewed' ? `<button class="btn btn-approve" onclick="setIncidentStatus('${r.id}','reviewed')">Mark reviewed</button>` : ''}
+            ${incidentFilter !== 'followup' ? `<button class="btn btn-hide" onclick="setIncidentStatus('${r.id}','followup')">Needs follow-up</button>` : ''}
+            ${incidentFilter !== 'new' ? `<button class="btn btn-unhide" onclick="setIncidentStatus('${r.id}','new')">Move back to New</button>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function setIncidentStatus(id, status) {
+    await db.collection('incidentReports').doc(id).update({
+      reviewStatus: status,
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: currentUser.uid,
+    });
+    showBanner('Report updated.');
+  }
+  window.setIncidentStatus = setIncidentStatus;
 
   function showBanner(msg, isError = false) {
     const b = document.getElementById('banner');
