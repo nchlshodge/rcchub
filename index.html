@@ -507,6 +507,7 @@
       icon: '🌴',
       iconClass: 'vanrental',
       href: 'time-off.html',
+      hideIfLocked: true, // staff-only tool — no reason for a random congregation member to even know this exists
     },
   ];
 
@@ -584,7 +585,10 @@
     // Every module always shows a tile — enabled ones link straight
     // in, disabled ones render grayed out and, when clicked, send an
     // access request to admins instead of navigating anywhere.
-    let html = MODULES.map(m => {
+    // EXCEPTION: modules flagged hideIfLocked (e.g. Time Off — a
+    // staff-only tool) are skipped entirely when the person doesn't
+    // have access, rather than showing as a discoverable locked tile.
+    let html = MODULES.filter(m => modules[m.key] === true || !m.hideIfLocked).map(m => {
       const on = modules[m.key] === true;
       if (on) {
         return `
