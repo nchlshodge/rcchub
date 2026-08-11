@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RCC · Admin</title>
+  <meta name="theme-color" content="#2557b8">
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500;600&display=swap');
+
+    :root {
+      --bg:         #f7f6f3;
+      --bg-card:    #ffffff;
+      --bg-raised:  #f0ece4;
+      --border:     #e8e4dc;
+      --border-mid: rgba(0,0,0,0.14);
+      --text:       #1a1a1a;
+      --text-mid:   #5c5650;
+      --text-soft:  #9e9890;
+      --blue:       #2557b8;
+      --blue-dim:   rgba(37,87,184,0.08);
+      --blue-glow:  rgba(37,87,184,0.20);
+      --green:      #2e7a52;
+      --green-dim:  rgba(46,122,82,0.10);
+      --red:        #a03030;
+      --red-dim:    rgba(160,48,48,0.10);
+      --radius:     14px;
+      --radius-sm:  8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      font-weight: 400;
+      color: var(--blue);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo img { height: 24px; width: auto; }
+    .logo span { font-size: 13px; color: var(--text-soft); font-family: 'Inter', sans-serif; font-weight: 400; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .header-right a { font-size: 13px; color: var(--text-soft); text-decoration: none; }
+    #signOutBtn {
+      background: transparent;
+      color: var(--text-soft);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+    }
+
+    nav {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      padding: 0 16px;
+      gap: 4px;
+      overflow-x: auto;
+    }
+    .section-tab {
+      padding: 14px 16px;
+      font-size: 14px;
+      color: var(--text-soft);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+    .section-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .section-tab:hover:not(.active) { color: var(--text-mid); }
+    .badge-count {
+      display: inline-block;
+      background: var(--red-dim);
+      color: var(--red);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 10px;
+      margin-left: 6px;
+    }
+
+    main { max-width: 760px; margin: 0 auto; padding: 28px 16px 80px; }
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .subnav { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 16px; overflow-x: auto; }
+    .subtab { padding: 10px 14px; font-size: 13px; font-weight: 600; color: var(--text-soft); border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+    .subtab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+    .section-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+      font-weight: 400;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+    .card-title { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 400; margin-bottom: 3px; }
+    .card-text { font-size: 14px; color: var(--text-mid); margin-bottom: 8px; }
+    .card-meta { font-size: 12px; color: var(--text-soft); margin-bottom: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .tag { font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+    .tag-hospital { background: var(--blue-dim); color: var(--blue); }
+    .tag-general  { background: rgba(100,100,180,0.1); color: #5a5ab0; }
+    .tag-pending  { background: var(--red-dim); color: var(--red); }
+    .tag-public   { background: var(--green-dim); color: var(--green); }
+    .tag-hidden   { background: rgba(0,0,0,0.06); color: var(--text-soft); }
+
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn { padding: 9px 14px; border-radius: var(--radius-sm); border: none; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif; }
+    .btn-approve { background: var(--green-dim); color: var(--green); border: 1px solid rgba(46,122,82,0.25); }
+    .btn-hide { background: var(--red-dim); color: var(--red); border: 1px solid rgba(160,48,48,0.2); }
+    .btn-unhide { background: var(--bg-raised); color: var(--text-mid); border: 1px solid var(--border-mid); }
+    .btn-delete { background: transparent; color: var(--red); border: 1px solid rgba(160,48,48,0.2); }
+
+    .empty-state { text-align: center; padding: 50px 20px; color: var(--text-soft); }
+    .loading { text-align: center; padding: 40px; color: var(--text-soft); font-size: 15px; }
+
+    #loginScreen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh; text-align: center; padding: 40px 24px;
+    }
+    .login-title { font-family: 'Playfair Display', serif; font-size: 30px; margin-bottom: 8px; }
+    .login-sub { font-size: 14px; color: var(--text-mid); margin-bottom: 32px; max-width: 300px; }
+    #googleSignInBtn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: #fff; border: 1px solid #d1cdc4; border-radius: 12px;
+      padding: 15px 24px; font-size: 15px; font-weight: 500; cursor: pointer;
+      width: 100%; max-width: 300px; font-family: 'Inter', sans-serif;
+    }
+    .access-denied { text-align: center; padding: 60px 24px; }
+    .access-denied .title { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--red); margin-bottom: 10px; }
+    .access-denied .sub { color: var(--text-mid); font-size: 15px; }
+
+    .banner {
+      display: none; padding: 14px 20px; text-align: center; font-size: 14px; font-weight: 500;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 300;
+    }
+    .banner.show { display: block; }
+  </style>
+</head>
+<body>
+
+<div class="banner" id="banner"></div>
+
+<div id="loginScreen">
+  <div class="login-title">RCC Admin</div>
+  <p class="login-sub">Sign in to manage Bedside, Incident Reports, and Van Usage from one place.</p>
+  <button id="googleSignInBtn">
+    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+    Sign in with Google
+  </button>
+</div>
+
+<div id="appShell" style="display:none;">
+  <header>
+    <div class="logo"><img src="assets/rcc-logo-plain.png" alt="RCC">RCC <span>· Admin</span></div>
+    <div class="header-right">
+      <a href="index.html">← All apps</a>
+      <button id="signOutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <div id="accessCheck" style="padding:60px; text-align:center; color:var(--text-soft);">Checking access...</div>
+
+  <div id="adminUI" style="display:none;">
+    <nav>
+      <div class="section-tab active" data-section="overview">Overview</div>
+      <div class="section-tab" data-section="bedside">Bedside</div>
+      <div class="section-tab" data-section="incidents">Incident Reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></div>
+      <div class="section-tab" data-section="vans">Van Usage</div>
+      <div class="section-tab" data-section="events">Event Requests <span class="badge-count" id="eventsCount" style="display:none;"></span></div>
+      <div class="section-tab" data-section="timeoff">Time Off <span class="badge-count" id="timeOffCount" style="display:none;"></span></div>
+      <div class="section-tab" data-section="access">App Access</div>
+      <div class="section-tab" data-section="requests">Access Requests <span class="badge-count" id="requestsCount" style="display:none;"></span></div>
+      <div class="section-tab" data-section="admins">Manage Admins</div>
+    </nav>
+
+    <main>
+      <!-- OVERVIEW -->
+      <div class="section active" id="section-overview">
+        <h2 class="section-title">Overview</h2>
+        <div id="overviewCards"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- BEDSIDE -->
+      <div class="section" id="section-bedside">
+        <h2 class="section-title">Bedside</h2>
+        <div class="subnav">
+          <div class="subtab active" data-btab="pending">Pending Prayer Requests</div>
+          <div class="subtab" data-btab="visits">Active Visits</div>
+          <div class="subtab" data-btab="wall">Prayer Wall</div>
+        </div>
+        <div id="bedside-pending"><div class="loading">Loading...</div></div>
+        <div id="bedside-visits" style="display:none;"><div class="loading">Loading...</div></div>
+        <div id="bedside-wall" style="display:none;"><div class="loading">Loading...</div></div>
+        <p class="card-text" style="margin-top:16px;">For discharge, add-visit, and full detail, use <a href="bedside/admin.html" style="color:var(--blue);">Bedside's own admin page →</a></p>
+      </div>
+
+      <!-- INCIDENT REPORTS -->
+      <div class="section" id="section-incidents">
+        <h2 class="section-title">Incident Reports</h2>
+        <div class="card" id="insuranceSettingsCard" style="margin-bottom:16px; display:none;">
+          <div class="card-title" style="font-size:15px;">Insurance Contact</div>
+          <div class="card-text" style="margin-bottom:10px;">Where reviewed reports get sent when you click "Send to Insurance."</div>
+          <input type="text" id="insuranceEmail" placeholder="insurance-agent@example.com" style="width:100%; padding:9px 11px; border:1px solid #d1cdc4; border-radius:7px; font-size:14px; margin-bottom:10px;">
+          <button class="btn btn-approve" onclick="saveInsuranceEmail()">Save</button>
+        </div>
+        <div class="subnav">
+          <div class="subtab active" data-itab="new">New</div>
+          <div class="subtab" data-itab="followup">Needs Follow-up</div>
+          <div class="subtab" data-itab="reviewed">Reviewed</div>
+        </div>
+        <div id="incidentsList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- VAN USAGE -->
+      <!-- EVENT REQUESTS -->
+      <div class="section" id="section-events">
+        <h2 class="section-title">Event Requests</h2>
+        <div class="subnav">
+          <div class="subtab active" data-etab="new">New</div>
+          <div class="subtab" data-etab="approved">Approved</div>
+          <div class="subtab" data-etab="denied">Denied</div>
+        </div>
+        <div id="eventRequestsList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- TIME OFF -->
+      <div class="section" id="section-timeoff">
+        <h2 class="section-title">Time Off Requests</h2>
+
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title" style="font-size:15px;">Notification Emails</div>
+          <div class="card-text" style="margin-bottom:10px;">Who gets emailed when a new time off request comes in.</div>
+          <label style="font-size:12px; font-weight:500; color:var(--text-soft); display:block; margin-bottom:4px;">Primary Email</label>
+          <input type="text" id="notifyEmail1" placeholder="you@rochesterchristian.church" style="width:100%; padding:9px 11px; border:1px solid #d1cdc4; border-radius:7px; font-size:14px; margin-bottom:10px;">
+          <label style="font-size:12px; font-weight:500; color:var(--text-soft); display:block; margin-bottom:4px;">Second Email (optional)</label>
+          <input type="text" id="notifyEmail2" placeholder="someone-else@rochesterchristian.church" style="width:100%; padding:9px 11px; border:1px solid #d1cdc4; border-radius:7px; font-size:14px; margin-bottom:10px;">
+          <button class="btn btn-approve" onclick="saveNotificationEmails()">Save</button>
+        </div>
+
+        <div class="subnav">
+          <div class="subtab active" data-totab="pending">Pending</div>
+          <div class="subtab" data-totab="approved">Approved</div>
+          <div class="subtab" data-totab="denied">Denied</div>
+        </div>
+        <div id="timeOffList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <div class="section" id="section-vans">
+        <h2 class="section-title">Van Usage</h2>
+        <div class="subnav">
+          <div class="subtab active" data-vtab="approvals">Driver Approvals</div>
+          <div class="subtab" data-vtab="vans">Vans</div>
+          <div class="subtab" data-vtab="alerts">Safety Alerts</div>
+          <div class="subtab" data-vtab="history">History</div>
+        </div>
+        <div id="van-approvals"><div class="loading">Loading...</div></div>
+        <div id="van-vans" style="display:none;"><div class="loading">Loading...</div></div>
+        <div id="van-alerts" style="display:none;"><div class="loading">Loading...</div></div>
+        <div id="van-history" style="display:none;"><div class="loading">Loading...</div></div>
+        <p class="card-text" style="margin-top:16px;">For scheduling, repairs, warning lights, adding drivers, adding vans, and managing weekly recurring reservations, use the <a href="van/index.html" style="color:var(--blue);">Van Usage admin view →</a></p>
+      </div>
+
+      <!-- APP ACCESS -->
+      <div class="section" id="section-access">
+        <h2 class="section-title">App Access</h2>
+        <div class="card" style="background:var(--blue-dim); border-color:var(--blue-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">"Apps" controls which tiles show on each person's hub dashboard. "Roles" grants department-scoped admin access — e.g. Van Usage Admin can approve drivers and manage vans, but has no access to Bedside, Graphics, or Marketing, and vice versa. Full admin access is still managed separately under "Manage Admins."</div>
+        </div>
+        <div id="moduleManageList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- ACCESS REQUESTS -->
+      <div class="section" id="section-requests">
+        <h2 class="section-title">Access Requests</h2>
+        <div class="card" style="background:var(--blue-dim); border-color:var(--blue-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">Anyone signed in can request access for someone else from the main hub page. Approving here creates or updates that person's account with the requested modules turned on.</div>
+        </div>
+        <div id="accessRequestsList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- MANAGE ADMINS -->
+      <div class="section" id="section-admins">
+        <h2 class="section-title">Manage Admins</h2>
+        <div class="card" style="background:var(--blue-dim); border-color:var(--blue-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">Anyone toggled on here gets full admin access across all apps, including the ability to manage other admins. Only toggle this on for people you trust with that.</div>
+        </div>
+        <div id="adminManageList"><div class="loading">Loading...</div></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="accessDenied" class="access-denied" style="display:none;">
+    <div class="title">Access Restricted</div>
+    <p class="sub">This area is limited to designated administrators.</p>
+  </div>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey:            "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+    authDomain:        "bedsidercc.firebaseapp.com",
+    projectId:         "bedsidercc",
+    storageBucket:     "bedsidercc.firebasestorage.app",
+    messagingSenderId: "950958384975",
+    appId:             "1:950958384975:web:6f43dec5a7ba842c69c73a"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  let currentUser = null;
+
+  document.getElementById('googleSignInBtn').addEventListener('click', () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err => showBanner('Sign-in failed: ' + err.message, true));
+  });
+  document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+
+  auth.onAuthStateChanged(async user => {
+    if (user) {
+      currentUser = user;
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appShell').style.display = 'block';
+      const userDoc = await db.collection('users').doc(user.uid).get();
+      const userData = userDoc.exists ? userDoc.data() : {};
+      const isFullAdmin = userData.isAdmin === true;
+      const roles = userData.roles || {};
+      const canVan = isFullAdmin || roles.vanAdmin === true;
+      const canBedside = isFullAdmin || roles.bedsideAdmin === true;
+      const canGraphics = isFullAdmin || roles.graphics === true;
+      const canMarketing = isFullAdmin || roles.marketing === true;
+      const canOverview = isFullAdmin || roles.overview === true;
+      const hasAnyAccess = isFullAdmin || canVan || canBedside || canGraphics || canMarketing || canOverview;
+      window.currentUserIsFullAdmin = isFullAdmin;
+      window.currentUserCanOverview = canOverview;
+      window.currentUserIsOwner = userData.isOwner === true;
+      window.currentUserCanEmailInsurance = userData.canEmailInsurance === true;
+      document.getElementById('accessCheck').style.display = 'none';
+
+      if (hasAnyAccess) {
+        document.getElementById('adminUI').style.display = 'block';
+
+        // Overview shows cross-app summary cards with links into each
+        // department's own admin tools — visible to anyone with the
+        // overview role OR full admin. The detailed department tabs
+        // (Bedside, Van Usage) still show for Department Heads, so
+        // they can work directly without detouring through Overview.
+        // Incident Reports, Event Requests, Time Off, App Access,
+        // Access Requests, and Manage Admins stay full-admin-only,
+        // since they sit outside any single department's scope.
+        const tabVisibility = {
+          overview: canOverview, bedside: canBedside, incidents: isFullAdmin, vans: canVan,
+          events: isFullAdmin, timeoff: isFullAdmin, access: isFullAdmin,
+          requests: isFullAdmin, admins: isFullAdmin,
+        };
+        document.querySelectorAll('.section-tab').forEach(tab => {
+          const key = tab.dataset.section;
+          if (key in tabVisibility) tab.style.display = tabVisibility[key] ? '' : 'none';
+        });
+
+        // Land on whichever tab makes sense: an explicit ?section=
+        // link (e.g. from Van Usage's own "Admin" button) wins if the
+        // person can see it; otherwise Overview if they have it,
+        // otherwise the first tab they can actually access.
+        const requestedSection = new URLSearchParams(window.location.search).get('section');
+        const firstVisible = Object.keys(tabVisibility).find(k => tabVisibility[k]);
+        const landingSection = (requestedSection && tabVisibility[requestedSection])
+          ? requestedSection
+          : (canOverview ? 'overview' : firstVisible);
+        document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.querySelector(`[data-section="${landingSection}"]`)?.classList.add('active');
+        document.getElementById('section-' + landingSection)?.classList.add('active');
+
+        if (canOverview) { loadOverview({canBedside, canVan, isFullAdmin}); }
+        if (canBedside) { loadBedsidePending(); loadBedsideVisits(); loadBedsideWall(); }
+        if (isFullAdmin) { loadIncidentReports(); loadInsuranceEmail(); }
+        if (canVan) { loadVanApprovals(); loadVans(); loadVanAlerts(); loadVanHistory(); }
+        if (isFullAdmin) { loadEventRequests(); loadTimeOffRequests(); loadNotificationEmails(); }
+        if (isFullAdmin) { loadModuleManagement(); loadAccessRequests(); loadAdminManagement(); }
+      } else {
+        document.getElementById('accessDenied').style.display = 'block';
+      }
+    } else {
+      currentUser = null;
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('appShell').style.display = 'none';
+    }
+  });
+
+  // ── Top-level section switching ──
+  document.querySelectorAll('.section-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('section-' + tab.dataset.section).classList.add('active');
+    });
+  });
+
+  // ── Bedside sub-tabs ──
+  document.querySelectorAll('[data-btab]').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('[data-btab]').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      ['pending','visits','wall'].forEach(k => {
+        document.getElementById('bedside-' + k).style.display = (k === t.dataset.btab) ? 'block' : 'none';
+      });
+    });
+  });
+
+  // ── OVERVIEW ──
+  // Pulls a handful of lightweight counts from across all apps and
+  // shows them as cards with a link into each department's own,
+  // full-featured admin page. This does NOT duplicate any admin
+  // actions — it's purely "what's going on, and where do I go to deal
+  // with it." Which cards show depends on what the viewer can access:
+  // a Department Head sees their own department's card here too, but
+  // clicking it just takes them to the tab they already have open
+  // access to; someone with ONLY the overview role sees every card
+  // (read-only counts) but the links still respect their actual
+  // permissions when they click through.
+  function loadOverview({canBedside, canVan, isFullAdmin}) {
+    const el = document.getElementById('overviewCards');
+
+    if (canBedside) {
+      db.collection('prayerRequests').where('status','==','pending').onSnapshot(snap => {
+        updateOverviewCard('bedside', 'Bedside', `${snap.size} prayer request${snap.size===1?'':'s'} awaiting review`, {externalUrl: 'bedside/admin.html'});
+      });
+    }
+    if (canVan) {
+      db.collection('users').onSnapshot(snap => {
+        const pendingDrivers = snap.docs.filter(d => d.data().vanRentalProfile?.status === 'pending').length;
+        updateOverviewCard('vans', 'Van Usage', `${pendingDrivers} driver application${pendingDrivers===1?'':'s'} awaiting approval`, {externalUrl: 'van/admin.html'});
+      });
+    }
+    if (isFullAdmin) {
+      db.collection('incidentReports').onSnapshot(snap => {
+        const newCount = snap.docs.filter(d => !d.data().reviewStatus || d.data().reviewStatus==='new').length;
+        updateOverviewCard('incidents', 'Incident Reports', `${newCount} new report${newCount===1?'':'s'}`, {targetSection: 'incidents'});
+      });
+      db.collection('eventRequests').onSnapshot(snap => {
+        const newCount = snap.docs.filter(d => (d.data().status||'new')==='new').length;
+        updateOverviewCard('events', 'Event Requests', `${newCount} new request${newCount===1?'':'s'}`, {targetSection: 'events'});
+      });
+      db.collection('timeOffRequests').onSnapshot(snap => {
+        const pendingCount = snap.docs.filter(d => (d.data().status||'pending')==='pending').length;
+        updateOverviewCard('timeoff', 'Time Off', `${pendingCount} pending request${pendingCount===1?'':'s'}`, {targetSection: 'timeoff'});
+      });
+      db.collection('accessRequests').where('status','==','pending').onSnapshot(snap => {
+        updateOverviewCard('requests', 'Access Requests', `${snap.size} pending request${snap.size===1?'':'s'}`, {targetSection: 'requests'});
+      });
+    }
+
+    if (el.querySelector('.loading')) el.innerHTML = '';
+  }
+
+  const overviewCardData = {};
+  function updateOverviewCard(key, title, summary, destination) {
+    overviewCardData[key] = { title, summary, destination };
+    renderOverviewCards();
+  }
+  function renderOverviewCards() {
+    const el = document.getElementById('overviewCards');
+    const keys = Object.keys(overviewCardData);
+    if (!keys.length) return;
+    el.innerHTML = keys.map(k => {
+      const c = overviewCardData[k];
+      const clickAction = c.destination.externalUrl
+        ? `window.location.href='${c.destination.externalUrl}'`
+        : `goToSection('${c.destination.targetSection}')`;
+      const arrow = c.destination.externalUrl ? '↗' : '→';
+      return `
+        <div class="card" style="cursor:pointer;" onclick="${clickAction}">
+          <div class="card-title">${escHtml(c.title)} <span style="font-size:13px; color:var(--text-soft); font-weight:400;">${arrow}</span></div>
+          <div class="card-text" style="margin-bottom:0;">${escHtml(c.summary)}</div>
+        </div>`;
+    }).join('');
+  }
+  window.goToSection = (section) => {
+    document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelector(`[data-section="${section}"]`)?.classList.add('active');
+    document.getElementById('section-' + section)?.classList.add('active');
+  };
+
+  function loadBedsidePending() {
+    db.collection('prayerRequests').where('status','==','pending').orderBy('createdAt','desc').onSnapshot(snap => {
+      const items = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      const c = document.getElementById('bedside-pending');
+      if (!items.length) { c.innerHTML = '<div class="empty-state">Nothing waiting for review. 🎉</div>'; return; }
+      c.innerHTML = items.map(r => `
+        <div class="card">
+          <div class="card-title">${escHtml(r.patientName)}</div>
+          <div class="card-text">${escHtml(r.text)}</div>
+          <div class="card-meta"><span class="tag ${r.type==='hospital_visit'?'tag-hospital':'tag-general'}">${r.type==='hospital_visit'?'Care Visit':'General Request'}</span><span>${escHtml(r.anonymous ? 'Anonymous' : (r.submittedBy?.name||''))}</span></div>
+          <div class="actions">
+            <button class="btn btn-approve" onclick="bedsideApprove('${r.id}')">Approve &amp; post publicly</button>
+            <button class="btn btn-hide" onclick="bedsideHide('${r.id}')">Keep private</button>
+          </div>
+        </div>`).join('');
+    });
+  }
+  function loadBedsideVisits() {
+    db.collection('visits').where('active','==',true).orderBy('createdAt','desc').onSnapshot(snap => {
+      const items = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      const c = document.getElementById('bedside-visits');
+      if (!items.length) { c.innerHTML = '<div class="empty-state">No active visits.</div>'; return; }
+      c.innerHTML = items.map(v => `
+        <div class="card">
+          <div class="card-title">${escHtml(v.patientName)}</div>
+          <div class="card-text">${escHtml(v.hospital)} — ${escHtml(v.reason)}</div>
+          <div class="card-meta"><span>Claimed by: ${escHtml((v.claimedBy||[]).map(c=>c.name).join(', ')||'No one yet')}</span></div>
+        </div>`).join('');
+    });
+  }
+  function loadBedsideWall() {
+    db.collection('prayerRequests').where('status','in',['public','hidden']).orderBy('createdAt','desc').onSnapshot(snap => {
+      const items = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      const c = document.getElementById('bedside-wall');
+      if (!items.length) { c.innerHTML = '<div class="empty-state">No prayer wall entries yet.</div>'; return; }
+      c.innerHTML = items.map(r => `
+        <div class="card">
+          <div class="card-title">${escHtml(r.patientName)}</div>
+          <div class="card-text">${escHtml(r.text)}</div>
+          <div class="card-meta"><span class="tag ${r.status==='public'?'tag-public':'tag-hidden'}">${r.status==='public'?'Public':'Hidden'}</span></div>
+          <div class="actions">
+            ${r.status==='public'
+              ? `<button class="btn btn-hide" onclick="bedsideHide('${r.id}')">Hide from wall</button>`
+              : `<button class="btn btn-unhide" onclick="bedsideUnhide('${r.id}')">Show on wall</button>`}
+          </div>
+        </div>`).join('');
+    });
+  }
+  window.bedsideApprove = async id => { await db.collection('prayerRequests').doc(id).update({status:'public', reviewedAt:new Date().toISOString()}); showBanner('Posted to the prayer wall.'); };
+  window.bedsideHide = async id => { await db.collection('prayerRequests').doc(id).update({status:'hidden', reviewedAt:new Date().toISOString()}); showBanner('Kept private.'); };
+  window.bedsideUnhide = async id => { await db.collection('prayerRequests').doc(id).update({status:'public'}); showBanner('Now visible on the prayer wall.'); };
+
+  // ── Incident Reports ──
+  let allIncidents = [], incidentFilter = 'new';
+  function loadIncidentReports() {
+    db.collection('incidentReports').orderBy('submittedAt','desc').onSnapshot(snap => {
+      allIncidents = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      renderIncidents();
+      const newCount = allIncidents.filter(r => !r.reviewStatus || r.reviewStatus==='new').length;
+      const badge = document.getElementById('incidentsCount');
+      if (newCount) { badge.textContent = newCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
+    }, err => {
+      document.getElementById('incidentsList').innerHTML = '<div class="empty-state">Could not load incident reports.</div>';
+      console.error(err);
+    });
+  }
+  document.querySelectorAll('[data-itab]').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('[data-itab]').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      incidentFilter = t.dataset.itab;
+      renderIncidents();
+    });
+  });
+  function renderIncidents() {
+    const c = document.getElementById('incidentsList');
+    const filtered = allIncidents.filter(r => (r.reviewStatus||'new') === incidentFilter);
+    if (!filtered.length) { c.innerHTML = '<div class="empty-state">Nothing here right now.</div>'; return; }
+    c.innerHTML = filtered.map(r => {
+      const date = r.submittedAt && r.submittedAt.toDate ? r.submittedAt.toDate().toLocaleString() : '';
+      const hasInjury = r.injury === 'yes';
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(r.location||'Unknown location')}</div>
+          <div class="card-meta"><span class="tag ${hasInjury?'tag-pending':'tag-general'}">${escHtml((r.incidentTypes||[]).join(', ')||'Type not specified')}</span><span>${r.incidentDate||''} ${r.incidentTime||''}</span></div>
+          <div class="card-text">${escHtml(r.description||'')}</div>
+          ${hasInjury ? `<div class="card-text" style="color:var(--red);"><strong>Injury:</strong> ${escHtml(r.injuryDesc||'no detail')} — treatment: ${escHtml(r.treatment||'n/a')}</div>` : ''}
+          <div class="card-meta"><span>Reported by ${escHtml(r.reporterName||'unknown')}${r.reporterPhone?' · '+escHtml(r.reporterPhone):''}</span></div>
+          <div class="card-meta"><span>Submitted ${date}</span></div>
+          <div class="actions">
+            ${incidentFilter!=='reviewed' ? `<button class="btn btn-approve" onclick="setIncidentStatus('${r.id}','reviewed')">Mark reviewed</button>` : ''}
+            ${incidentFilter!=='followup' ? `<button class="btn btn-hide" onclick="setIncidentStatus('${r.id}','followup')">Needs follow-up</button>` : ''}
+            ${incidentFilter!=='new' ? `<button class="btn btn-unhide" onclick="setIncidentStatus('${r.id}','new')">Move back to New</button>` : ''}
+          </div>
+          ${window.currentUserCanEmailInsurance && incidentFilter==='reviewed' ? `
+            <div class="actions" style="margin-top:8px;">
+              <button class="btn btn-unhide" onclick="sendToInsurance('${r.id}')">${r.insuranceSentAt ? 'Re-send to Insurance' : 'Send to Insurance'}</button>
+              ${r.insuranceSentAt ? `<span class="tag tag-public">Sent ${new Date(r.insuranceSentAt).toLocaleDateString()}</span>` : ''}
+            </div>
+          ` : ''}
+        </div>`;
+    }).join('');
+  }
+  window.setIncidentStatus = async (id, status) => {
+    await db.collection('incidentReports').doc(id).update({reviewStatus:status, reviewedAt:new Date().toISOString(), reviewedBy: currentUser.uid});
+    showBanner('Report updated.');
+  };
+
+  // ── Insurance emailing (canEmailInsurance accounts only) ──
+  const INSURANCE_WEBHOOK_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL"; // 🔧 paste your deployed Apps Script URL here
+
+  function loadInsuranceEmail() {
+    const card = document.getElementById('insuranceSettingsCard');
+    if (window.currentUserCanEmailInsurance) card.style.display = 'block';
+    db.collection('settings').doc('insuranceContact').get().then(doc => {
+      if (doc.exists) document.getElementById('insuranceEmail').value = doc.data().email || '';
+    });
+  }
+  window.saveInsuranceEmail = async () => {
+    const email = document.getElementById('insuranceEmail').value.trim();
+    await db.collection('settings').doc('insuranceContact').set({ email }, { merge: true });
+    showBanner('Insurance contact saved.');
+  };
+  window.sendToInsurance = async (reportId) => {
+    const report = allIncidents.find(r => r.id === reportId);
+    if (!report) return;
+    const settingsDoc = await db.collection('settings').doc('insuranceContact').get();
+    const insuranceEmail = settingsDoc.exists ? settingsDoc.data().email : '';
+    if (!insuranceEmail) { alert('Set an insurance contact email above first.'); return; }
+    if (INSURANCE_WEBHOOK_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL') { alert('Insurance email isn\'t set up yet — the Apps Script URL still needs to be added.'); return; }
+
+    try {
+      await fetch(INSURANCE_WEBHOOK_URL, {
+        method: 'POST', mode: 'no-cors', headers: {'Content-Type':'text/plain'},
+        body: JSON.stringify({ insuranceEmail, report }),
+      });
+      await db.collection('incidentReports').doc(reportId).update({
+        insuranceSentAt: new Date().toISOString(),
+        insuranceSentBy: currentUser.uid,
+      });
+      showBanner('Sent to insurance.');
+    } catch (err) {
+      alert('Could not send: ' + err.message);
+    }
+  };
+
+  // ── Van Usage ──
+  document.querySelectorAll('[data-vtab]').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('[data-vtab]').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      ['approvals','vans','alerts','history'].forEach(k => {
+        document.getElementById('van-' + k).style.display = (k === t.dataset.vtab) ? 'block' : 'none';
+      });
+    });
+  });
+  function loadVanApprovals() {
+    db.collection('users').onSnapshot(snap => {
+      const drivers = snap.docs.map(d => ({id:d.id, ...d.data()})).filter(u => u.vanRentalProfile);
+      const pending = drivers.filter(u => u.vanRentalProfile.status === 'pending');
+      const c = document.getElementById('van-approvals');
+      if (!pending.length) { c.innerHTML = '<div class="empty-state">No pending driver applications.</div>'; return; }
+      c.innerHTML = pending.map(u => {
+        const vr = u.vanRentalProfile;
+        const needsVerify = !vr.licenseVerifiedInPerson;
+        return `
+        <div class="card">
+          <div class="card-title">${escHtml(u.name||'Unnamed')}</div>
+          <div class="card-text">${escHtml(u.phone||'')} · License expires: ${escHtml(vr.licenseExp||'(not set)')}
+            <button class="btn btn-unhide" style="padding:2px 8px;font-size:12px;" onclick="vanEditExp('${u.id}','${escHtml(vr.licenseExp||'')}')">Edit</button>
+          </div>
+          <div class="card-meta"><span>License check: <strong style="color:${vr.licenseVerifiedInPerson ? 'var(--green)' : 'var(--red)'}">${vr.licenseVerifiedInPerson ? 'Verified in person ✓' : 'Not yet verified in person'}</strong></span></div>
+          <div class="card-meta"><span>Insurance cancelled: ${vr.insuranceCancelled ? 'YES' : 'No'} · License revoked/suspended: ${vr.licenseRevokedSuspended ? 'YES' : 'No'}</span></div>
+          <div class="actions">
+            ${needsVerify ? `<button class="btn btn-unhide" onclick="vanVerifyInPerson('${u.id}')">Mark license verified in person</button>` : ''}
+            <button class="btn btn-approve" ${needsVerify ? 'disabled style="opacity:0.5;cursor:default;"' : ''} onclick="vanApprove('${u.id}')">Approve</button>
+            <button class="btn btn-hide" onclick="vanDeny('${u.id}')">Deny</button>
+          </div>
+        </div>`;
+      }).join('');
+    });
+  }
+  window.vanApprove = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.status':'approved'}); showBanner('Driver approved.'); };
+  window.vanDeny = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.status':'denied'}); showBanner('Application denied.'); };
+  window.vanEditExp = async (uid, currentExp) => {
+    const newExp = prompt('New license expiration date (YYYY-MM-DD):', currentExp || '');
+    if (newExp === null) return;
+    await db.collection('users').doc(uid).update({'vanRentalProfile.licenseExp': newExp});
+    showBanner('Expiration date updated.');
+  };
+  window.vanVerifyInPerson = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.licenseVerifiedInPerson':true}); showBanner('License marked verified.'); };
+
+  function loadVans() {
+    db.collection('vans').onSnapshot(snap => {
+      const vans = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      const c = document.getElementById('van-vans');
+      if (!vans.length) { c.innerHTML = '<div class="empty-state">No vans on file.</div>'; return; }
+      c.innerHTML = vans.map(v => `
+        <div class="card">
+          <div class="card-title">${escHtml(v.name)}</div>
+          <div class="card-meta"><span class="tag ${v.status==='available'?'tag-public':(v.status==='maintenance'?'tag-pending':'tag-hidden')}">${v.status}</span><span>${v.mileage} mi · ${v.gas}% gas</span></div>
+          <div class="actions">
+            ${v.status!=='maintenance'
+              ? `<button class="btn btn-hide" onclick="setVanStatus('${v.id}','maintenance')">Send to Maintenance</button>`
+              : `<button class="btn btn-approve" onclick="setVanStatus('${v.id}','available')">Mark Available</button>`}
+          </div>
+        </div>`).join('');
+    });
+  }
+  window.setVanStatus = async (vanId, status) => { await db.collection('vans').doc(vanId).update({status}); showBanner('Van updated.'); };
+
+  function loadVanAlerts() {
+    db.collection('vanAlerts').onSnapshot(alertsSnap => {
+      const alerts = alertsSnap.docs.map(d => ({id:d.id, ...d.data()})).filter(a => !a.resolved);
+      const c = document.getElementById('van-alerts');
+      if (!alerts.length) { c.innerHTML = '<div class="empty-state">No open alerts.</div>'; return; }
+
+      db.collection('vanRentals').get().then(rentalsSnap => {
+        const rentals = rentalsSnap.docs.map(d => ({id:d.id, ...d.data()}));
+        c.innerHTML = alerts.map(a => {
+          const rental = a.rentalId ? rentals.find(r => r.id === a.rentalId) : null;
+          const isBlock = a.type === 'safety_light_block' && rental && rental.checkoutBlocked && !rental.checkoutCleared;
+          const draft = rental?.checkoutDraft || {};
+          return `
+            <div class="card">
+              <div class="card-text">"${escHtml(a.description||'')}"</div>
+              ${isBlock ? `<div class="card-meta"><span>Recorded so far — Mileage: ${escHtml(draft.mileage||'—')} · Gas: ${draft.gas ?? '—'}%</span></div>` : ''}
+              <div class="actions">
+                ${isBlock ? `<button class="btn btn-approve" onclick="clearVanCheckout('${rental.id}','${a.id}')">Clear — let driver finish</button>
+                  <span class="card-text" style="align-self:center;">or use the <a href="van/index.html" style="color:var(--blue);">Van Usage admin</a> to complete it yourself</span>` : ''}
+                <button class="btn btn-hide" onclick="resolveVanAlert('${a.id}')">Mark Resolved</button>
+              </div>
+            </div>`;
+        }).join('');
+      });
+    });
+  }
+  window.resolveVanAlert = async id => { await db.collection('vanAlerts').doc(id).update({resolved:true}); showBanner('Alert resolved.'); };
+  window.clearVanCheckout = async (rentalId, alertId) => {
+    await db.collection('vanRentals').doc(rentalId).update({
+      checkoutCleared: true, clearedBy: currentUser.uid, clearedAt: Date.now(),
+    });
+    await db.collection('vanAlerts').doc(alertId).update({resolved:true});
+    showBanner('Cleared — driver can finish checkout now.');
+  };
+
+  function loadVanHistory() {
+    Promise.all([
+      db.collection('vanRentals').where('status','==','completed').get(),
+      db.collection('vans').get(),
+      db.collection('users').get(),
+    ]).then(([rentalsSnap, vansSnap, usersSnap]) => {
+      const rentals = rentalsSnap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(b.return?.at||0)-(a.return?.at||0));
+      const vansById = {}; vansSnap.docs.forEach(d => vansById[d.id] = d.data());
+      const usersById = {}; usersSnap.docs.forEach(d => usersById[d.id] = d.data());
+      const nameFor = uid_ => uid_ ? (usersById[uid_]?.name || usersById[uid_]?.email || 'Unknown') : 'Unknown';
+
+      const c = document.getElementById('van-history');
+      if (!rentals.length) { c.innerHTML = '<div class="empty-state">No completed rentals yet.</div>'; return; }
+
+      c.innerHTML = rentals.map(r => {
+        const van = vansById[r.vanId];
+        const checkoutBy = nameFor(r.driverId);
+        const checkinBy = nameFor(r.return?.completedBy);
+        const differentPerson = r.return?.completedBy && r.return.completedBy !== r.driverId;
+        return `
+          <div class="card">
+            <div class="card-title">${escHtml(van?.name||'Unknown van')}</div>
+            <div class="card-meta"><span>${r.date||''} ${r.time||''} → ${r.endDate||''} ${r.endTime||''}</span></div>
+            <div class="card-text">Checked out by: ${escHtml(checkoutBy)}</div>
+            <div class="card-text">Checked in by: ${escHtml(checkinBy)}${differentPerson ? ' <strong style="color:var(--blue);">— different from who checked it out</strong>' : ''}</div>
+          </div>`;
+      }).join('');
+    }).catch(err => {
+      document.getElementById('van-history').innerHTML = '<div class="empty-state">Could not load rental history.</div>';
+      console.error(err);
+    });
+  }
+
+  // ── App Access ──
+  const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage', eventRequest: 'Event Request', timeOff: 'Time Off Request' };
+  const ROLE_LABELS = { overview: 'Overview', vanAdmin: 'Van Usage Admin (Department Head)', bedsideAdmin: 'Bedside Admin (Department Head)', graphics: 'Graphics Team (Department Head)', marketing: 'Marketing Team (Department Head)' };
+  function loadModuleManagement() {
+    db.collection('users').onSnapshot(snap => {
+      const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+      const c = document.getElementById('moduleManageList');
+      if (!users.length) { c.innerHTML = '<div class="empty-state">No users found yet.</div>'; return; }
+      c.innerHTML = users.map(u => {
+        const modules = u.modules || {};
+        const roles = u.roles || {};
+        const moduleToggles = Object.keys(MODULE_LABELS).map(key => {
+          const on = modules[key] === true;
+          return `<button class="btn ${on?'btn-approve':'btn-unhide'}" style="margin-right:6px;margin-bottom:6px;" onclick="toggleModule('${u.id}','${key}',${!on})">${MODULE_LABELS[key]}: ${on?'On':'Off'}</button>`;
+        }).join('');
+        const roleToggles = Object.keys(ROLE_LABELS).map(key => {
+          const on = roles[key] === true;
+          return `<button class="btn ${on?'btn-approve':'btn-unhide'}" style="margin-right:6px;margin-bottom:6px;" onclick="toggleRole('${u.id}','${key}',${!on})">${ROLE_LABELS[key]}: ${on?'On':'Off'}</button>`;
+        }).join('');
+        return `<div class="card"><div class="card-title">${escHtml(u.name||'(no name set)')}</div><div class="card-text">${escHtml(u.email||'')}</div>
+          <div class="card-meta" style="margin-bottom:4px;">Apps</div><div class="actions" style="margin-bottom:10px;">${moduleToggles}</div>
+          <div class="card-meta" style="margin-bottom:4px;">Department Admin Roles</div><div class="actions">${roleToggles}</div></div>`;
+      }).join('');
+    });
+  }
+  window.toggleModule = async (uid, key, val) => {
+    await db.collection('users').doc(uid).set({modules:{[key]:val}}, {merge:true});
+    showBanner(`${MODULE_LABELS[key]} ${val?'enabled':'disabled'}.`);
+  };
+  window.toggleRole = async (uid, key, val) => {
+    await db.collection('users').doc(uid).set({roles:{[key]:val}}, {merge:true});
+    showBanner(`${ROLE_LABELS[key]} ${val?'enabled':'disabled'}.`);
+  };
+
+  // ── Access Requests ──
+  let allAccessRequests = [];
+  function loadAccessRequests() {
+    db.collection('accessRequests').where('status','==','pending').orderBy('createdAt','desc').onSnapshot(snap => {
+      allAccessRequests = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      renderAccessRequests();
+      const badge = document.getElementById('requestsCount');
+      if (allAccessRequests.length) { badge.textContent = allAccessRequests.length; badge.style.display = 'inline-block'; }
+      else { badge.style.display = 'none'; }
+    }, err => {
+      document.getElementById('accessRequestsList').innerHTML = '<div class="empty-state">Could not load requests.</div>';
+      console.error(err);
+    });
+  }
+
+  function renderAccessRequests() {
+    const c = document.getElementById('accessRequestsList');
+    if (!allAccessRequests.length) { c.innerHTML = '<div class="empty-state">No pending requests.</div>'; return; }
+    c.innerHTML = allAccessRequests.map(r => {
+      const modLabels = (r.modulesRequested||[]).map(k => MODULE_LABELS[k] || k).join(', ');
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(r.name)}</div>
+          <div class="card-text">${escHtml(r.email)}</div>
+          <div class="card-meta"><span class="tag tag-hospital">${escHtml(modLabels)}</span></div>
+          ${r.note ? `<div class="card-text">"${escHtml(r.note)}"</div>` : ''}
+          <div class="card-meta"><span>Requested by ${escHtml(r.requestedBy?.name||'unknown')}</span></div>
+          <div class="actions">
+            <button class="btn btn-approve" onclick="approveAccessRequest('${r.id}')">Approve &amp; grant access</button>
+            <button class="btn btn-delete" onclick="dismissAccessRequest('${r.id}')">Dismiss</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  window.approveAccessRequest = async (reqId) => {
+    const req = allAccessRequests.find(r => r.id === reqId);
+    if (!req) return;
+    const moduleUpdates = {};
+    (req.modulesRequested||[]).forEach(k => moduleUpdates[k] = true);
+
+    // If someone with this email already has an account, update it directly.
+    const existing = await db.collection('users').where('email','==',req.email).limit(1).get();
+    if (!existing.empty) {
+      await db.collection('users').doc(existing.docs[0].id).set({modules: moduleUpdates}, {merge:true});
+    } else {
+      // Otherwise, stash the requested modules so they're applied
+      // automatically the first time this email signs in.
+      await db.collection('hubInvites').doc(req.email).set({
+        email: req.email, name: req.name, modules: moduleUpdates, claimed:false, createdAt: Date.now(),
+      }, {merge:true});
+    }
+    await db.collection('accessRequests').doc(reqId).update({status:'approved', resolvedAt:new Date().toISOString(), resolvedBy: currentUser.uid});
+    showBanner('Access granted.');
+  };
+
+  window.dismissAccessRequest = async (reqId) => {
+    await db.collection('accessRequests').doc(reqId).update({status:'dismissed', resolvedAt:new Date().toISOString(), resolvedBy: currentUser.uid});
+    showBanner('Request dismissed.');
+  };
+
+  // ── Manage Admins ──
+  function loadAdminManagement() {
+    db.collection('users').onSnapshot(snap => {
+      const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b) => {
+        if (!!a.isOwner !== !!b.isOwner) return a.isOwner ? -1 : 1;
+        if (!!a.isAdmin !== !!b.isAdmin) return a.isAdmin ? -1 : 1;
+        return (a.name||'').localeCompare(b.name||'');
+      });
+      const c = document.getElementById('adminManageList');
+      if (!users.length) { c.innerHTML = '<div class="empty-state">No users found yet.</div>'; return; }
+      c.innerHTML = users.map(u => {
+        const isAdmin = u.isAdmin === true;
+        const isOwnerFlag = u.isOwner === true;
+        const isSelf = u.id === currentUser.uid;
+        const adminButton = isSelf
+          ? `<span class="tag tag-public">You${isAdmin ? ' (admin)' : ''}</span>`
+          : (isAdmin
+              ? ((window.currentUserIsOwner || !isOwnerFlag)
+                  ? `<button class="btn btn-hide" onclick="toggleAdmin('${u.id}',false)">Remove admin access</button>`
+                  : '')
+              : `<button class="btn btn-unhide" onclick="toggleAdmin('${u.id}',true)">Make admin</button>`);
+        const ownerButton = (!isSelf && window.currentUserIsOwner)
+          ? (isOwnerFlag
+              ? `<button class="btn btn-hide" onclick="toggleOwner('${u.id}',false)">Remove Owner</button>`
+              : `<button class="btn btn-approve" onclick="toggleOwner('${u.id}',true)">Make Owner</button>`)
+          : '';
+        return `<div class="card"><div class="card-title">${escHtml(u.name||'(no name set)')}</div><div class="card-text">${escHtml(u.email||'')}</div>
+          <div class="actions">${isOwnerFlag ? `<span class="tag tag-hospital">👑 Owner</span>` : ''}${adminButton}${ownerButton}</div></div>`;
+      }).join('');
+    });
+  }
+  window.toggleAdmin = async (uid, makeAdmin) => {
+    if (makeAdmin && !confirm('Give this person full admin access?')) return;
+    if (!makeAdmin && !confirm('Remove admin access for this person?')) return;
+    try {
+      await db.collection('users').doc(uid).set({isAdmin: makeAdmin}, {merge:true});
+    } catch (e) {
+      showBanner('Could not update — this account may be Owner-protected: ' + e.message, true);
+    }
+  };
+  window.toggleOwner = async (uid, makeOwner) => {
+    if (makeOwner && !confirm('Give this person Owner status? They can never be removed by a regular admin afterward — only by another Owner.')) return;
+    if (!makeOwner && !confirm('Remove Owner status from this person?')) return;
+    try {
+      await db.collection('users').doc(uid).set({isOwner: makeOwner}, {merge:true});
+      showBanner(`Owner status ${makeOwner ? 'granted' : 'removed'}.`);
+    } catch (e) {
+      showBanner('Could not update: ' + e.message, true);
+    }
+  };
+
+  function showBanner(msg, isError=false) {
+    const b = document.getElementById('banner');
+    b.textContent = msg;
+    b.style.background = isError ? '#fdecea' : '#eaf4ee';
+    b.style.color = isError ? '#a03030' : '#2e7a52';
+    b.classList.add('show');
+    setTimeout(() => b.classList.remove('show'), 3200);
+  }
+  // ── Event Requests ──
+  let allEventRequests = [];
+  let eventFilter = 'new';
+  function loadEventRequests() {
+    db.collection('eventRequests').orderBy('submittedAt','desc').onSnapshot(snap => {
+      allEventRequests = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      renderEventRequests();
+      const newCount = allEventRequests.filter(r => (r.status||'new')==='new').length;
+      const badge = document.getElementById('eventsCount');
+      if (newCount) { badge.textContent = newCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
+    }, err => {
+      document.getElementById('eventRequestsList').innerHTML = '<div class="empty-state">Could not load event requests.</div>';
+      console.error(err);
+    });
+  }
+  document.querySelectorAll('[data-etab]').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('[data-etab]').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      eventFilter = t.dataset.etab;
+      renderEventRequests();
+    });
+  });
+
+  const REQUEST_TYPE_LABELS = {
+    church_event: 'Church Event', media_only: 'Media/Graphic Only', facilities: 'Facilities Rental',
+  };
+
+  function renderEventRequests() {
+    const c = document.getElementById('eventRequestsList');
+    const filtered = allEventRequests.filter(r => (r.status||'new') === eventFilter);
+    if (!filtered.length) { c.innerHTML = '<div class="empty-state">Nothing here right now.</div>'; return; }
+
+    c.innerHTML = filtered.map(r => {
+      const typeLabel = REQUEST_TYPE_LABELS[r.requestType] || r.requestType || '';
+      const isEvent = r.requestType === 'church_event';
+      const isMedia = r.requestType === 'church_event' || r.requestType === 'media_only';
+
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(r.eventTitle || r.projectTitle || 'Untitled request')}</div>
+          <div class="card-meta">
+            <span class="tag tag-hospital">${escHtml(typeLabel)}</span>
+            <span>${escHtml((r.department||[]).join(', '))}</span>
+          </div>
+          <div class="card-text">Requested by ${escHtml(r.requesterName||'')} (${escHtml(r.email||'')})</div>
+          ${r.eventDate ? `<div class="card-meta"><span>${escHtml(r.eventDate)} ${escHtml(r.startTime||'')}${r.endTime ? ' – '+escHtml(r.endTime) : ''}</span></div>` : ''}
+          ${r.eventDesc ? `<div class="card-text">${escHtml(r.eventDesc)}</div>` : ''}
+          ${r.mediaDesc ? `<div class="card-text"><strong>Media needed:</strong> ${escHtml(r.mediaDesc)}</div>` : ''}
+          ${(r.vansNeeded||[]).length && !r.vansNeeded.includes('None') ? `<div class="card-meta"><span>Van requested: ${escHtml(r.vansNeeded.join(', '))} ${r.vanConfirmed ? '✓ confirmed' : '— not yet confirmed'}</span></div>` : ''}
+
+          <div class="actions" style="margin-top:10px;">
+            ${eventFilter==='new' ? `
+              <button class="btn btn-approve" onclick="setEventStatus('${r.id}','approved')">Approve</button>
+              <button class="btn btn-hide" onclick="setEventStatus('${r.id}','denied')">Deny</button>
+            ` : `<button class="btn btn-unhide" onclick="setEventStatus('${r.id}','new')">Move back to New</button>`}
+          </div>
+
+          ${eventFilter==='approved' ? `
+            <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:8px;">
+              <button class="btn ${r.calendarAdded?'btn-approve':'btn-unhide'}" onclick="toggleEventField('${r.id}','calendarAdded',${!r.calendarAdded})">Calendar Added: ${r.calendarAdded?'Yes':'No'}</button>
+              ${isMedia ? `<button class="btn ${r.graphicStatus==='Completed'?'btn-approve':'btn-unhide'}" onclick="cycleGraphicStatus('${r.id}','${r.graphicStatus||''}')">Graphic Status: ${escHtml(r.graphicStatus||'Not started')}</button>` : ''}
+              ${isMedia ? `<button class="btn ${r.marketingStatus==='Completed'?'btn-approve':'btn-unhide'}" onclick="cycleMarketingStatus('${r.id}','${r.marketingStatus||''}')">Marketing Status: ${escHtml(r.marketingStatus||'Not started')}</button>` : ''}
+              ${(r.vansNeeded||[]).length && !r.vansNeeded.includes('None') ? `<button class="btn ${r.vanConfirmed?'btn-approve':'btn-unhide'}" onclick="toggleEventField('${r.id}','vanConfirmed',${!r.vanConfirmed})">Van Confirmed: ${r.vanConfirmed?'Yes':'No'}</button>` : ''}
+            </div>
+          ` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  window.setEventStatus = async (id, status) => {
+    await db.collection('eventRequests').doc(id).update({status, statusChangedAt:new Date().toISOString(), statusChangedBy: currentUser.uid});
+    showBanner('Request updated.');
+  };
+  window.toggleEventField = async (id, field, val) => {
+    await db.collection('eventRequests').doc(id).update({[field]: val});
+  };
+
+  // ── Time Off Requests ──
+  let allTimeOffRequests = [];
+  let timeOffFilter = 'pending';
+  function loadTimeOffRequests() {
+    db.collection('timeOffRequests').orderBy('submittedAt','desc').onSnapshot(snap => {
+      allTimeOffRequests = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      renderTimeOffRequests();
+      const pendingCount = allTimeOffRequests.filter(r => (r.status||'pending')==='pending').length;
+      const badge = document.getElementById('timeOffCount');
+      if (pendingCount) { badge.textContent = pendingCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
+    }, err => {
+      document.getElementById('timeOffList').innerHTML = '<div class="empty-state">Could not load time off requests.</div>';
+      console.error(err);
+    });
+  }
+  document.querySelectorAll('[data-totab]').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('[data-totab]').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      timeOffFilter = t.dataset.totab;
+      renderTimeOffRequests();
+    });
+  });
+
+  function renderTimeOffRequests() {
+    const c = document.getElementById('timeOffList');
+    const filtered = allTimeOffRequests.filter(r => (r.status||'pending') === timeOffFilter);
+    if (!filtered.length) { c.innerHTML = '<div class="empty-state">Nothing here right now.</div>'; return; }
+
+    c.innerHTML = filtered.map(r => `
+      <div class="card">
+        <div class="card-title">${escHtml(r.name||'')}</div>
+        <div class="card-meta"><span class="tag tag-hospital">${escHtml(r.requestType||'')}</span><span>${escHtml(r.startDate||'')} → ${escHtml(r.endDate||'')}</span></div>
+        <div class="card-text">Amount off: ${escHtml(r.amountOff||'')}</div>
+        <div class="card-text">Coverage: ${escHtml(r.coverage||'')}</div>
+        ${r.officeReturnDate ? `<div class="card-meta"><span>Office return: ${escHtml(r.officeReturnDate)}</span></div>` : ''}
+        <div class="card-meta"><span>${escHtml(r.email||'')}</span></div>
+        <div class="actions" style="margin-top:10px;">
+          ${timeOffFilter==='pending' ? `
+            <button class="btn btn-approve" onclick="setTimeOffStatus('${r.id}','approved')">Approve</button>
+            <button class="btn btn-hide" onclick="setTimeOffStatus('${r.id}','denied')">Deny</button>
+          ` : `<button class="btn btn-unhide" onclick="setTimeOffStatus('${r.id}','pending')">Move back to Pending</button>`}
+        </div>
+      </div>`).join('');
+  }
+
+  window.setTimeOffStatus = async (id, status) => {
+    const req = allTimeOffRequests.find(r=>r.id===id);
+    await db.collection('timeOffRequests').doc(id).update({
+      status, approvedBy: status==='approved' ? currentUser.uid : null,
+      statusChangedAt: new Date().toISOString(),
+    });
+    // Notify the requester via the same Apps Script webhook — this is
+    // a separate call from the initial submission sync, fired the
+    // moment an admin approves/denies from inside the app.
+    if (req && TIME_OFF_WEBHOOK_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
+      fetch(TIME_OFF_WEBHOOK_URL, {
+        method: 'POST', mode: 'no-cors', headers: {'Content-Type':'text/plain'},
+        body: JSON.stringify({
+          action: 'statusChanged', requestId: id, status,
+          requesterEmail: req.email, requesterName: req.name,
+          startDate: req.startDate, endDate: req.endDate,
+        })
+      }).catch(() => {});
+    }
+    showBanner('Request updated.');
+  };
+  // 🔧 Same Apps Script Web App URL as time-off.html's SHEET_SYNC_URL
+  // — paste it here too once deployed, so approve/deny actions taken
+  // in the admin screen can trigger the requester notification email.
+  const TIME_OFF_WEBHOOK_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
+
+  // ── Notification Email Settings ──
+  // Stored in a single small doc so the Apps Script webhook can read
+  // it fresh on every submission, without needing code changes here
+  // whenever the emails change.
+  function loadNotificationEmails() {
+    db.collection('settings').doc('timeOffNotifications').get().then(doc => {
+      if (doc.exists) {
+        const data = doc.data();
+        document.getElementById('notifyEmail1').value = data.email1 || '';
+        document.getElementById('notifyEmail2').value = data.email2 || '';
+      }
+    });
+  }
+  window.saveNotificationEmails = async () => {
+    const email1 = document.getElementById('notifyEmail1').value.trim();
+    const email2 = document.getElementById('notifyEmail2').value.trim();
+    await db.collection('settings').doc('timeOffNotifications').set({ email1, email2 }, { merge: true });
+    showBanner('Notification emails saved.');
+  };
+
+  window.cycleGraphicStatus = async (id, current) => {
+    const order = ['', 'In Progress', 'Completed'];
+    const next = order[(order.indexOf(current)+1) % order.length];
+    await db.collection('eventRequests').doc(id).update({graphicStatus: next});
+  };
+  window.cycleMarketingStatus = async (id, current) => {
+    const order = ['', 'In Progress', 'Completed'];
+    const next = order[(order.indexOf(current)+1) % order.length];
+    await db.collection('eventRequests').doc(id).update({marketingStatus: next});
+  };
+
+  function escHtml(str) { return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>
