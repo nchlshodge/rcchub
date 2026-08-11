@@ -394,7 +394,7 @@
         document.querySelector(`[data-section="${landingSection}"]`)?.classList.add('active');
         document.getElementById('section-' + landingSection)?.classList.add('active');
 
-        if (canOverview) { loadOverview({canBedside, canVan, isFullAdmin}); }
+        if (canOverview) { loadOverview({canBedside, canVan, isFullAdmin, canOverview}); }
         if (isFullAdmin) { loadIncidentsBadgeOnly(); }
         if (canBedside) { loadBedsidePending(); loadBedsideVisits(); loadBedsideWall(); }
         if (isFullAdmin) { /* Incident Reports now lives in its own incident/admin.html page */ }
@@ -443,21 +443,29 @@
   // access to; someone with ONLY the overview role sees every card
   // (read-only counts) but the links still respect their actual
   // permissions when they click through.
-  function loadOverview({canBedside, canVan, isFullAdmin}) {
+  function loadOverview({canBedside, canVan, isFullAdmin, canOverview}) {
     const el = document.getElementById('overviewCards');
+    // Overview-role access shows every card as a read-only summary,
+    // even for someone who ISN'T also a Department Head — otherwise a
+    // person with only the overview role would see a completely empty
+    // page, since none of canBedside/canVan/isFullAdmin would be true
+    // for them on their own.
+    const showBedsideCard = canBedside || canOverview;
+    const showVanCard = canVan || canOverview;
+    const showFullAdminCards = isFullAdmin || canOverview;
 
-    if (canBedside) {
+    if (showBedsideCard) {
       db.collection('prayerRequests').where('status','==','pending').onSnapshot(snap => {
         updateOverviewCard('bedside', 'Bedside', `${snap.size} prayer request${snap.size===1?'':'s'} awaiting review`, {externalUrl: 'bedside/admin.html'});
       });
     }
-    if (canVan) {
+    if (showVanCard) {
       db.collection('users').onSnapshot(snap => {
         const pendingDrivers = snap.docs.filter(d => d.data().vanRentalProfile?.status === 'pending').length;
         updateOverviewCard('vans', 'Van Usage', `${pendingDrivers} driver application${pendingDrivers===1?'':'s'} awaiting approval`, {externalUrl: 'van/admin.html'});
       });
     }
-    if (isFullAdmin) {
+    if (showFullAdminCards) {
       db.collection('incidentReports').onSnapshot(snap => {
         const newCount = snap.docs.filter(d => !d.data().reviewStatus || d.data().reviewStatus==='new').length;
         updateOverviewCard('incidents', 'Incident Reports', `${newCount} new report${newCount===1?'':'s'}`, {externalUrl: 'incident/admin.html'});
