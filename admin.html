@@ -201,8 +201,9 @@
 
   <div id="adminUI" style="display:none;">
     <nav>
-      <div class="section-tab active" data-section="bedside">Bedside</div>
-      <div class="section-tab" data-section="incidents">Incident Reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></div>
+      <div class="section-tab active" data-section="overview">Overview</div>
+      <div class="section-tab" data-section="bedside">Bedside</div>
+      <a class="section-tab" href="incident/admin.html" style="text-decoration:none;">Incident Reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></a>
       <div class="section-tab" data-section="vans">Van Usage</div>
       <div class="section-tab" data-section="events">Event Requests <span class="badge-count" id="eventsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="timeoff">Time Off <span class="badge-count" id="timeOffCount" style="display:none;"></span></div>
@@ -212,8 +213,14 @@
     </nav>
 
     <main>
+      <!-- OVERVIEW -->
+      <div class="section active" id="section-overview">
+        <h2 class="section-title">Overview</h2>
+        <div id="overviewCards"><div class="loading">Loading...</div></div>
+      </div>
+
       <!-- BEDSIDE -->
-      <div class="section active" id="section-bedside">
+      <div class="section" id="section-bedside">
         <h2 class="section-title">Bedside</h2>
         <div class="subnav">
           <div class="subtab active" data-btab="pending">Pending Prayer Requests</div>
@@ -226,16 +233,6 @@
         <p class="card-text" style="margin-top:16px;">For discharge, add-visit, and full detail, use <a href="bedside/admin.html" style="color:var(--blue);">Bedside's own admin page →</a></p>
       </div>
 
-      <!-- INCIDENT REPORTS -->
-      <div class="section" id="section-incidents">
-        <h2 class="section-title">Incident Reports</h2>
-        <div class="subnav">
-          <div class="subtab active" data-itab="new">New</div>
-          <div class="subtab" data-itab="followup">Needs Follow-up</div>
-          <div class="subtab" data-itab="reviewed">Reviewed</div>
-        </div>
-        <div id="incidentsList"><div class="loading">Loading...</div></div>
-      </div>
 
       <!-- VAN USAGE -->
       <!-- EVENT REQUESTS -->
@@ -347,24 +344,63 @@
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('appShell').style.display = 'block';
       const userDoc = await db.collection('users').doc(user.uid).get();
-      const isAdmin = userDoc.exists && userDoc.data().isAdmin === true;
+      const userData = userDoc.exists ? userDoc.data() : {};
+      const isFullAdmin = userData.isAdmin === true;
+      const roles = userData.roles || {};
+      const canVan = isFullAdmin || roles.vanAdmin === true;
+      const canBedside = isFullAdmin || roles.bedsideAdmin === true;
+      const canGraphics = isFullAdmin || roles.graphics === true;
+      const canMarketing = isFullAdmin || roles.marketing === true;
+      const canOverview = isFullAdmin || roles.overview === true;
+      const hasAnyAccess = isFullAdmin || canVan || canBedside || canGraphics || canMarketing || canOverview;
+      window.currentUserIsFullAdmin = isFullAdmin;
+      window.currentUserCanOverview = canOverview;
+      window.currentUserIsOwner = userData.isOwner === true;
+      window.currentUserCanEmailInsurance = userData.canEmailInsurance === true;
       document.getElementById('accessCheck').style.display = 'none';
-      if (isAdmin) {
+
+      if (hasAnyAccess) {
         document.getElementById('adminUI').style.display = 'block';
-        loadBedsidePending();
-        loadBedsideVisits();
-        loadBedsideWall();
-        loadIncidentReports();
-        loadVanApprovals();
-        loadEventRequests();
-        loadTimeOffRequests();
-        loadNotificationEmails();
-        loadVans();
-        loadVanAlerts();
-        loadVanHistory();
-        loadModuleManagement();
-        loadAccessRequests();
-        loadAdminManagement();
+
+        // Overview shows cross-app summary cards with links into each
+        // department's own admin tools — visible to anyone with the
+        // overview role OR full admin. The detailed department tabs
+        // (Bedside, Van Usage) still show for Department Heads, so
+        // they can work directly without detouring through Overview.
+        // Incident Reports, Event Requests, Time Off, App Access,
+        // Access Requests, and Manage Admins stay full-admin-only,
+        // since they sit outside any single department's scope.
+        const tabVisibility = {
+          overview: canOverview, bedside: canBedside, incidents: isFullAdmin, vans: canVan,
+          events: isFullAdmin, timeoff: isFullAdmin, access: isFullAdmin,
+          requests: isFullAdmin, admins: isFullAdmin,
+        };
+        document.querySelectorAll('.section-tab').forEach(tab => {
+          const key = tab.dataset.section;
+          if (key in tabVisibility) tab.style.display = tabVisibility[key] ? '' : 'none';
+        });
+
+        // Land on whichever tab makes sense: an explicit ?section=
+        // link (e.g. from Van Usage's own "Admin" button) wins if the
+        // person can see it; otherwise Overview if they have it,
+        // otherwise the first tab they can actually access.
+        const requestedSection = new URLSearchParams(window.location.search).get('section');
+        const firstVisible = Object.keys(tabVisibility).find(k => tabVisibility[k]);
+        const landingSection = (requestedSection && tabVisibility[requestedSection])
+          ? requestedSection
+          : (canOverview ? 'overview' : firstVisible);
+        document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.querySelector(`[data-section="${landingSection}"]`)?.classList.add('active');
+        document.getElementById('section-' + landingSection)?.classList.add('active');
+
+        if (canOverview) { loadOverview({canBedside, canVan, isFullAdmin}); }
+        if (isFullAdmin) { loadIncidentsBadgeOnly(); }
+        if (canBedside) { loadBedsidePending(); loadBedsideVisits(); loadBedsideWall(); }
+        if (isFullAdmin) { /* Incident Reports now lives in its own incident/admin.html page */ }
+        if (canVan) { loadVanApprovals(); loadVans(); loadVanAlerts(); loadVanHistory(); }
+        if (isFullAdmin) { loadEventRequests(); loadTimeOffRequests(); loadNotificationEmails(); }
+        if (isFullAdmin) { loadModuleManagement(); loadAccessRequests(); loadAdminManagement(); }
       } else {
         document.getElementById('accessDenied').style.display = 'block';
       }
@@ -395,6 +431,81 @@
       });
     });
   });
+
+  // ── OVERVIEW ──
+  // Pulls a handful of lightweight counts from across all apps and
+  // shows them as cards with a link into each department's own,
+  // full-featured admin page. This does NOT duplicate any admin
+  // actions — it's purely "what's going on, and where do I go to deal
+  // with it." Which cards show depends on what the viewer can access:
+  // a Department Head sees their own department's card here too, but
+  // clicking it just takes them to the tab they already have open
+  // access to; someone with ONLY the overview role sees every card
+  // (read-only counts) but the links still respect their actual
+  // permissions when they click through.
+  function loadOverview({canBedside, canVan, isFullAdmin}) {
+    const el = document.getElementById('overviewCards');
+
+    if (canBedside) {
+      db.collection('prayerRequests').where('status','==','pending').onSnapshot(snap => {
+        updateOverviewCard('bedside', 'Bedside', `${snap.size} prayer request${snap.size===1?'':'s'} awaiting review`, {externalUrl: 'bedside/admin.html'});
+      });
+    }
+    if (canVan) {
+      db.collection('users').onSnapshot(snap => {
+        const pendingDrivers = snap.docs.filter(d => d.data().vanRentalProfile?.status === 'pending').length;
+        updateOverviewCard('vans', 'Van Usage', `${pendingDrivers} driver application${pendingDrivers===1?'':'s'} awaiting approval`, {externalUrl: 'van/admin.html'});
+      });
+    }
+    if (isFullAdmin) {
+      db.collection('incidentReports').onSnapshot(snap => {
+        const newCount = snap.docs.filter(d => !d.data().reviewStatus || d.data().reviewStatus==='new').length;
+        updateOverviewCard('incidents', 'Incident Reports', `${newCount} new report${newCount===1?'':'s'}`, {externalUrl: 'incident/admin.html'});
+      });
+      db.collection('eventRequests').onSnapshot(snap => {
+        const newCount = snap.docs.filter(d => (d.data().status||'new')==='new').length;
+        updateOverviewCard('events', 'Event Requests', `${newCount} new request${newCount===1?'':'s'}`, {targetSection: 'events'});
+      });
+      db.collection('timeOffRequests').onSnapshot(snap => {
+        const pendingCount = snap.docs.filter(d => (d.data().status||'pending')==='pending').length;
+        updateOverviewCard('timeoff', 'Time Off', `${pendingCount} pending request${pendingCount===1?'':'s'}`, {targetSection: 'timeoff'});
+      });
+      db.collection('accessRequests').where('status','==','pending').onSnapshot(snap => {
+        updateOverviewCard('requests', 'Access Requests', `${snap.size} pending request${snap.size===1?'':'s'}`, {targetSection: 'requests'});
+      });
+    }
+
+    if (el.querySelector('.loading')) el.innerHTML = '';
+  }
+
+  const overviewCardData = {};
+  function updateOverviewCard(key, title, summary, destination) {
+    overviewCardData[key] = { title, summary, destination };
+    renderOverviewCards();
+  }
+  function renderOverviewCards() {
+    const el = document.getElementById('overviewCards');
+    const keys = Object.keys(overviewCardData);
+    if (!keys.length) return;
+    el.innerHTML = keys.map(k => {
+      const c = overviewCardData[k];
+      const clickAction = c.destination.externalUrl
+        ? `window.location.href='${c.destination.externalUrl}'`
+        : `goToSection('${c.destination.targetSection}')`;
+      const arrow = c.destination.externalUrl ? '↗' : '→';
+      return `
+        <div class="card" style="cursor:pointer;" onclick="${clickAction}">
+          <div class="card-title">${escHtml(c.title)} <span style="font-size:13px; color:var(--text-soft); font-weight:400;">${arrow}</span></div>
+          <div class="card-text" style="margin-bottom:0;">${escHtml(c.summary)}</div>
+        </div>`;
+    }).join('');
+  }
+  window.goToSection = (section) => {
+    document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelector(`[data-section="${section}"]`)?.classList.add('active');
+    document.getElementById('section-' + section)?.classList.add('active');
+  };
 
   function loadBedsidePending() {
     db.collection('prayerRequests').where('status','==','pending').orderBy('createdAt','desc').onSnapshot(snap => {
@@ -448,55 +559,15 @@
   window.bedsideHide = async id => { await db.collection('prayerRequests').doc(id).update({status:'hidden', reviewedAt:new Date().toISOString()}); showBanner('Kept private.'); };
   window.bedsideUnhide = async id => { await db.collection('prayerRequests').doc(id).update({status:'public'}); showBanner('Now visible on the prayer wall.'); };
 
-  // ── Incident Reports ──
-  let allIncidents = [], incidentFilter = 'new';
-  function loadIncidentReports() {
-    db.collection('incidentReports').orderBy('submittedAt','desc').onSnapshot(snap => {
-      allIncidents = snap.docs.map(d => ({id:d.id, ...d.data()}));
-      renderIncidents();
-      const newCount = allIncidents.filter(r => !r.reviewStatus || r.reviewStatus==='new').length;
+  // Just the count for the nav link's badge — the full report list and
+  // review actions now live entirely in incident/admin.html.
+  function loadIncidentsBadgeOnly() {
+    db.collection('incidentReports').onSnapshot(snap => {
+      const newCount = snap.docs.filter(d => !d.data().reviewStatus || d.data().reviewStatus==='new').length;
       const badge = document.getElementById('incidentsCount');
       if (newCount) { badge.textContent = newCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
-    }, err => {
-      document.getElementById('incidentsList').innerHTML = '<div class="empty-state">Could not load incident reports.</div>';
-      console.error(err);
     });
   }
-  document.querySelectorAll('[data-itab]').forEach(t => {
-    t.addEventListener('click', () => {
-      document.querySelectorAll('[data-itab]').forEach(x => x.classList.remove('active'));
-      t.classList.add('active');
-      incidentFilter = t.dataset.itab;
-      renderIncidents();
-    });
-  });
-  function renderIncidents() {
-    const c = document.getElementById('incidentsList');
-    const filtered = allIncidents.filter(r => (r.reviewStatus||'new') === incidentFilter);
-    if (!filtered.length) { c.innerHTML = '<div class="empty-state">Nothing here right now.</div>'; return; }
-    c.innerHTML = filtered.map(r => {
-      const date = r.submittedAt && r.submittedAt.toDate ? r.submittedAt.toDate().toLocaleString() : '';
-      const hasInjury = r.injury === 'yes';
-      return `
-        <div class="card">
-          <div class="card-title">${escHtml(r.location||'Unknown location')}</div>
-          <div class="card-meta"><span class="tag ${hasInjury?'tag-pending':'tag-general'}">${escHtml((r.incidentTypes||[]).join(', ')||'Type not specified')}</span><span>${r.incidentDate||''} ${r.incidentTime||''}</span></div>
-          <div class="card-text">${escHtml(r.description||'')}</div>
-          ${hasInjury ? `<div class="card-text" style="color:var(--red);"><strong>Injury:</strong> ${escHtml(r.injuryDesc||'no detail')} — treatment: ${escHtml(r.treatment||'n/a')}</div>` : ''}
-          <div class="card-meta"><span>Reported by ${escHtml(r.reporterName||'unknown')}${r.reporterPhone?' · '+escHtml(r.reporterPhone):''}</span></div>
-          <div class="card-meta"><span>Submitted ${date}</span></div>
-          <div class="actions">
-            ${incidentFilter!=='reviewed' ? `<button class="btn btn-approve" onclick="setIncidentStatus('${r.id}','reviewed')">Mark reviewed</button>` : ''}
-            ${incidentFilter!=='followup' ? `<button class="btn btn-hide" onclick="setIncidentStatus('${r.id}','followup')">Needs follow-up</button>` : ''}
-            ${incidentFilter!=='new' ? `<button class="btn btn-unhide" onclick="setIncidentStatus('${r.id}','new')">Move back to New</button>` : ''}
-          </div>
-        </div>`;
-    }).join('');
-  }
-  window.setIncidentStatus = async (id, status) => {
-    await db.collection('incidentReports').doc(id).update({reviewStatus:status, reviewedAt:new Date().toISOString(), reviewedBy: currentUser.uid});
-    showBanner('Report updated.');
-  };
 
   // ── Van Usage ──
   document.querySelectorAll('[data-vtab]').forEach(t => {
@@ -633,7 +704,7 @@
 
   // ── App Access ──
   const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage', eventRequest: 'Event Request', timeOff: 'Time Off Request' };
-  const ROLE_LABELS = { vanAdmin: 'Van Usage Admin', bedsideAdmin: 'Bedside Admin', graphics: 'Graphics Team', marketing: 'Marketing Team' };
+  const ROLE_LABELS = { overview: 'Overview', vanAdmin: 'Van Usage Admin (Department Head)', bedsideAdmin: 'Bedside Admin (Department Head)', graphics: 'Graphics Team (Department Head)', marketing: 'Marketing Team (Department Head)' };
   function loadModuleManagement() {
     db.collection('users').onSnapshot(snap => {
       const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
@@ -730,6 +801,7 @@
   function loadAdminManagement() {
     db.collection('users').onSnapshot(snap => {
       const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b) => {
+        if (!!a.isOwner !== !!b.isOwner) return a.isOwner ? -1 : 1;
         if (!!a.isAdmin !== !!b.isAdmin) return a.isAdmin ? -1 : 1;
         return (a.name||'').localeCompare(b.name||'');
       });
@@ -737,16 +809,43 @@
       if (!users.length) { c.innerHTML = '<div class="empty-state">No users found yet.</div>'; return; }
       c.innerHTML = users.map(u => {
         const isAdmin = u.isAdmin === true;
+        const isOwnerFlag = u.isOwner === true;
         const isSelf = u.id === currentUser.uid;
+        const adminButton = isSelf
+          ? `<span class="tag tag-public">You${isAdmin ? ' (admin)' : ''}</span>`
+          : (isAdmin
+              ? ((window.currentUserIsOwner || !isOwnerFlag)
+                  ? `<button class="btn btn-hide" onclick="toggleAdmin('${u.id}',false)">Remove admin access</button>`
+                  : '')
+              : `<button class="btn btn-unhide" onclick="toggleAdmin('${u.id}',true)">Make admin</button>`);
+        const ownerButton = (!isSelf && window.currentUserIsOwner)
+          ? (isOwnerFlag
+              ? `<button class="btn btn-hide" onclick="toggleOwner('${u.id}',false)">Remove Owner</button>`
+              : `<button class="btn btn-approve" onclick="toggleOwner('${u.id}',true)">Make Owner</button>`)
+          : '';
         return `<div class="card"><div class="card-title">${escHtml(u.name||'(no name set)')}</div><div class="card-text">${escHtml(u.email||'')}</div>
-          <div class="actions">${isSelf ? `<span class="tag tag-public">You (admin)</span>` : (isAdmin ? `<button class="btn btn-hide" onclick="toggleAdmin('${u.id}',false)">Remove admin access</button>` : `<button class="btn btn-unhide" onclick="toggleAdmin('${u.id}',true)">Make admin</button>`)}</div></div>`;
+          <div class="actions">${isOwnerFlag ? `<span class="tag tag-hospital">👑 Owner</span>` : ''}${adminButton}${ownerButton}</div></div>`;
       }).join('');
     });
   }
   window.toggleAdmin = async (uid, makeAdmin) => {
     if (makeAdmin && !confirm('Give this person full admin access?')) return;
     if (!makeAdmin && !confirm('Remove admin access for this person?')) return;
-    await db.collection('users').doc(uid).set({isAdmin: makeAdmin}, {merge:true});
+    try {
+      await db.collection('users').doc(uid).set({isAdmin: makeAdmin}, {merge:true});
+    } catch (e) {
+      showBanner('Could not update — this account may be Owner-protected: ' + e.message, true);
+    }
+  };
+  window.toggleOwner = async (uid, makeOwner) => {
+    if (makeOwner && !confirm('Give this person Owner status? They can never be removed by a regular admin afterward — only by another Owner.')) return;
+    if (!makeOwner && !confirm('Remove Owner status from this person?')) return;
+    try {
+      await db.collection('users').doc(uid).set({isOwner: makeOwner}, {merge:true});
+      showBanner(`Owner status ${makeOwner ? 'granted' : 'removed'}.`);
+    } catch (e) {
+      showBanner('Could not update: ' + e.message, true);
+    }
   };
 
   function showBanner(msg, isError=false) {
