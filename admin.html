@@ -280,7 +280,7 @@
         <div id="van-vans" style="display:none;"><div class="loading">Loading...</div></div>
         <div id="van-alerts" style="display:none;"><div class="loading">Loading...</div></div>
         <div id="van-history" style="display:none;"><div class="loading">Loading...</div></div>
-        <p class="card-text" style="margin-top:16px;">For scheduling, repairs, warning lights, adding drivers, adding vans, and managing weekly recurring reservations, use the <a href="van/index.html" style="color:var(--blue);">Van Usage admin view →</a></p>
+        <p class="card-text" style="margin-top:16px;">For scheduling, repairs, warning lights, adding drivers, adding vans, and managing weekly recurring reservations, use the <a href="van/admin.html" style="color:var(--blue);">Van Usage admin view →</a></p>
       </div>
 
       <!-- APP ACCESS -->
@@ -660,7 +660,7 @@
               ${isBlock ? `<div class="card-meta"><span>Recorded so far — Mileage: ${escHtml(draft.mileage||'—')} · Gas: ${draft.gas ?? '—'}%</span></div>` : ''}
               <div class="actions">
                 ${isBlock ? `<button class="btn btn-approve" onclick="clearVanCheckout('${rental.id}','${a.id}')">Clear — let driver finish</button>
-                  <span class="card-text" style="align-self:center;">or use the <a href="van/index.html" style="color:var(--blue);">Van Usage admin</a> to complete it yourself</span>` : ''}
+                  <span class="card-text" style="align-self:center;">or use the <a href="van/admin.html" style="color:var(--blue);">Van Usage admin</a> to complete it yourself</span>` : ''}
                 <button class="btn btn-hide" onclick="resolveVanAlert('${a.id}')">Mark Resolved</button>
               </div>
             </div>`;
