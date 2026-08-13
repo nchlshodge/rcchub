@@ -735,6 +735,80 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
     return {success: true};
   }
 
+  // Reassigns an in-progress rental to a new driver, a new van, or
+  // both — closes out the current rental as "reassigned" (distinct
+  // from a normal completed return, so History can tell the
+  // difference) and opens a fresh rental for the new driver/van,
+  // carrying over the handoff mileage/gas as the new leg's starting
+  // point. Two linked records instead of editing one in place, so
+  // the trail of who actually had the van and when stays honest.
+  async function reassignVan(oldRentalId, {newDriverId, newVanId, mileage, gas, purpose}){
+    const oldRental = rentals.find(r=>r.id===oldRentalId);
+    if(!oldRental) return {error: 'Original rental not found.'};
+    const targetVanId = newVanId || oldRental.vanId;
+    const targetDriverId = newDriverId || oldRental.driverId;
+    const newVan = vans.find(v=>v.id===targetVanId);
+    if(!newVan) return {error: 'Van not found.'};
+    if(newVanId && newVanId!==oldRental.vanId && newVan.status==='maintenance'){
+      return {error: 'That van is currently in maintenance.'};
+    }
+
+    // Only check for conflicts if switching to a genuinely different
+    // van — reassigning the same van to a new driver can't conflict
+    // with itself.
+    if(newVanId && newVanId!==oldRental.vanId){
+      const conflict = rentals.some(r=>{
+        if(r.id===oldRentalId || r.vanId!==newVanId || r.status==='completed' || r.status==='cancelled') return false;
+        if(!r.checkout || r.return) return false;
+        return true;
+      });
+      if(conflict) return {error: 'That van is currently checked out to someone else.'};
+    }
+
+    const oldVan = vans.find(v=>v.id===oldRental.vanId);
+
+    // Close out the old rental as reassigned, not a normal return.
+    await db.collection('vanRentals').doc(oldRentalId).update({
+      status: 'completed',
+      return: {
+        mileage, gas, clean: null, cleanPhoto: null,
+        warningLightsOn: [], otherLightReported: false, otherLightDesc: '',
+        completedBy: currentUserUid(), completedByAdmin: true,
+        reassigned: true, reassignedTo: {driverId: targetDriverId, vanId: targetVanId},
+        at: Date.now(),
+      },
+    });
+
+    // If the van itself is changing, the old van goes back to
+    // available (assuming nothing else has it out already).
+    if(oldVan && newVanId && newVanId!==oldRental.vanId){
+      await db.collection('vans').doc(oldVan.id).update({status:'available'});
+    }
+
+    // Open the new leg.
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toTimeString().slice(0,5);
+    const newRentalRef = db.collection('vanRentals').doc();
+    await newRentalRef.set({
+      driverId: targetDriverId, vanId: targetVanId, date: dateStr, time: timeStr,
+      endDate: dateStr, endTime: timeStr, purpose: purpose || oldRental.purpose || '',
+      status: 'assigned', createdAt: Date.now(), createdByAdmin: true,
+      reassignedFrom: oldRentalId,
+      checkout: {
+        mileage, gas, dashPhoto: null, warningLightsOn: [],
+        otherLightReported: false, otherLightDesc: '',
+        clean: null, cleanPhoto: null, at: Date.now(),
+        completedByAdmin: true, completedByAdminUid: currentUserUid(),
+      },
+    });
+    await db.collection('vans').doc(targetVanId).update({
+      mileage: Number(mileage)||newVan.mileage, gas: Number(gas)||newVan.gas, status:'inuse',
+    });
+
+    return {success: true};
+  }
+
   return (
     <div className="content">
       <div className="nav-tabs">
@@ -799,7 +873,7 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
         </div>
       )}
 
-      {tab==='checkinout' && <ManualCheckInOut vans={vans} rentals={rentals} approvedDrivers={approved} onCheckout={manualCheckout} onCheckin={manualCheckin} onAssignDirectly={assignVanDirectly} />}
+      {tab==='checkinout' && <ManualCheckInOut vans={vans} rentals={rentals} approvedDrivers={approved} onCheckout={manualCheckout} onCheckin={manualCheckin} onAssignDirectly={assignVanDirectly} onReassign={reassignVan} />}
 
       {tab==='schedule' && <ScheduleAdmin vans={vans} approvedDrivers={approved} rentals={rentals} onAdd={addManualReservation} onCancel={cancelReservation} />}
       {tab==='history' && <RentalHistoryAdmin vans={vans} rentals={rentals} allUsers={allUsers} />}
@@ -961,7 +1035,7 @@ function RecurringAdmin({recurringRequests,allUsers,onApprove,onDeny,onEnd,onApp
   );
 }
 
-function ManualCheckInOut({vans,rentals,approvedDrivers,onCheckout,onCheckin,onAssignDirectly}){
+function ManualCheckInOut({vans,rentals,approvedDrivers,onCheckout,onCheckin,onAssignDirectly,onReassign}){
   const pendingCheckouts = rentals.filter(r=>r.status==='assigned' && !r.checkout);
   const outstandingReturns = rentals.filter(r=>r.checkout && !r.return);
   const availableVans = vans.filter(v=>v.status!=='maintenance');
@@ -985,12 +1059,12 @@ function ManualCheckInOut({vans,rentals,approvedDrivers,onCheckout,onCheckin,onA
         return <ManualCheckoutRow key={r.id} rental={r} van={van} driverName={nameFor(r.driverId)} onSubmit={onCheckout} />;
       })}
 
-      <h3 style={{marginTop:24}}>Check In a Van</h3>
-      <p className="muted">Complete a return on a driver's behalf.</p>
+      <h3 style={{marginTop:24}}>Currently Out — Check In or Reassign</h3>
+      <p className="muted">Complete a return, or hand the van off to a different driver or a different van mid-use.</p>
       {outstandingReturns.length===0 && <p className="muted">No vans currently out.</p>}
       {outstandingReturns.map(r=>{
         const van = vans.find(v=>v.id===r.vanId);
-        return <ManualCheckinRow key={r.id} rental={r} van={van} driverName={nameFor(r.driverId)} onSubmit={onCheckin} />;
+        return <ManualCheckinRow key={r.id} rental={r} van={van} vans={availableVans} approvedDrivers={approvedDrivers} driverName={nameFor(r.driverId)} onSubmit={onCheckin} onReassign={onReassign} />;
       })}
     </div>
   );
@@ -1064,33 +1138,77 @@ function ManualCheckoutRow({rental,van,driverName,onSubmit}){
   );
 }
 
-function ManualCheckinRow({rental,van,driverName,onSubmit}){
+function ManualCheckinRow({rental,van,vans,approvedDrivers,driverName,onSubmit,onReassign}){
+  const [mode,setMode] = useState('checkin'); // checkin | reassign
   const [mileage,setMileage] = useState('');
   const [gas,setGas] = useState('');
   const [problems,setProblems] = useState(false);
   const [problemDetails,setProblemDetails] = useState('');
+  const [newDriverId,setNewDriverId] = useState('');
+  const [newVanId,setNewVanId] = useState('');
+  const [purpose,setPurpose] = useState('');
   const [saving,setSaving] = useState(false);
+  const [error,setError] = useState('');
 
-  async function submit(){
+  async function submitCheckin(){
     setSaving(true);
     await onSubmit(rental.id, {mileage, gas: Number(gas), problems, problemDetails});
     setSaving(false);
+  }
+
+  async function submitReassign(){
+    setError('');
+    if(!newDriverId && !newVanId){ setError('Pick a new driver, a new van, or both.'); return; }
+    setSaving(true);
+    const result = await onReassign(rental.id, {
+      newDriverId: newDriverId || null, newVanId: newVanId || null,
+      mileage, gas: Number(gas), purpose,
+    });
+    setSaving(false);
+    if(result?.error){ setError(result.error); return; }
   }
 
   return (
     <div className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
       <div><strong>{van?.name||'Unknown van'}</strong> — {driverName}</div>
       <div className="muted">Out since {rental.checkout?.at ? new Date(rental.checkout.at).toLocaleString() : '—'}</div>
-      <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
-        <input type="number" placeholder="Final mileage" value={mileage} onChange={e=>setMileage(e.target.value)} style={{flex:1,minWidth:140}} />
+
+      <div style={{display:'flex',gap:6,marginTop:10}}>
+        <button className={mode==='checkin'?'primary':'secondary'} style={{marginTop:0,width:'auto',padding:'6px 12px',fontSize:13}} onClick={()=>setMode('checkin')}>Check In</button>
+        <button className={mode==='reassign'?'primary':'secondary'} style={{marginTop:0,width:'auto',padding:'6px 12px',fontSize:13}} onClick={()=>setMode('reassign')}>Reassign</button>
+      </div>
+
+      <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap',alignItems:'center'}}>
+        <input type="number" placeholder={mode==='checkin' ? 'Final mileage' : 'Mileage at handoff'} value={mileage} onChange={e=>setMileage(e.target.value)} style={{flex:1,minWidth:140}} />
         <input type="number" placeholder="Gas %" min="0" max="100" value={gas} onChange={e=>setGas(e.target.value)} style={{width:90}} />
       </div>
-      <label style={{display:'flex',alignItems:'center',gap:8,marginTop:8,fontSize:14,fontWeight:400,cursor:'pointer'}}>
-        <input type="checkbox" checked={problems} onChange={e=>setProblems(e.target.checked)} style={{width:'auto'}} />
-        Any problems to report?
-      </label>
-      {problems && <textarea placeholder="Describe the problem" value={problemDetails} onChange={e=>setProblemDetails(e.target.value)} style={{marginTop:8}} />}
-      <button className="primary" style={{width:'auto',padding:'10px 16px'}} disabled={!mileage||!gas||saving} onClick={submit}>{saving?'Saving...':'Check In'}</button>
+
+      {mode==='checkin' && (<>
+        <label style={{display:'flex',alignItems:'center',gap:8,marginTop:8,fontSize:14,fontWeight:400,cursor:'pointer'}}>
+          <input type="checkbox" checked={problems} onChange={e=>setProblems(e.target.checked)} style={{width:'auto'}} />
+          Any problems to report?
+        </label>
+        {problems && <textarea placeholder="Describe the problem" value={problemDetails} onChange={e=>setProblemDetails(e.target.value)} style={{marginTop:8}} />}
+        <button className="primary" style={{width:'auto',padding:'10px 16px'}} disabled={!mileage||!gas||saving} onClick={submitCheckin}>{saving?'Saving...':'Check In'}</button>
+      </>)}
+
+      {mode==='reassign' && (<>
+        <p className="muted" style={{marginTop:8}}>Change the driver, the van, or both — leave either as-is to keep it the same.</p>
+        <label>New Driver (optional — leave blank to keep {driverName})</label>
+        <select value={newDriverId} onChange={e=>setNewDriverId(e.target.value)}>
+          <option value="">Keep {driverName}</option>
+          {approvedDrivers.filter(d=>d.id!==rental.driverId).map(d=><option key={d.id} value={d.id}>{d.name||d.email}</option>)}
+        </select>
+        <label>New Van (optional — leave blank to keep {van?.name||'this van'})</label>
+        <select value={newVanId} onChange={e=>setNewVanId(e.target.value)}>
+          <option value="">Keep {van?.name||'this van'}</option>
+          {vans.filter(v=>v.id!==rental.vanId).map(v=><option key={v.id} value={v.id}>{v.name} ({v.status})</option>)}
+        </select>
+        <label>Purpose (optional)</label>
+        <input type="text" value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="Carries over if left blank" />
+        {error && <div className="banner-danger">{error}</div>}
+        <button className="primary" style={{width:'auto',padding:'10px 16px'}} disabled={!mileage||!gas||saving} onClick={submitReassign}>{saving?'Reassigning...':'Confirm Reassignment'}</button>
+      </>)}
     </div>
   );
 }
@@ -1127,15 +1245,23 @@ function RentalHistoryAdmin({vans,rentals,allUsers}){
         const checkinBy = nameFor(r.return?.completedBy);
         const differentPerson = r.return?.completedBy && r.return.completedBy !== r.driverId;
         const adminCompleted = r.checkout?.completedByAdmin;
+        const wasReassigned = r.return?.reassigned;
         return (
           <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-            <div><strong>{van?.name}</strong></div>
+            <div><strong>{van?.name}</strong> {wasReassigned && <span className="badge admin">reassigned</span>}</div>
             <div className="muted">{r.date} {r.time} → {r.endDate} {r.endTime}</div>
             <div className="muted">Checked out by: {checkoutBy}{adminCompleted && ' (checkout completed by admin)'}</div>
-            <div className="muted">
-              Checked in by: {checkinBy}
-              {differentPerson && <span style={{color:'var(--blue)', fontWeight:600}}> — different from who checked it out</span>}
-            </div>
+            {wasReassigned ? (
+              <div className="muted">
+                Reassigned to {nameFor(r.return.reassignedTo?.driverId)}
+                {r.return.reassignedTo?.vanId && r.return.reassignedTo.vanId!==r.vanId ? ` on ${vans.find(v=>v.id===r.return.reassignedTo.vanId)?.name||'another van'}` : ''}
+              </div>
+            ) : (
+              <div className="muted">
+                Checked in by: {checkinBy}
+                {differentPerson && <span style={{color:'var(--blue)', fontWeight:600}}> — different from who checked it out</span>}
+              </div>
+            )}
             {r.return?.problems && <div className="muted" style={{color:'var(--danger)'}}>Problems reported at return</div>}
           </div>
         );
