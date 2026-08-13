@@ -1,1142 +1,1331 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RCC · Admin</title>
-  <meta name="theme-color" content="#2557b8">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCC Van Admin</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="theme-color" content="#2557b8">
 
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500;600&display=swap');
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
 
-    :root {
-      --bg:         #f7f6f3;
-      --bg-card:    #ffffff;
-      --bg-raised:  #f0ece4;
-      --border:     #e8e4dc;
-      --border-mid: rgba(0,0,0,0.14);
-      --text:       #1a1a1a;
-      --text-mid:   #5c5650;
-      --text-soft:  #9e9890;
-      --blue:       #2557b8;
-      --blue-dim:   rgba(37,87,184,0.08);
-      --blue-glow:  rgba(37,87,184,0.20);
-      --green:      #2e7a52;
-      --green-dim:  rgba(46,122,82,0.10);
-      --red:        #a03030;
-      --red-dim:    rgba(160,48,48,0.10);
-      --radius:     14px;
-      --radius-sm:  8px;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      font-size: 16px;
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    header {
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
-      padding: 0 24px;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .logo {
-      font-family: 'Playfair Display', serif;
-      font-size: 22px;
-      font-weight: 400;
-      color: var(--blue);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .logo img { height: 24px; width: auto; }
-    .logo span { font-size: 13px; color: var(--text-soft); font-family: 'Inter', sans-serif; font-weight: 400; }
-    .header-right { display: flex; align-items: center; gap: 12px; }
-    .header-right a { font-size: 13px; color: var(--text-soft); text-decoration: none; }
-    #signOutBtn {
-      background: transparent;
-      color: var(--text-soft);
-      border: 1px solid var(--border);
-      padding: 6px 14px;
-      border-radius: var(--radius-sm);
-      font-size: 13px;
-      cursor: pointer;
-      font-family: 'Inter', sans-serif;
-    }
-
-    nav {
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      padding: 0 16px;
-      gap: 4px;
-      overflow-x: auto;
-    }
-    .section-tab {
-      padding: 14px 16px;
-      font-size: 14px;
-      color: var(--text-soft);
-      cursor: pointer;
-      border-bottom: 3px solid transparent;
-      white-space: nowrap;
-      font-weight: 600;
-    }
-    .section-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
-    .section-tab:hover:not(.active) { color: var(--text-mid); }
-    .badge-count {
-      display: inline-block;
-      background: var(--red-dim);
-      color: var(--red);
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: 10px;
-      margin-left: 6px;
-    }
-
-    main { max-width: 760px; margin: 0 auto; padding: 28px 16px 80px; }
-    .section { display: none; }
-    .section.active { display: block; }
-
-    .subnav { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 16px; overflow-x: auto; }
-    .subtab { padding: 10px 14px; font-size: 13px; font-weight: 600; color: var(--text-soft); border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
-    .subtab.active { color: var(--blue); border-bottom-color: var(--blue); }
-
-    .section-title {
-      font-family: 'Playfair Display', serif;
-      font-size: 20px;
-      font-weight: 400;
-      margin-bottom: 18px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid var(--border);
-    }
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-      margin-bottom: 10px;
-    }
-    .card-title { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 400; margin-bottom: 3px; }
-    .card-text { font-size: 14px; color: var(--text-mid); margin-bottom: 8px; }
-    .card-meta { font-size: 12px; color: var(--text-soft); margin-bottom: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .tag { font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
-    .tag-hospital { background: var(--blue-dim); color: var(--blue); }
-    .tag-general  { background: rgba(100,100,180,0.1); color: #5a5ab0; }
-    .tag-pending  { background: var(--red-dim); color: var(--red); }
-    .tag-public   { background: var(--green-dim); color: var(--green); }
-    .tag-hidden   { background: rgba(0,0,0,0.06); color: var(--text-soft); }
-
-    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .btn { padding: 9px 14px; border-radius: var(--radius-sm); border: none; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif; }
-    .btn-approve { background: var(--green-dim); color: var(--green); border: 1px solid rgba(46,122,82,0.25); }
-    .btn-hide { background: var(--red-dim); color: var(--red); border: 1px solid rgba(160,48,48,0.2); }
-    .btn-unhide { background: var(--bg-raised); color: var(--text-mid); border: 1px solid var(--border-mid); }
-    .btn-delete { background: transparent; color: var(--red); border: 1px solid rgba(160,48,48,0.2); }
-
-    .empty-state { text-align: center; padding: 50px 20px; color: var(--text-soft); }
-    .loading { text-align: center; padding: 40px; color: var(--text-soft); font-size: 15px; }
-
-    #loginScreen {
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      min-height: 100vh; text-align: center; padding: 40px 24px;
-    }
-    .login-title { font-family: 'Playfair Display', serif; font-size: 30px; margin-bottom: 8px; }
-    .login-sub { font-size: 14px; color: var(--text-mid); margin-bottom: 32px; max-width: 300px; }
-    #googleSignInBtn {
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      background: #fff; border: 1px solid #d1cdc4; border-radius: 12px;
-      padding: 15px 24px; font-size: 15px; font-weight: 500; cursor: pointer;
-      width: 100%; max-width: 300px; font-family: 'Inter', sans-serif;
-    }
-    .access-denied { text-align: center; padding: 60px 24px; }
-    .access-denied .title { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--red); margin-bottom: 10px; }
-    .access-denied .sub { color: var(--text-mid); font-size: 15px; }
-
-    .banner {
-      display: none; padding: 14px 20px; text-align: center; font-size: 14px; font-weight: 500;
-      position: fixed; top: 0; left: 0; right: 0; z-index: 300;
-    }
-    .banner.show { display: block; }
-  </style>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500;600&display=swap');
+  :root{
+    --blue:#2557b8; --blue-dim:rgba(37,87,184,.08); --blue-glow:rgba(37,87,184,.20);
+    --bg:#f7f6f3; --card:#ffffff; --text:#1a1a1a;
+    --muted:#7a746a; --danger:#a03030; --danger-dim:rgba(160,48,48,.08);
+    --safe:#2e7a52; --safe-dim:rgba(46,122,82,.08); --border:#e8e4dc;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);}
+  h1,h2,h3{font-family:'Playfair Display',Georgia,serif;margin:0 0 8px;font-weight:400;}
+  .app{max-width:560px;margin:0 auto;min-height:100vh;background:var(--bg);padding-bottom:40px;}
+  .topbar{background:#fff;border-bottom:1px solid var(--border);color:var(--text);padding:0 20px;height:60px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50;}
+  .topbar h1{font-size:20px;color:var(--blue);display:flex;align-items:center;gap:10px;}
+  .topbar .backlink{font-size:13px;color:var(--muted);text-decoration:none;font-weight:400;font-family:'Inter',sans-serif;}
+  .topbar-right{display:flex;align-items:center;gap:10px;}
+  .topbar button.plain,.topbar a.plain{background:transparent;border:1px solid var(--border);color:var(--muted);padding:7px 12px;border-radius:8px;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;text-decoration:none;}
+  .content{padding:20px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;}
+  label{display:block;font-size:15px;font-weight:600;margin:14px 0 6px;}
+  input,select,textarea{width:100%;padding:14px;font-size:16px;border:2px solid var(--border);border-radius:10px;background:#fff;color:var(--text);font-family:'Inter',sans-serif;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);}
+  textarea{min-height:80px;}
+  button.primary{width:100%;padding:16px;font-size:17px;font-weight:600;background:var(--blue);color:#fff;border:none;border-radius:12px;margin-top:16px;cursor:pointer;font-family:'Inter',sans-serif;}
+  button.primary:hover{opacity:.92;}
+  button.secondary{width:100%;padding:16px;font-size:17px;font-weight:600;background:#fff;color:var(--blue);border:2px solid var(--blue);border-radius:12px;margin-top:10px;cursor:pointer;font-family:'Inter',sans-serif;}
+  button.danger{background:var(--danger);}
+  button:disabled{opacity:.45;cursor:default;}
+  .toggle-row{display:flex;gap:12px;margin-top:10px;}
+  .toggle-row button{flex:1;padding:16px;font-size:16px;border-radius:10px;border:2px solid var(--border);background:#fff;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
+  .toggle-row button.active-yes{background:var(--safe-dim);color:var(--safe);border-color:var(--safe);}
+  .toggle-row button.active-no{background:var(--danger-dim);color:var(--danger);border-color:var(--danger);}
+  .badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;}
+  .badge.pending{background:#f5e3c3;color:#8a6100;}
+  .badge.approved{background:var(--safe-dim);color:var(--safe);}
+  .badge.available{background:var(--safe-dim);color:var(--safe);}
+  .badge.inuse{background:#f5e3c3;color:#8a6100;}
+  .badge.maintenance{background:var(--danger-dim);color:var(--danger);}
+  .badge.admin{background:var(--blue-dim);color:var(--blue);}
+  .list-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);}
+  .list-item:last-child{border-bottom:none;}
+  .muted{color:var(--muted);font-size:14px;}
+  .center{text-align:center;}
+  .camera-box{border:2px dashed var(--border);border-radius:12px;padding:20px;text-align:center;margin-top:8px;}
+  .camera-box img{max-width:100%;border-radius:8px;margin-top:10px;}
+  .upload-progress{font-size:13px;color:var(--blue);margin-top:8px;}
+  .banner-safe{background:var(--safe-dim);color:var(--safe);padding:14px;border-radius:10px;margin-top:12px;font-weight:600;}
+  .banner-danger{background:var(--danger-dim);color:var(--danger);padding:14px;border-radius:10px;margin-top:12px;font-weight:700;}
+  .nav-tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:16px;overflow-x:auto;}
+  .nav-tabs button{flex:1;padding:12px 10px;background:none;border:none;font-size:14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap;cursor:pointer;font-family:'Inter',sans-serif;}
+  .nav-tabs button.active{color:var(--blue);border-bottom-color:var(--blue);}
+  .link-btn{background:none;border:none;color:var(--blue);font-size:15px;font-weight:600;text-decoration:underline;padding:8px 0;cursor:pointer;font-family:'Inter',sans-serif;}
+  .step-dot{display:flex;gap:6px;justify-content:center;margin-bottom:16px;padding-top:16px;}
+  .step-dot span{width:8px;height:8px;border-radius:50%;background:var(--border);}
+  .step-dot span.on{background:var(--blue);}
+  .login-mark{width:72px;height:72px;margin:40px auto 12px;display:flex;align-items:center;justify-content:center;font-size:34px;}
+  .login-title{font-family:'Playfair Display',serif;font-size:28px;text-align:center;margin-bottom:6px;}
+  .login-sub{font-size:14px;color:var(--muted);text-align:center;margin-bottom:28px;}
+  #googleSignInBtn{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;border:1px solid #d1cdc4;border-radius:12px;padding:15px;font-size:15px;font-weight:500;cursor:pointer;width:100%;font-family:'Inter',sans-serif;}
+  .loading{text-align:center;padding:40px;color:var(--muted);}
+</style>
 </head>
 <body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const {useState,useEffect,useRef} = React;
 
-<div class="banner" id="banner"></div>
+// ---------- Firebase ----------
+const firebaseConfig = {
+  apiKey:            "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+  authDomain:        "bedsidercc.firebaseapp.com",
+  projectId:         "bedsidercc",
+  storageBucket:     "bedsidercc.firebasestorage.app",
+  messagingSenderId: "950958384975",
+  appId:             "1:950958384975:web:6f43dec5a7ba842c69c73a"
+};
+try { firebase.app(); } catch(e) { firebase.initializeApp(firebaseConfig); }
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
 
-<div id="loginScreen">
-  <div class="login-title">RCC Admin</div>
-  <p class="login-sub">Sign in to manage Bedside, Incident Reports, and Van Usage from one place.</p>
-  <button id="googleSignInBtn">
-    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-    Sign in with Google
-  </button>
-</div>
+function uid(){ return Math.random().toString(36).slice(2,10); }
 
-<div id="appShell" style="display:none;">
-  <header>
-    <div class="logo"><img src="assets/rcc-logo-plain.png" alt="RCC">RCC <span>· Admin</span></div>
-    <div class="header-right">
-      <a href="index.html">← All apps</a>
-      <button id="signOutBtn">Sign out</button>
+// Seed vans once if the collection is empty (first-run convenience only)
+async function ensureVansSeeded(){
+  const snap = await db.collection('vans').limit(1).get();
+  if(!snap.empty) return;
+  const seed = [
+    {name:'White Chevy Van (low priority use)', mileage:52310, gas:75, status:'available', lowPriority:true},
+    {name:'Brown GMC Van', mileage:88120, gas:40, status:'available', lowPriority:false},
+    {name:'White Ford Van', mileage:31200, gas:90, status:'available', lowPriority:false},
+  ];
+  const batch = db.batch();
+  seed.forEach(v=>{ const ref = db.collection('vans').doc(); batch.set(ref, v); });
+  await batch.commit();
+}
+async function ensureWarningLightsSeeded(){
+  const snap = await db.collection('vanWarningLights').limit(1).get();
+  if(!snap.empty) return;
+  const seed = [
+    {name:'Tire Pressure Light', safety:false, feedback:"That's the tire pressure light — we know about it, low priority. Thanks for flagging it, no need to call anyone."},
+    {name:'Check Engine Light (known emissions sensor)', safety:false, feedback:"That's a known issue — not a safety concern. Go ahead and drive.", van:null},
+    {name:'Brake Warning Light', safety:true, feedback:null},
+    {name:'Oil Pressure Light', safety:true, feedback:null},
+  ];
+  const batch = db.batch();
+  seed.forEach(l=>{ const ref = db.collection('vanWarningLights').doc(); batch.set(ref, l); });
+  await batch.commit();
+}
+
+// ---------- Small components ----------
+function TopBar({title,onBack,right,hubLink}){
+  return (
+    <div className="topbar">
+      <h1>
+        {hubLink && <a className="backlink" href="../index.html">← All apps</a>}
+        {onBack && <button className="plain" onClick={onBack}>← Back</button>}
+        {title}
+      </h1>
+      <div className="topbar-right">{right}</div>
     </div>
-  </header>
+  );
+}
 
-  <div id="accessCheck" style="padding:60px; text-align:center; color:var(--text-soft);">Checking access...</div>
+function YesNo({value,onChange,yesLabel="Yes",noLabel="No"}){
+  return (
+    <div className="toggle-row">
+      <button type="button" className={value===true?'active-yes':''} onClick={()=>onChange(true)}>{yesLabel}</button>
+      <button type="button" className={value===false?'active-no':''} onClick={()=>onChange(false)}>{noLabel}</button>
+    </div>
+  );
+}
 
-  <div id="adminUI" style="display:none;">
-    <nav>
-      <div class="section-tab active" data-section="overview">Overview</div>
-      <div class="section-tab" data-section="bedside">Bedside</div>
-      <div class="section-tab" data-section="incidents">Incident Reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></div>
-      <div class="section-tab" data-section="vans">Van Usage</div>
-      <div class="section-tab" data-section="events">Event Requests <span class="badge-count" id="eventsCount" style="display:none;"></span></div>
-      <div class="section-tab" data-section="timeoff">Time Off <span class="badge-count" id="timeOffCount" style="display:none;"></span></div>
-      <div class="section-tab" data-section="access">App Access</div>
-      <div class="section-tab" data-section="requests">Access Requests <span class="badge-count" id="requestsCount" style="display:none;"></span></div>
-      <div class="section-tab" data-section="admins">Manage Admins</div>
-    </nav>
+function CameraCapture({label, onCapture, photoUrl, uploading}){
+  const inputRef = useRef();
+  return (
+    <div className="camera-box">
+      <div className="muted">{label}</div>
+      <input ref={inputRef} type="file" accept="image/*" capture="environment" style={{display:'none'}}
+        onChange={e=>{ const file = e.target.files[0]; if(file) onCapture(file); }} />
+      <button type="button" className="secondary" style={{marginTop:10}} onClick={()=>inputRef.current.click()} disabled={uploading}>
+        📷 {uploading ? 'Uploading...' : (photoUrl ? 'Retake Photo' : 'Open Camera')}
+      </button>
+      {uploading && <div className="upload-progress">Uploading photo…</div>}
+      {photoUrl && !uploading && <img src={photoUrl} alt="capture" />}
+    </div>
+  );
+}
 
-    <main>
-      <!-- OVERVIEW -->
-      <div class="section active" id="section-overview">
-        <h2 class="section-title">Overview</h2>
-        <div id="overviewCards"><div class="loading">Loading...</div></div>
+// Uploads a File to Firebase Storage under a given path, returns download URL
+async function uploadPhoto(file, path){
+  const ref = storage.ref().child(path);
+  await ref.put(file);
+  return await ref.getDownloadURL();
+}
+
+// Visual gas gauge selector — an arc from Empty to Full with 5 tap
+// zones. Picking a zone sets the needle to that position. Drivers pick
+// the closest reading at or below the actual needle (e.g. if it's
+// between 3/4 and Full, they pick 3/4).
+const GAS_LEVELS = [
+  {key:'empty', label:'Empty', angle:-90, value:5},
+  {key:'quarter', label:'1/4', angle:-45, value:25},
+  {key:'half', label:'1/2', angle:0, value:50},
+  {key:'threequarter', label:'3/4', angle:45, value:75},
+  {key:'full', label:'Full', angle:90, value:100},
+];
+function GasGauge({value, onChange}){
+  const selected = GAS_LEVELS.find(l=>l.value===value);
+  const needleAngle = selected ? selected.angle : -90;
+  const rad = (needleAngle-90) * Math.PI/180;
+  const cx=100, cy=100, r=70;
+  const needleX = cx + r*0.85*Math.cos(rad);
+  const needleY = cy + r*0.85*Math.sin(rad);
+
+  return (
+    <div style={{textAlign:'center'}}>
+      <svg viewBox="0 0 200 130" style={{width:'100%',maxWidth:280,margin:'0 auto',display:'block'}}>
+        <path d="M 30 100 A 70 70 0 0 1 170 100" fill="none" stroke="var(--border)" strokeWidth="14" strokeLinecap="round" />
+        <path d="M 30 100 A 70 70 0 0 1 170 100" fill="none" stroke="var(--blue)" strokeWidth="14" strokeLinecap="round"
+          strokeDasharray={`${selected ? (GAS_LEVELS.indexOf(selected)/4)*220 : 0} 999`} />
+        <line x1={cx} y1={cy} x2={needleX} y2={needleY} stroke="var(--danger)" strokeWidth="3" strokeLinecap="round" />
+        <circle cx={cx} cy={cy} r="6" fill="var(--danger)" />
+        <text x="30" y="118" fontSize="11" fill="var(--muted)" textAnchor="middle">E</text>
+        <text x="170" y="118" fontSize="11" fill="var(--muted)" textAnchor="middle">F</text>
+      </svg>
+      <div style={{display:'flex',gap:6,justifyContent:'center',flexWrap:'wrap',marginTop:10}}>
+        {GAS_LEVELS.map(l=>(
+          <button key={l.key} type="button"
+            onClick={()=>onChange(l.value)}
+            style={{
+              padding:'10px 14px', fontSize:14, fontWeight:600, borderRadius:10, cursor:'pointer',
+              border: value===l.value ? '2px solid var(--blue)' : '2px solid var(--border)',
+              background: value===l.value ? 'var(--blue-dim)' : '#fff',
+              color: value===l.value ? 'var(--blue)' : 'var(--text)',
+            }}>
+            {l.label}
+          </button>
+        ))}
+      </div>
+      <p className="muted" style={{marginTop:8}}>Pick the closest mark at or below the needle — e.g. between 3/4 and Full, pick 3/4.</p>
+    </div>
+  );
+}
+
+// ---------- Admin Dashboard ----------
+function VanDetailCard({van,maintenanceNotes,repairLog,onSetStatus,onRemove,onResolveMaint}){
+  const [expanded,setExpanded] = useState(false);
+  const openNotes = maintenanceNotes.filter(m=>!m.resolved);
+  const sortedRepairs = repairLog.slice().sort((a,b)=>b.createdAt-a.createdAt);
+
+  return (
+    <div className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={()=>setExpanded(e=>!e)}>
+        <div>
+          <div>{van.name} {van.lowPriority && <span className="badge pending">low priority</span>} {van.borrowed && <span className="badge admin">borrowed</span>} {openNotes.length>0 && <span className="badge maintenance">{openNotes.length} open issue{openNotes.length===1?'':'s'}</span>}</div>
+          <div className="muted">{van.mileage} mi · {van.gas}% gas</div>
+          {van.borrowed && <div className="muted">From {van.borrowedFrom || 'unspecified org'}{van.expectedReturnDate ? ` · return by ${van.expectedReturnDate}` : ''}</div>}
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span className={`badge ${van.status}`}>{van.status}</span>
+          <span className="muted">{expanded?'▲':'▼'}</span>
+        </div>
       </div>
 
-      <!-- BEDSIDE -->
-      <div class="section" id="section-bedside">
-        <h2 class="section-title">Bedside</h2>
-        <div class="subnav">
-          <div class="subtab active" data-btab="pending">Pending Prayer Requests</div>
-          <div class="subtab" data-btab="visits">Active Visits</div>
-          <div class="subtab" data-btab="wall">Prayer Wall</div>
-        </div>
-        <div id="bedside-pending"><div class="loading">Loading...</div></div>
-        <div id="bedside-visits" style="display:none;"><div class="loading">Loading...</div></div>
-        <div id="bedside-wall" style="display:none;"><div class="loading">Loading...</div></div>
-        <p class="card-text" style="margin-top:16px;">For discharge, add-visit, and full detail, use <a href="bedside/admin.html" style="color:var(--blue);">Bedside's own admin page →</a></p>
-      </div>
-
-      <!-- INCIDENT REPORTS -->
-      <div class="section" id="section-incidents">
-        <h2 class="section-title">Incident Reports</h2>
-        <div class="card" id="insuranceSettingsCard" style="margin-bottom:16px; display:none;">
-          <div class="card-title" style="font-size:15px;">Insurance Contact</div>
-          <div class="card-text" style="margin-bottom:10px;">Where reviewed reports get sent when you click "Send to Insurance."</div>
-          <input type="text" id="insuranceEmail" placeholder="insurance-agent@example.com" style="width:100%; padding:9px 11px; border:1px solid #d1cdc4; border-radius:7px; font-size:14px; margin-bottom:10px;">
-          <button class="btn btn-approve" onclick="saveInsuranceEmail()">Save</button>
-        </div>
-        <div class="subnav">
-          <div class="subtab active" data-itab="new">New</div>
-          <div class="subtab" data-itab="followup">Needs Follow-up</div>
-          <div class="subtab" data-itab="reviewed">Reviewed</div>
-        </div>
-        <div id="incidentsList"><div class="loading">Loading...</div></div>
-      </div>
-
-      <!-- VAN USAGE -->
-      <!-- EVENT REQUESTS -->
-      <div class="section" id="section-events">
-        <h2 class="section-title">Event Requests</h2>
-        <div class="subnav">
-          <div class="subtab active" data-etab="new">New</div>
-          <div class="subtab" data-etab="approved">Approved</div>
-          <div class="subtab" data-etab="denied">Denied</div>
-        </div>
-        <div id="eventRequestsList"><div class="loading">Loading...</div></div>
-      </div>
-
-      <!-- TIME OFF -->
-      <div class="section" id="section-timeoff">
-        <h2 class="section-title">Time Off Requests</h2>
-
-        <div class="card" style="margin-bottom:16px;">
-          <div class="card-title" style="font-size:15px;">Notification Emails</div>
-          <div class="card-text" style="margin-bottom:10px;">Who gets emailed when a new time off request comes in.</div>
-          <label style="font-size:12px; font-weight:500; color:var(--text-soft); display:block; margin-bottom:4px;">Primary Email</label>
-          <input type="text" id="notifyEmail1" placeholder="you@rochesterchristian.church" style="width:100%; padding:9px 11px; border:1px solid #d1cdc4; border-radius:7px; font-size:14px; margin-bottom:10px;">
-          <label style="font-size:12px; font-weight:500; color:var(--text-soft); display:block; margin-bottom:4px;">Second Email (optional)</label>
-          <input type="text" id="notifyEmail2" placeholder="someone-else@rochesterchristian.church" style="width:100%; padding:9px 11px; border:1px solid #d1cdc4; border-radius:7px; font-size:14px; margin-bottom:10px;">
-          <button class="btn btn-approve" onclick="saveNotificationEmails()">Save</button>
-        </div>
-
-        <div class="subnav">
-          <div class="subtab active" data-totab="pending">Pending</div>
-          <div class="subtab" data-totab="approved">Approved</div>
-          <div class="subtab" data-totab="denied">Denied</div>
-        </div>
-        <div id="timeOffList"><div class="loading">Loading...</div></div>
-      </div>
-
-      <div class="section" id="section-vans">
-        <h2 class="section-title">Van Usage</h2>
-        <div class="subnav">
-          <div class="subtab active" data-vtab="approvals">Driver Approvals</div>
-          <div class="subtab" data-vtab="vans">Vans</div>
-          <div class="subtab" data-vtab="alerts">Safety Alerts</div>
-          <div class="subtab" data-vtab="history">History</div>
-        </div>
-        <div id="van-approvals"><div class="loading">Loading...</div></div>
-        <div id="van-vans" style="display:none;"><div class="loading">Loading...</div></div>
-        <div id="van-alerts" style="display:none;"><div class="loading">Loading...</div></div>
-        <div id="van-history" style="display:none;"><div class="loading">Loading...</div></div>
-        <p class="card-text" style="margin-top:16px;">For scheduling, repairs, warning lights, adding drivers, adding vans, and managing weekly recurring reservations, use the <a href="van/index.html" style="color:var(--blue);">Van Usage admin view →</a></p>
-      </div>
-
-      <!-- APP ACCESS -->
-      <div class="section" id="section-access">
-        <h2 class="section-title">App Access</h2>
-        <div class="card" style="background:var(--blue-dim); border-color:var(--blue-glow); margin-bottom:14px;">
-          <div class="card-text" style="margin-bottom:0;">"Apps" controls which tiles show on each person's hub dashboard. "Roles" grants department-scoped admin access — e.g. Van Usage Admin can approve drivers and manage vans, but has no access to Bedside, Graphics, or Marketing, and vice versa. Full admin access is still managed separately under "Manage Admins."</div>
-        </div>
-        <div id="moduleManageList"><div class="loading">Loading...</div></div>
-      </div>
-
-      <!-- ACCESS REQUESTS -->
-      <div class="section" id="section-requests">
-        <h2 class="section-title">Access Requests</h2>
-        <div class="card" style="background:var(--blue-dim); border-color:var(--blue-glow); margin-bottom:14px;">
-          <div class="card-text" style="margin-bottom:0;">Anyone signed in can request access for someone else from the main hub page. Approving here creates or updates that person's account with the requested modules turned on.</div>
-        </div>
-        <div id="accessRequestsList"><div class="loading">Loading...</div></div>
-      </div>
-
-      <!-- MANAGE ADMINS -->
-      <div class="section" id="section-admins">
-        <h2 class="section-title">Manage Admins</h2>
-        <div class="card" style="background:var(--blue-dim); border-color:var(--blue-glow); margin-bottom:14px;">
-          <div class="card-text" style="margin-bottom:0;">Anyone toggled on here gets full admin access across all apps, including the ability to manage other admins. Only toggle this on for people you trust with that.</div>
-        </div>
-        <div id="adminManageList"><div class="loading">Loading...</div></div>
-      </div>
-    </main>
-  </div>
-
-  <div id="accessDenied" class="access-denied" style="display:none;">
-    <div class="title">Access Restricted</div>
-    <p class="sub">This area is limited to designated administrators.</p>
-  </div>
-</div>
-
-<script>
-  const firebaseConfig = {
-    apiKey:            "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
-    authDomain:        "bedsidercc.firebaseapp.com",
-    projectId:         "bedsidercc",
-    storageBucket:     "bedsidercc.firebasestorage.app",
-    messagingSenderId: "950958384975",
-    appId:             "1:950958384975:web:6f43dec5a7ba842c69c73a"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-  let currentUser = null;
-
-  document.getElementById('googleSignInBtn').addEventListener('click', () => {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(err => showBanner('Sign-in failed: ' + err.message, true));
-  });
-  document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
-
-  auth.onAuthStateChanged(async user => {
-    if (user) {
-      currentUser = user;
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('appShell').style.display = 'block';
-      const userDoc = await db.collection('users').doc(user.uid).get();
-      const userData = userDoc.exists ? userDoc.data() : {};
-      const isFullAdmin = userData.isAdmin === true;
-      const roles = userData.roles || {};
-      const canVan = isFullAdmin || roles.vanAdmin === true;
-      const canBedside = isFullAdmin || roles.bedsideAdmin === true;
-      const canGraphics = isFullAdmin || roles.graphics === true;
-      const canMarketing = isFullAdmin || roles.marketing === true;
-      const canOverview = isFullAdmin || roles.overview === true;
-      const hasAnyAccess = isFullAdmin || canVan || canBedside || canGraphics || canMarketing || canOverview;
-      window.currentUserIsFullAdmin = isFullAdmin;
-      window.currentUserCanOverview = canOverview;
-      window.currentUserIsOwner = userData.isOwner === true;
-      window.currentUserCanEmailInsurance = userData.canEmailInsurance === true;
-      document.getElementById('accessCheck').style.display = 'none';
-
-      if (hasAnyAccess) {
-        document.getElementById('adminUI').style.display = 'block';
-
-        // Overview shows cross-app summary cards with links into each
-        // department's own admin tools — visible to anyone with the
-        // overview role OR full admin. The detailed department tabs
-        // (Bedside, Van Usage) still show for Department Heads, so
-        // they can work directly without detouring through Overview.
-        // Incident Reports, Event Requests, Time Off, App Access,
-        // Access Requests, and Manage Admins stay full-admin-only,
-        // since they sit outside any single department's scope.
-        const tabVisibility = {
-          overview: canOverview, bedside: canBedside, incidents: isFullAdmin, vans: canVan,
-          events: isFullAdmin, timeoff: isFullAdmin, access: isFullAdmin,
-          requests: isFullAdmin, admins: isFullAdmin,
-        };
-        document.querySelectorAll('.section-tab').forEach(tab => {
-          const key = tab.dataset.section;
-          if (key in tabVisibility) tab.style.display = tabVisibility[key] ? '' : 'none';
-        });
-
-        // Land on whichever tab makes sense: an explicit ?section=
-        // link (e.g. from Van Usage's own "Admin" button) wins if the
-        // person can see it; otherwise Overview if they have it,
-        // otherwise the first tab they can actually access.
-        const requestedSection = new URLSearchParams(window.location.search).get('section');
-        const firstVisible = Object.keys(tabVisibility).find(k => tabVisibility[k]);
-        const landingSection = (requestedSection && tabVisibility[requestedSection])
-          ? requestedSection
-          : (canOverview ? 'overview' : firstVisible);
-        document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.querySelector(`[data-section="${landingSection}"]`)?.classList.add('active');
-        document.getElementById('section-' + landingSection)?.classList.add('active');
-
-        if (canOverview) { loadOverview({canBedside, canVan, isFullAdmin}); }
-        if (canBedside) { loadBedsidePending(); loadBedsideVisits(); loadBedsideWall(); }
-        if (isFullAdmin) { loadIncidentReports(); loadInsuranceEmail(); }
-        if (canVan) { loadVanApprovals(); loadVans(); loadVanAlerts(); loadVanHistory(); }
-        if (isFullAdmin) { loadEventRequests(); loadTimeOffRequests(); loadNotificationEmails(); }
-        if (isFullAdmin) { loadModuleManagement(); loadAccessRequests(); loadAdminManagement(); }
-      } else {
-        document.getElementById('accessDenied').style.display = 'block';
-      }
-    } else {
-      currentUser = null;
-      document.getElementById('loginScreen').style.display = 'flex';
-      document.getElementById('appShell').style.display = 'none';
-    }
-  });
-
-  // ── Top-level section switching ──
-  document.querySelectorAll('.section-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById('section-' + tab.dataset.section).classList.add('active');
-    });
-  });
-
-  // ── Bedside sub-tabs ──
-  document.querySelectorAll('[data-btab]').forEach(t => {
-    t.addEventListener('click', () => {
-      document.querySelectorAll('[data-btab]').forEach(x => x.classList.remove('active'));
-      t.classList.add('active');
-      ['pending','visits','wall'].forEach(k => {
-        document.getElementById('bedside-' + k).style.display = (k === t.dataset.btab) ? 'block' : 'none';
-      });
-    });
-  });
-
-  // ── OVERVIEW ──
-  // Pulls a handful of lightweight counts from across all apps and
-  // shows them as cards with a link into each department's own,
-  // full-featured admin page. This does NOT duplicate any admin
-  // actions — it's purely "what's going on, and where do I go to deal
-  // with it." Which cards show depends on what the viewer can access:
-  // a Department Head sees their own department's card here too, but
-  // clicking it just takes them to the tab they already have open
-  // access to; someone with ONLY the overview role sees every card
-  // (read-only counts) but the links still respect their actual
-  // permissions when they click through.
-  function loadOverview({canBedside, canVan, isFullAdmin}) {
-    const el = document.getElementById('overviewCards');
-
-    if (canBedside) {
-      db.collection('prayerRequests').where('status','==','pending').onSnapshot(snap => {
-        updateOverviewCard('bedside', 'Bedside', `${snap.size} prayer request${snap.size===1?'':'s'} awaiting review`, {externalUrl: 'bedside/admin.html'});
-      });
-    }
-    if (canVan) {
-      db.collection('users').onSnapshot(snap => {
-        const pendingDrivers = snap.docs.filter(d => d.data().vanRentalProfile?.status === 'pending').length;
-        updateOverviewCard('vans', 'Van Usage', `${pendingDrivers} driver application${pendingDrivers===1?'':'s'} awaiting approval`, {externalUrl: 'van/admin.html'});
-      });
-    }
-    if (isFullAdmin) {
-      db.collection('incidentReports').onSnapshot(snap => {
-        const newCount = snap.docs.filter(d => !d.data().reviewStatus || d.data().reviewStatus==='new').length;
-        updateOverviewCard('incidents', 'Incident Reports', `${newCount} new report${newCount===1?'':'s'}`, {targetSection: 'incidents'});
-      });
-      db.collection('eventRequests').onSnapshot(snap => {
-        const newCount = snap.docs.filter(d => (d.data().status||'new')==='new').length;
-        updateOverviewCard('events', 'Event Requests', `${newCount} new request${newCount===1?'':'s'}`, {targetSection: 'events'});
-      });
-      db.collection('timeOffRequests').onSnapshot(snap => {
-        const pendingCount = snap.docs.filter(d => (d.data().status||'pending')==='pending').length;
-        updateOverviewCard('timeoff', 'Time Off', `${pendingCount} pending request${pendingCount===1?'':'s'}`, {targetSection: 'timeoff'});
-      });
-      db.collection('accessRequests').where('status','==','pending').onSnapshot(snap => {
-        updateOverviewCard('requests', 'Access Requests', `${snap.size} pending request${snap.size===1?'':'s'}`, {targetSection: 'requests'});
-      });
-    }
-
-    if (el.querySelector('.loading')) el.innerHTML = '';
-  }
-
-  const overviewCardData = {};
-  function updateOverviewCard(key, title, summary, destination) {
-    overviewCardData[key] = { title, summary, destination };
-    renderOverviewCards();
-  }
-  function renderOverviewCards() {
-    const el = document.getElementById('overviewCards');
-    const keys = Object.keys(overviewCardData);
-    if (!keys.length) return;
-    el.innerHTML = keys.map(k => {
-      const c = overviewCardData[k];
-      const clickAction = c.destination.externalUrl
-        ? `window.location.href='${c.destination.externalUrl}'`
-        : `goToSection('${c.destination.targetSection}')`;
-      const arrow = c.destination.externalUrl ? '↗' : '→';
-      return `
-        <div class="card" style="cursor:pointer;" onclick="${clickAction}">
-          <div class="card-title">${escHtml(c.title)} <span style="font-size:13px; color:var(--text-soft); font-weight:400;">${arrow}</span></div>
-          <div class="card-text" style="margin-bottom:0;">${escHtml(c.summary)}</div>
-        </div>`;
-    }).join('');
-  }
-  window.goToSection = (section) => {
-    document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.querySelector(`[data-section="${section}"]`)?.classList.add('active');
-    document.getElementById('section-' + section)?.classList.add('active');
-  };
-
-  function loadBedsidePending() {
-    db.collection('prayerRequests').where('status','==','pending').orderBy('createdAt','desc').onSnapshot(snap => {
-      const items = snap.docs.map(d => ({id:d.id, ...d.data()}));
-      const c = document.getElementById('bedside-pending');
-      if (!items.length) { c.innerHTML = '<div class="empty-state">Nothing waiting for review. 🎉</div>'; return; }
-      c.innerHTML = items.map(r => `
-        <div class="card">
-          <div class="card-title">${escHtml(r.patientName)}</div>
-          <div class="card-text">${escHtml(r.text)}</div>
-          <div class="card-meta"><span class="tag ${r.type==='hospital_visit'?'tag-hospital':'tag-general'}">${r.type==='hospital_visit'?'Care Visit':'General Request'}</span><span>${escHtml(r.anonymous ? 'Anonymous' : (r.submittedBy?.name||''))}</span></div>
-          <div class="actions">
-            <button class="btn btn-approve" onclick="bedsideApprove('${r.id}')">Approve &amp; post publicly</button>
-            <button class="btn btn-hide" onclick="bedsideHide('${r.id}')">Keep private</button>
-          </div>
-        </div>`).join('');
-    });
-  }
-  function loadBedsideVisits() {
-    db.collection('visits').where('active','==',true).orderBy('createdAt','desc').onSnapshot(snap => {
-      const items = snap.docs.map(d => ({id:d.id, ...d.data()}));
-      const c = document.getElementById('bedside-visits');
-      if (!items.length) { c.innerHTML = '<div class="empty-state">No active visits.</div>'; return; }
-      c.innerHTML = items.map(v => `
-        <div class="card">
-          <div class="card-title">${escHtml(v.patientName)}</div>
-          <div class="card-text">${escHtml(v.hospital)} — ${escHtml(v.reason)}</div>
-          <div class="card-meta"><span>Claimed by: ${escHtml((v.claimedBy||[]).map(c=>c.name).join(', ')||'No one yet')}</span></div>
-        </div>`).join('');
-    });
-  }
-  function loadBedsideWall() {
-    db.collection('prayerRequests').where('status','in',['public','hidden']).orderBy('createdAt','desc').onSnapshot(snap => {
-      const items = snap.docs.map(d => ({id:d.id, ...d.data()}));
-      const c = document.getElementById('bedside-wall');
-      if (!items.length) { c.innerHTML = '<div class="empty-state">No prayer wall entries yet.</div>'; return; }
-      c.innerHTML = items.map(r => `
-        <div class="card">
-          <div class="card-title">${escHtml(r.patientName)}</div>
-          <div class="card-text">${escHtml(r.text)}</div>
-          <div class="card-meta"><span class="tag ${r.status==='public'?'tag-public':'tag-hidden'}">${r.status==='public'?'Public':'Hidden'}</span></div>
-          <div class="actions">
-            ${r.status==='public'
-              ? `<button class="btn btn-hide" onclick="bedsideHide('${r.id}')">Hide from wall</button>`
-              : `<button class="btn btn-unhide" onclick="bedsideUnhide('${r.id}')">Show on wall</button>`}
-          </div>
-        </div>`).join('');
-    });
-  }
-  window.bedsideApprove = async id => { await db.collection('prayerRequests').doc(id).update({status:'public', reviewedAt:new Date().toISOString()}); showBanner('Posted to the prayer wall.'); };
-  window.bedsideHide = async id => { await db.collection('prayerRequests').doc(id).update({status:'hidden', reviewedAt:new Date().toISOString()}); showBanner('Kept private.'); };
-  window.bedsideUnhide = async id => { await db.collection('prayerRequests').doc(id).update({status:'public'}); showBanner('Now visible on the prayer wall.'); };
-
-  // ── Incident Reports ──
-  let allIncidents = [], incidentFilter = 'new';
-  function loadIncidentReports() {
-    db.collection('incidentReports').orderBy('submittedAt','desc').onSnapshot(snap => {
-      allIncidents = snap.docs.map(d => ({id:d.id, ...d.data()}));
-      renderIncidents();
-      const newCount = allIncidents.filter(r => !r.reviewStatus || r.reviewStatus==='new').length;
-      const badge = document.getElementById('incidentsCount');
-      if (newCount) { badge.textContent = newCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
-    }, err => {
-      document.getElementById('incidentsList').innerHTML = '<div class="empty-state">Could not load incident reports.</div>';
-      console.error(err);
-    });
-  }
-  document.querySelectorAll('[data-itab]').forEach(t => {
-    t.addEventListener('click', () => {
-      document.querySelectorAll('[data-itab]').forEach(x => x.classList.remove('active'));
-      t.classList.add('active');
-      incidentFilter = t.dataset.itab;
-      renderIncidents();
-    });
-  });
-  function renderIncidents() {
-    const c = document.getElementById('incidentsList');
-    const filtered = allIncidents.filter(r => (r.reviewStatus||'new') === incidentFilter);
-    if (!filtered.length) { c.innerHTML = '<div class="empty-state">Nothing here right now.</div>'; return; }
-    c.innerHTML = filtered.map(r => {
-      const date = r.submittedAt && r.submittedAt.toDate ? r.submittedAt.toDate().toLocaleString() : '';
-      const hasInjury = r.injury === 'yes';
-      return `
-        <div class="card">
-          <div class="card-title">${escHtml(r.location||'Unknown location')}</div>
-          <div class="card-meta"><span class="tag ${hasInjury?'tag-pending':'tag-general'}">${escHtml((r.incidentTypes||[]).join(', ')||'Type not specified')}</span><span>${r.incidentDate||''} ${r.incidentTime||''}</span></div>
-          <div class="card-text">${escHtml(r.description||'')}</div>
-          ${hasInjury ? `<div class="card-text" style="color:var(--red);"><strong>Injury:</strong> ${escHtml(r.injuryDesc||'no detail')} — treatment: ${escHtml(r.treatment||'n/a')}</div>` : ''}
-          <div class="card-meta"><span>Reported by ${escHtml(r.reporterName||'unknown')}${r.reporterPhone?' · '+escHtml(r.reporterPhone):''}</span></div>
-          <div class="card-meta"><span>Submitted ${date}</span></div>
-          <div class="actions">
-            ${incidentFilter!=='reviewed' ? `<button class="btn btn-approve" onclick="setIncidentStatus('${r.id}','reviewed')">Mark reviewed</button>` : ''}
-            ${incidentFilter!=='followup' ? `<button class="btn btn-hide" onclick="setIncidentStatus('${r.id}','followup')">Needs follow-up</button>` : ''}
-            ${incidentFilter!=='new' ? `<button class="btn btn-unhide" onclick="setIncidentStatus('${r.id}','new')">Move back to New</button>` : ''}
-          </div>
-          ${window.currentUserCanEmailInsurance && incidentFilter==='reviewed' ? `
-            <div class="actions" style="margin-top:8px;">
-              <button class="btn btn-unhide" onclick="sendToInsurance('${r.id}')">${r.insuranceSentAt ? 'Re-send to Insurance' : 'Send to Insurance'}</button>
-              ${r.insuranceSentAt ? `<span class="tag tag-public">Sent ${new Date(r.insuranceSentAt).toLocaleDateString()}</span>` : ''}
+      {expanded && (
+        <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)'}}>
+          <h4 style={{fontSize:14,marginBottom:6}}>Maintenance Notes</h4>
+          {maintenanceNotes.length===0 && <p className="muted">No notes on file for this van.</p>}
+          {maintenanceNotes.slice().reverse().map(m=>(
+            <div key={m.id} className="list-item" style={{opacity:m.resolved?0.5:1}}>
+              <div className="muted">{m.note} {m.resolved && '(resolved)'}</div>
+              {!m.resolved && <button className="secondary" style={{marginTop:0,width:'auto',padding:'6px 10px'}} onClick={()=>onResolveMaint(m.id)}>Resolve</button>}
             </div>
-          ` : ''}
-        </div>`;
-    }).join('');
+          ))}
+
+          <h4 style={{fontSize:14,marginTop:16,marginBottom:6}}>Repair History</h4>
+          {sortedRepairs.length===0 && <p className="muted">No repairs logged for this van.</p>}
+          {sortedRepairs.map(r=>(
+            <div key={r.id} className="muted" style={{marginBottom:6}}>
+              {r.date} — {r.serviceType}{r.performedBy ? ` (by ${r.performedBy})` : ''}{r.notes ? `: ${r.notes}` : ''}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
+        {van.status!=='maintenance'
+          ? <button className="secondary" style={{marginTop:0}} onClick={()=>onSetStatus(van.id,'maintenance')}>Send to Maintenance</button>
+          : <button className="secondary" style={{marginTop:0}} onClick={()=>onSetStatus(van.id,'available')}>Mark Available</button>}
+        <button className="secondary" style={{marginTop:0,color:'var(--danger)',borderColor:'var(--danger)'}} onClick={()=>onRemove(van.id)}>
+          {van.borrowed ? 'Returned — Remove' : 'Remove'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AddVanForm({onAdd}){
+  const [name,setName] = useState('');
+  const [isBorrowed,setIsBorrowed] = useState(false);
+  const [borrowedFrom,setBorrowedFrom] = useState('');
+  const [returnDate,setReturnDate] = useState('');
+  const [saving,setSaving] = useState(false);
+
+  async function submit(){
+    setSaving(true);
+    await onAdd(name, isBorrowed, borrowedFrom, returnDate);
+    setName(''); setIsBorrowed(false); setBorrowedFrom(''); setReturnDate('');
+    setSaving(false);
   }
-  window.setIncidentStatus = async (id, status) => {
-    await db.collection('incidentReports').doc(id).update({reviewStatus:status, reviewedAt:new Date().toISOString(), reviewedBy: currentUser.uid});
-    showBanner('Report updated.');
-  };
 
-  // ── Insurance emailing (canEmailInsurance accounts only) ──
-  const INSURANCE_WEBHOOK_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL"; // 🔧 paste your deployed Apps Script URL here
+  return (
+    <div style={{marginTop:20, paddingTop:20, borderTop:'1px solid var(--border)'}}>
+      <h3>Add a Van</h3>
+      <p className="muted">For your own fleet, or a vehicle borrowed from another organization for a season or event.</p>
+      <label>Van Name</label>
+      <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. First Baptist's 15-passenger van" />
+      <label>Is this a borrowed vehicle?</label>
+      <YesNo value={isBorrowed} onChange={setIsBorrowed} />
+      {isBorrowed && (<>
+        <label>Borrowed From</label>
+        <input value={borrowedFrom} onChange={e=>setBorrowedFrom(e.target.value)} placeholder="Organization name" />
+        <label>Expected Return Date</label>
+        <input type="date" value={returnDate} onChange={e=>setReturnDate(e.target.value)} />
+      </>)}
+      <button className="primary" disabled={!name || saving} onClick={submit}>{saving?'Adding...':'Add Van'}</button>
+    </div>
+  );
+}
 
-  function loadInsuranceEmail() {
-    const card = document.getElementById('insuranceSettingsCard');
-    if (window.currentUserCanEmailInsurance) card.style.display = 'block';
-    db.collection('settings').doc('insuranceContact').get().then(doc => {
-      if (doc.exists) document.getElementById('insuranceEmail').value = doc.data().email || '';
+function AdminAddDriver(){
+  const [name,setName] = useState('');
+  const [email,setEmail] = useState('');
+  const [phone,setPhone] = useState('');
+  const [licenseExp,setLicenseExp] = useState('');
+  const [licenseVerified,setLicenseVerified] = useState(false);
+  const [saving,setSaving] = useState(false);
+  const [generatedLink,setGeneratedLink] = useState(null);
+  const [invites,setInvites] = useState([]);
+
+  useEffect(()=>{
+    const unsub = db.collection('vanDriverInvites').where('claimed','==',false).onSnapshot(snap=>{
+      setInvites(snap.docs.map(d=>({id:d.id,...d.data()})));
     });
-  }
-  window.saveInsuranceEmail = async () => {
-    const email = document.getElementById('insuranceEmail').value.trim();
-    await db.collection('settings').doc('insuranceContact').set({ email }, { merge: true });
-    showBanner('Insurance contact saved.');
-  };
-  window.sendToInsurance = async (reportId) => {
-    const report = allIncidents.find(r => r.id === reportId);
-    if (!report) return;
-    const settingsDoc = await db.collection('settings').doc('insuranceContact').get();
-    const insuranceEmail = settingsDoc.exists ? settingsDoc.data().email : '';
-    if (!insuranceEmail) { alert('Set an insurance contact email above first.'); return; }
-    if (INSURANCE_WEBHOOK_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL') { alert('Insurance email isn\'t set up yet — the Apps Script URL still needs to be added.'); return; }
+    return unsub;
+  },[]);
 
-    try {
-      await fetch(INSURANCE_WEBHOOK_URL, {
-        method: 'POST', mode: 'no-cors', headers: {'Content-Type':'text/plain'},
-        body: JSON.stringify({ insuranceEmail, report }),
-      });
-      await db.collection('incidentReports').doc(reportId).update({
-        insuranceSentAt: new Date().toISOString(),
-        insuranceSentBy: currentUser.uid,
-      });
-      showBanner('Sent to insurance.');
-    } catch (err) {
-      alert('Could not send: ' + err.message);
+  const canSubmit = name && email && !saving;
+
+  async function createInvite(){
+    setSaving(true);
+    const token = uid()+uid();
+    await db.collection('vanDriverInvites').doc(token).set({
+      name, email: email.toLowerCase().trim(), phone, licenseExp,
+      licenseVerifiedInPerson: licenseVerified,
+      claimed:false, createdAt:Date.now(),
+    });
+    const url = new URL(window.location.href);
+    url.searchParams.set('invite', token);
+    setGeneratedLink(url.toString());
+    setName(''); setEmail(''); setPhone(''); setLicenseExp(''); setLicenseVerified(false);
+    setSaving(false);
+  }
+
+  async function deleteInvite(token){
+    if(!confirm('Remove this invite? The person will need a new one if you want to add them again.')) return;
+    await db.collection('vanDriverInvites').doc(token).delete();
+  }
+
+  return (
+    <div className="card">
+      <h3>Add an Existing Driver</h3>
+      <p className="muted">For people already approved to drive before this app existed, or anyone you'd rather set up yourself. When they sign in with the matching email, their info here fills in automatically. You can also send them the link directly as a shortcut.</p>
+
+      <label>Full Name</label>
+      <input value={name} onChange={e=>setName(e.target.value)} />
+      <label>Email (must match their Google sign-in)</label>
+      <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@example.com" />
+      <label>Phone Number</label>
+      <input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" />
+      <label>License Expiration Date (if known)</label>
+      <input type="date" value={licenseExp} onChange={e=>setLicenseExp(e.target.value)} />
+      <label>Has this person's license already been seen in person?</label>
+      <YesNo value={licenseVerified} onChange={setLicenseVerified} />
+
+      <button className="primary" disabled={!canSubmit} onClick={createInvite}>{saving?'Creating...':'Add Driver'}</button>
+
+      {generatedLink && (
+        <div className="banner-safe" style={{wordBreak:'break-all', marginTop:14}}>
+          Added! If you'd like, you can also send this direct link — it's optional since matching by email works automatically once they sign in:
+          <div style={{marginTop:8,fontWeight:400,fontSize:14}}>{generatedLink}</div>
+          <button className="secondary" style={{marginTop:10}} onClick={()=>navigator.clipboard.writeText(generatedLink)}>Copy Link</button>
+        </div>
+      )}
+
+      <h3 style={{marginTop:24}}>Awaiting First Sign-In</h3>
+      {invites.length===0 && <p className="muted">None waiting.</p>}
+      {invites.map(inv=>{
+        const url = new URL(window.location.href);
+        url.searchParams.set('invite', inv.id);
+        return (
+          <div key={inv.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+            <div><strong>{inv.name}</strong> — {inv.email}</div>
+            <div className="muted" style={{wordBreak:'break-all'}}>{url.toString()}</div>
+            <div style={{display:'flex',gap:8,marginTop:8}}>
+              <button className="secondary" style={{marginTop:0}} onClick={()=>navigator.clipboard.writeText(url.toString())}>Copy Link</button>
+              <button className="secondary" style={{marginTop:0,color:'var(--danger)',borderColor:'var(--danger)'}} onClick={()=>deleteInvite(inv.id)}>Remove</button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PendingDriverCard({driverUser,onApprove,onDeny,onVerify,onUpdateExp}){
+  const vr = driverUser.vanRentalProfile;
+  const [editingExp,setEditingExp] = useState(false);
+  const [expDraft,setExpDraft] = useState(vr.licenseExp||'');
+  const needsVerify = !vr.licenseVerifiedInPerson;
+
+  return (
+    <div className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+      <div><strong>{driverUser.name}</strong> — {driverUser.phone}</div>
+      <div className="muted">DOB: {vr.birthdate}</div>
+      <div className="muted" style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        {!editingExp ? (
+          <>License expires: {vr.licenseExp || '(not set)'} {vr.cdl ? '· CDL' : ''}
+            <button className="link-btn" style={{padding:0,fontSize:13}} onClick={()=>{setExpDraft(vr.licenseExp||''); setEditingExp(true);}}>Edit</button>
+          </>
+        ) : (
+          <>
+            <input type="date" value={expDraft} onChange={e=>setExpDraft(e.target.value)} style={{width:'auto',padding:8}} />
+            <button className="link-btn" style={{padding:0,fontSize:13}} onClick={()=>{onUpdateExp(driverUser.id, expDraft); setEditingExp(false);}}>Save</button>
+            <button className="link-btn" style={{padding:0,fontSize:13,color:'var(--muted)'}} onClick={()=>setEditingExp(false)}>Cancel</button>
+          </>
+        )}
+      </div>
+      <div className="muted">
+        License check: <strong style={{color: vr.licenseVerifiedInPerson ? 'var(--safe)' : 'var(--danger)'}}>
+          {vr.licenseVerifiedInPerson ? 'Verified in person ✓' : 'Not yet verified in person'}
+        </strong>
+      </div>
+      <div className="muted">At-fault accidents (3yr): {vr.atFaultAccidents3yr ? (vr.atFaultAccidentsDetails||'Yes') : 'None reported'}</div>
+      <div className="muted">Moving violations (3yr): {vr.movingViolations3yr ? (vr.movingViolationsDetails||'Yes') : 'None reported'}</div>
+      <div className="muted">Insurance cancelled/refused: {vr.insuranceCancelled ? <strong style={{color:'var(--danger)'}}>YES</strong> : 'No'}</div>
+      <div className="muted">License revoked/suspended/restricted: {vr.licenseRevokedSuspended ? <strong style={{color:'var(--danger)'}}>YES</strong> : 'No'}</div>
+      <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
+        {needsVerify && <button className="secondary" style={{marginTop:0}} onClick={()=>onVerify(driverUser.id)}>Mark license verified in person</button>}
+        <button className="primary" style={{marginTop:0}} disabled={needsVerify} onClick={()=>onApprove(driverUser.id)}>Approve</button>
+        <button className="secondary" style={{marginTop:0}} onClick={()=>onDeny(driverUser.id)}>Deny</button>
+      </div>
+    </div>
+  );
+}
+
+function SafetyBlockAlertCard({alert,driver,van,rental,onResolveAlert}){
+  const draft = rental.checkoutDraft || {};
+  const [completing,setCompleting] = useState(false);
+  const [clean,setClean] = useState(null);
+  const [cleanPhoto,setCleanPhoto] = useState(null);
+  const [cleanUploading,setCleanUploading] = useState(false);
+  const [saving,setSaving] = useState(false);
+
+  async function clearForDriver(){
+    setSaving(true);
+    await db.collection('vanRentals').doc(rental.id).update({
+      checkoutCleared: true,
+      clearedBy: currentUserUid(), clearedAt: Date.now(),
+    });
+    await onResolveAlert(alert.id);
+    setSaving(false);
+  }
+
+  async function handlePhoto(file){
+    setCleanUploading(true);
+    const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/${uid()}.jpg`);
+    setCleanPhoto(url);
+    setCleanUploading(false);
+  }
+
+  async function completeAsAdmin(){
+    setSaving(true);
+    await db.collection('vanRentals').doc(rental.id).update({
+      checkout: {
+        mileage: draft.mileage, gas: draft.gas, dashPhoto: draft.dashPhoto,
+        warningLightsOn: draft.checkedLights || [],
+        otherLightReported: draft.otherLightChecked||false, otherLightDesc: draft.otherLightDesc||'',
+        clean, cleanPhoto, at: Date.now(), completedByAdmin: true,
+      },
+      checkoutDraft: firebase.firestore.FieldValue.delete(),
+      checkoutBlocked: false, checkoutCleared: false,
+    });
+    await db.collection('vans').doc(van.id).update({
+      mileage: Number(draft.mileage)||van.mileage, gas: draft.gas,
+    });
+    await onResolveAlert(alert.id);
+    setSaving(false);
+  }
+
+  return (
+    <div className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+      <div><strong>{driver?.name||'Unknown driver'}</strong> on {van?.name}</div>
+      <div className="muted">"{alert.description}"</div>
+      <div className="muted" style={{marginTop:6}}>Recorded so far — Mileage: {draft.mileage||'—'} · Gas: {draft.gas ?? '—'}%</div>
+      {draft.dashPhoto && <img src={draft.dashPhoto} alt="dashboard" style={{maxWidth:'100%',borderRadius:8,marginTop:8}} />}
+
+      {!completing && (
+        <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
+          <button className="secondary" style={{marginTop:0}} disabled={saving} onClick={clearForDriver}>
+            {saving ? 'Clearing...' : 'Clear — let driver finish'}
+          </button>
+          <button className="secondary" style={{marginTop:0}} onClick={()=>setCompleting(true)}>Complete checkout myself</button>
+        </div>
+      )}
+
+      {completing && (
+        <div style={{marginTop:14, paddingTop:14, borderTop:'1px solid var(--border)'}}>
+          <p className="muted">Finish the last step (cleanliness) on the driver's behalf to complete this checkout now.</p>
+          <label>Is the van clean?</label>
+          <YesNo value={clean} onChange={setClean} />
+          <CameraCapture label="Take a photo of the van interior" photoUrl={cleanPhoto} uploading={cleanUploading} onCapture={handlePhoto} />
+          <button className="primary" disabled={clean===null || !cleanPhoto || saving} onClick={completeAsAdmin}>
+            {saving ? 'Completing...' : 'Complete Checkout'}
+          </button>
+          <button className="link-btn" onClick={()=>setCompleting(false)}>Cancel</button>
+        </div>
+      )}
+    </div>
+  );
+}
+function currentUserUid(){ return auth.currentUser ? auth.currentUser.uid : null; }
+
+function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,repairLog,alerts,recurringRequests}){
+  const [tab,setTab] = useState('approvals');
+  const driverUsers = allUsers.filter(u=>u.vanRentalProfile);
+  const pending = driverUsers.filter(u=>u.vanRentalProfile.status==='pending');
+  const approved = driverUsers.filter(u=>u.vanRentalProfile.status==='approved');
+  const openAlerts = alerts.filter(a=>!a.resolved);
+  const recurringPendingCount = recurringRequests.filter(r=>r.status==='pending'||r.status==='renewal_requested').length;
+
+  async function approve(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'approved'}); }
+  async function deny(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'denied'}); }
+
+  // Generates individual weekly vanRentals docs across a 3-month
+  // window for an approved recurring request, checking each week for
+  // van conflicts the same way a one-time request does.
+  async function approveRecurring(reqId){
+    const req = recurringRequests.find(r=>r.id===reqId);
+    if(!req) return;
+    const activeRentals = rentals.filter(r=>r.status!=='completed' && r.status!=='cancelled');
+    const start = new Date(req.windowStart+'T00:00:00');
+    const end = new Date(req.windowEnd+'T00:00:00');
+    let cursor = new Date(start);
+    // Move cursor to the first matching day-of-week on or after windowStart
+    while(cursor.getDay() !== Number(req.dayOfWeek)) cursor.setDate(cursor.getDate()+1);
+
+    const createdDates = [];
+    const skippedDates = [];
+    while(cursor <= end){
+      const dateStr = cursor.toISOString().split('T')[0];
+      const slotStart = new Date(`${dateStr}T${req.time}`);
+      const slotEnd = new Date(`${dateStr}T${req.endTime}`);
+      const conflictVanIds = new Set(
+        activeRentals.filter(r=>{
+          if(!r.date || !r.time) return false;
+          const rStart = new Date(`${r.date}T${r.time}`);
+          const rEnd = r.endDate && r.endTime ? new Date(`${r.endDate}T${r.endTime}`) : new Date(rStart.getTime()+4*60*60*1000);
+          return rentalOverlaps(slotStart,slotEnd,rStart,rEnd);
+        }).map(r=>r.vanId)
+      );
+      const available = vans.filter(v=>v.status!=='maintenance' && !conflictVanIds.has(v.id));
+      if(available.length>0){
+        const van = [...available].sort((a,b)=>{
+          if(!!a.lowPriority !== !!b.lowPriority) return a.lowPriority ? 1 : -1;
+          return a.mileage-b.mileage;
+        })[0];
+        await db.collection('vanRentals').add({
+          driverId: req.driverId, vanId: van.id, date: dateStr, time: req.time,
+          endDate: dateStr, endTime: req.endTime, purpose: req.purpose,
+          status:'assigned', createdAt: Date.now(), recurringRequestId: reqId,
+        });
+        createdDates.push(dateStr);
+      } else {
+        skippedDates.push(dateStr);
+      }
+      cursor.setDate(cursor.getDate()+7);
     }
-  };
 
-  // ── Van Usage ──
-  document.querySelectorAll('[data-vtab]').forEach(t => {
-    t.addEventListener('click', () => {
-      document.querySelectorAll('[data-vtab]').forEach(x => x.classList.remove('active'));
-      t.classList.add('active');
-      ['approvals','vans','alerts','history'].forEach(k => {
-        document.getElementById('van-' + k).style.display = (k === t.dataset.vtab) ? 'block' : 'none';
-      });
-    });
-  });
-  function loadVanApprovals() {
-    db.collection('users').onSnapshot(snap => {
-      const drivers = snap.docs.map(d => ({id:d.id, ...d.data()})).filter(u => u.vanRentalProfile);
-      const pending = drivers.filter(u => u.vanRentalProfile.status === 'pending');
-      const c = document.getElementById('van-approvals');
-      if (!pending.length) { c.innerHTML = '<div class="empty-state">No pending driver applications.</div>'; return; }
-      c.innerHTML = pending.map(u => {
-        const vr = u.vanRentalProfile;
-        const needsVerify = !vr.licenseVerifiedInPerson;
-        return `
-        <div class="card">
-          <div class="card-title">${escHtml(u.name||'Unnamed')}</div>
-          <div class="card-text">${escHtml(u.phone||'')} · License expires: ${escHtml(vr.licenseExp||'(not set)')}
-            <button class="btn btn-unhide" style="padding:2px 8px;font-size:12px;" onclick="vanEditExp('${u.id}','${escHtml(vr.licenseExp||'')}')">Edit</button>
-          </div>
-          <div class="card-meta"><span>License check: <strong style="color:${vr.licenseVerifiedInPerson ? 'var(--green)' : 'var(--red)'}">${vr.licenseVerifiedInPerson ? 'Verified in person ✓' : 'Not yet verified in person'}</strong></span></div>
-          <div class="card-meta"><span>Insurance cancelled: ${vr.insuranceCancelled ? 'YES' : 'No'} · License revoked/suspended: ${vr.licenseRevokedSuspended ? 'YES' : 'No'}</span></div>
-          <div class="actions">
-            ${needsVerify ? `<button class="btn btn-unhide" onclick="vanVerifyInPerson('${u.id}')">Mark license verified in person</button>` : ''}
-            <button class="btn btn-approve" ${needsVerify ? 'disabled style="opacity:0.5;cursor:default;"' : ''} onclick="vanApprove('${u.id}')">Approve</button>
-            <button class="btn btn-hide" onclick="vanDeny('${u.id}')">Deny</button>
-          </div>
-        </div>`;
-      }).join('');
+    await db.collection('vanRecurringRequests').doc(reqId).update({
+      status:'active', approvedAt: Date.now(),
+      lastGeneratedDates: createdDates, skippedDates,
     });
   }
-  window.vanApprove = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.status':'approved'}); showBanner('Driver approved.'); };
-  window.vanDeny = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.status':'denied'}); showBanner('Application denied.'); };
-  window.vanEditExp = async (uid, currentExp) => {
-    const newExp = prompt('New license expiration date (YYYY-MM-DD):', currentExp || '');
-    if (newExp === null) return;
-    await db.collection('users').doc(uid).update({'vanRentalProfile.licenseExp': newExp});
-    showBanner('Expiration date updated.');
-  };
-  window.vanVerifyInPerson = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.licenseVerifiedInPerson':true}); showBanner('License marked verified.'); };
 
-  function loadVans() {
-    db.collection('vans').onSnapshot(snap => {
-      const vans = snap.docs.map(d => ({id:d.id, ...d.data()}));
-      const c = document.getElementById('van-vans');
-      if (!vans.length) { c.innerHTML = '<div class="empty-state">No vans on file.</div>'; return; }
-      c.innerHTML = vans.map(v => `
-        <div class="card">
-          <div class="card-title">${escHtml(v.name)}</div>
-          <div class="card-meta"><span class="tag ${v.status==='available'?'tag-public':(v.status==='maintenance'?'tag-pending':'tag-hidden')}">${v.status}</span><span>${v.mileage} mi · ${v.gas}% gas</span></div>
-          <div class="actions">
-            ${v.status!=='maintenance'
-              ? `<button class="btn btn-hide" onclick="setVanStatus('${v.id}','maintenance')">Send to Maintenance</button>`
-              : `<button class="btn btn-approve" onclick="setVanStatus('${v.id}','available')">Mark Available</button>`}
-          </div>
-        </div>`).join('');
+  async function denyRecurring(reqId){
+    await db.collection('vanRecurringRequests').doc(reqId).update({status:'denied'});
+  }
+
+  async function endRecurring(reqId){
+    if(!confirm('End this recurring reservation? Already-scheduled weeks stay on the calendar, but no new weeks will be generated.')) return;
+    await db.collection('vanRecurringRequests').doc(reqId).update({status:'ended', endedAt: Date.now()});
+  }
+
+  // Approving a renewal extends the window another 3 months and
+  // generates the next batch of weekly slots, same conflict-checking
+  // as the initial approval.
+  async function approveRenewal(reqId){
+    const req = recurringRequests.find(r=>r.id===reqId);
+    if(!req) return;
+    const newWindowStart = req.windowEnd;
+    const d = new Date(newWindowStart+'T00:00:00');
+    d.setMonth(d.getMonth()+3);
+    const newWindowEnd = d.toISOString().split('T')[0];
+    await db.collection('vanRecurringRequests').doc(reqId).update({
+      windowStart: newWindowStart, windowEnd: newWindowEnd, status:'pending', renewalRequestedAt: null,
+    });
+    // Re-run the same generation logic against the new window.
+    await approveRecurring(reqId);
+  }
+  async function verifyLicenseInPerson(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.licenseVerifiedInPerson':true}); }
+  async function updateLicenseExp(uid_, newExp){ await db.collection('users').doc(uid_).update({'vanRentalProfile.licenseExp':newExp}); }
+  async function resolveAlert(id){ await db.collection('vanAlerts').doc(id).update({resolved:true}); }
+  async function addWarningLight(name,safety,feedback,vanId){
+    await db.collection('vanWarningLights').add({name,safety,feedback: safety? null : feedback, van: vanId||null});
+  }
+  async function resolveMaint(id){ await db.collection('vanMaintenanceNotes').doc(id).update({resolved:true}); }
+  async function setVanStatus(vanId,status){ await db.collection('vans').doc(vanId).update({status}); }
+  async function addVan(name, isBorrowed, borrowedFrom, returnDate){
+    await db.collection('vans').add({
+      name, mileage:0, gas:100, status:'available', lowPriority:false,
+      borrowed: isBorrowed, borrowedFrom: isBorrowed ? borrowedFrom : null,
+      expectedReturnDate: isBorrowed ? returnDate : null,
     });
   }
-  window.setVanStatus = async (vanId, status) => { await db.collection('vans').doc(vanId).update({status}); showBanner('Van updated.'); };
-
-  function loadVanAlerts() {
-    db.collection('vanAlerts').onSnapshot(alertsSnap => {
-      const alerts = alertsSnap.docs.map(d => ({id:d.id, ...d.data()})).filter(a => !a.resolved);
-      const c = document.getElementById('van-alerts');
-      if (!alerts.length) { c.innerHTML = '<div class="empty-state">No open alerts.</div>'; return; }
-
-      db.collection('vanRentals').get().then(rentalsSnap => {
-        const rentals = rentalsSnap.docs.map(d => ({id:d.id, ...d.data()}));
-        c.innerHTML = alerts.map(a => {
-          const rental = a.rentalId ? rentals.find(r => r.id === a.rentalId) : null;
-          const isBlock = a.type === 'safety_light_block' && rental && rental.checkoutBlocked && !rental.checkoutCleared;
-          const draft = rental?.checkoutDraft || {};
-          return `
-            <div class="card">
-              <div class="card-text">"${escHtml(a.description||'')}"</div>
-              ${isBlock ? `<div class="card-meta"><span>Recorded so far — Mileage: ${escHtml(draft.mileage||'—')} · Gas: ${draft.gas ?? '—'}%</span></div>` : ''}
-              <div class="actions">
-                ${isBlock ? `<button class="btn btn-approve" onclick="clearVanCheckout('${rental.id}','${a.id}')">Clear — let driver finish</button>
-                  <span class="card-text" style="align-self:center;">or use the <a href="van/index.html" style="color:var(--blue);">Van Usage admin</a> to complete it yourself</span>` : ''}
-                <button class="btn btn-hide" onclick="resolveVanAlert('${a.id}')">Mark Resolved</button>
-              </div>
-            </div>`;
-        }).join('');
-      });
-    });
+  async function removeVan(vanId){
+    if(!confirm('Remove this van from the system? This does not delete its rental history.')) return;
+    await db.collection('vans').doc(vanId).delete();
   }
-  window.resolveVanAlert = async id => { await db.collection('vanAlerts').doc(id).update({resolved:true}); showBanner('Alert resolved.'); };
-  window.clearVanCheckout = async (rentalId, alertId) => {
+  async function addRepair(vanId,date,serviceType,notes,performedBy){
+    await db.collection('vanRepairLog').add({vanId,date,serviceType,notes,performedBy,createdAt:Date.now()});
+  }
+  async function addManualReservation({vanId,driverId,date,time,endDate,endTime,purpose}){
+    await db.collection('vanRentals').add({
+      driverId: driverId||null, vanId, date, time, endDate, endTime, purpose,
+      status:'assigned', createdAt:Date.now(), createdByAdmin:true,
+    });
+    const van = vans.find(v=>v.id===vanId);
+    if(van && van.status!=='maintenance') await db.collection('vans').doc(vanId).update({status:'inuse'});
+  }
+  async function cancelReservation(rentalId){
+    const rental = rentals.find(r=>r.id===rentalId);
+    if(!rental) return;
+    await db.collection('vanRentals').doc(rentalId).update({status:'cancelled'});
+    const otherActive = rentals.some(r=>r.id!==rentalId && r.vanId===rental.vanId && r.status!=='completed' && r.status!=='cancelled' && r.checkout && !r.return);
+    const van = vans.find(v=>v.id===rental.vanId);
+    if(van && van.status!=='maintenance' && !otherActive){ await db.collection('vans').doc(rental.vanId).update({status:'available'}); }
+  }
+
+  // Lets an admin complete a checkout on a driver's behalf, without
+  // requiring the dashboard photo/gauge steps a driver would normally
+  // go through in person — useful when the admin is handing off keys
+  // directly and wants to record mileage/gas themselves. Writes data
+  // compatible with the same checkout shape the driver flow uses, so
+  // History and other views don't need special-casing, but flags
+  // completedByAdmin so it's clear this wasn't the driver's own
+  // in-person confirmation.
+  async function manualCheckout(rentalId, {mileage, gas}){
+    const rental = rentals.find(r=>r.id===rentalId);
+    if(!rental) return;
+    const van = vans.find(v=>v.id===rental.vanId);
     await db.collection('vanRentals').doc(rentalId).update({
-      checkoutCleared: true, clearedBy: currentUser.uid, clearedAt: Date.now(),
+      checkout: {
+        mileage, gas, dashPhoto: null, warningLightsOn: [],
+        otherLightReported: false, otherLightDesc: '',
+        clean: null, cleanPhoto: null, at: Date.now(),
+        completedByAdmin: true, completedByAdminUid: currentUserUid(),
+      },
     });
-    await db.collection('vanAlerts').doc(alertId).update({resolved:true});
-    showBanner('Cleared — driver can finish checkout now.');
-  };
+    if(van){
+      await db.collection('vans').doc(van.id).update({
+        mileage: Number(mileage)||van.mileage, gas: Number(gas)||van.gas, status:'inuse',
+      });
+    }
+  }
 
-  function loadVanHistory() {
-    Promise.all([
-      db.collection('vanRentals').where('status','==','completed').get(),
-      db.collection('vans').get(),
-      db.collection('users').get(),
-    ]).then(([rentalsSnap, vansSnap, usersSnap]) => {
-      const rentals = rentalsSnap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(b.return?.at||0)-(a.return?.at||0));
-      const vansById = {}; vansSnap.docs.forEach(d => vansById[d.id] = d.data());
-      const usersById = {}; usersSnap.docs.forEach(d => usersById[d.id] = d.data());
-      const nameFor = uid_ => uid_ ? (usersById[uid_]?.name || usersById[uid_]?.email || 'Unknown') : 'Unknown';
+  // Same idea for completing a return/check-in manually — this is
+  // functionally identical to any approved driver checking in someone
+  // else's van (which is already allowed), just surfaced here as a
+  // dedicated admin action for convenience.
+  async function manualCheckin(rentalId, {mileage, gas, problems, problemDetails}){
+    const rental = rentals.find(r=>r.id===rentalId);
+    if(!rental) return;
+    const van = vans.find(v=>v.id===rental.vanId);
+    await db.collection('vanRentals').doc(rentalId).update({
+      status:'completed',
+      return: {
+        mileage, gas, clean: null, cleanPhoto: null,
+        warningLightsOn: [], otherLightReported: false, otherLightDesc: '',
+        completedBy: currentUserUid(), completedByAdmin: true,
+        problems, problemDetails, at: Date.now(),
+      },
+    });
+    if(van){
+      await db.collection('vans').doc(van.id).update({
+        mileage: Number(mileage)||van.mileage, gas: Number(gas)||van.gas, status:'available',
+      });
+    }
+    if(problems && problemDetails){
+      await db.collection('vanMaintenanceNotes').add({
+        vanId: rental.vanId, note: problemDetails, reportedBy: rental.driverId, rentalId,
+        createdAt: Date.now(), resolved: false,
+      });
+    }
+  }
 
-      const c = document.getElementById('van-history');
-      if (!rentals.length) { c.innerHTML = '<div class="empty-state">No completed rentals yet.</div>'; return; }
+  return (
+    <div className="content">
+      <div className="nav-tabs">
+        <button className={tab==='approvals'?'active':''} onClick={()=>setTab('approvals')}>Drivers</button>
+        <button className={tab==='adddriver'?'active':''} onClick={()=>setTab('adddriver')}>Add Driver</button>
+        <button className={tab==='vans'?'active':''} onClick={()=>setTab('vans')}>Vans</button>
+        <button className={tab==='checkinout'?'active':''} onClick={()=>setTab('checkinout')}>Check In/Out</button>
+        <button className={tab==='schedule'?'active':''} onClick={()=>setTab('schedule')}>Schedule</button>
+        <button className={tab==='history'?'active':''} onClick={()=>setTab('history')}>History</button>
+        <button className={tab==='recurring'?'active':''} onClick={()=>setTab('recurring')}>Recurring{recurringPendingCount>0?` (${recurringPendingCount})`:''}</button>
+        <button className={tab==='team'?'active':''} onClick={()=>setTab('team')}>Team</button>
+        <button className={tab==='repairs'?'active':''} onClick={()=>setTab('repairs')}>Repairs</button>
+        <button className={tab==='lights'?'active':''} onClick={()=>setTab('lights')}>Lights</button>
+        <button className={tab==='alerts'?'active':''} onClick={()=>setTab('alerts')}>Alerts{openAlerts.length>0?` (${openAlerts.length})`:''}</button>
+        <button className={tab==='maint'?'active':''} onClick={()=>setTab('maint')}>Maint.</button>
+      </div>
 
-      c.innerHTML = rentals.map(r => {
-        const van = vansById[r.vanId];
+      {tab==='approvals' && (
+        <div className="card">
+          <h3>Pending Applications</h3>
+          {pending.length===0 && <p className="muted">None pending.</p>}
+          {pending.map(u=>(
+            <PendingDriverCard key={u.id} driverUser={u} onApprove={approve} onDeny={deny} onVerify={verifyLicenseInPerson} onUpdateExp={updateLicenseExp} />
+          ))}
+          <h3 style={{marginTop:20}}>Approved Drivers</h3>
+          {approved.map(u=>{
+            const vr = u.vanRentalProfile;
+            const flags = [];
+            if(vr.atFaultAccidents1yr) flags.push('at-fault accident');
+            if(vr.movingViolations1yr) flags.push('moving violation');
+            if(vr.licenseRevokedSuspended) flags.push('license revoked/suspended');
+            return (
+              <div key={u.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+                <div style={{display:'flex',justifyContent:'space-between'}}>
+                  <div>{u.name}</div><span className="badge approved">approved</span>
+                </div>
+                {vr.lastRenewed && <div className="muted">Last renewed: {new Date(vr.lastRenewed).toLocaleDateString()}</div>}
+                {flags.length>0 && <div className="muted" style={{color:'var(--danger)',fontWeight:600}}>Flagged at renewal: {flags.join(', ')}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tab==='adddriver' && <AdminAddDriver />}
+
+      {tab==='vans' && (
+        <div className="card">
+          <h3>Vans</h3>
+          {vans.map(v=>(
+            <VanDetailCard
+              key={v.id}
+              van={v}
+              maintenanceNotes={maintenanceNotes.filter(m=>m.vanId===v.id)}
+              repairLog={repairLog.filter(r=>r.vanId===v.id)}
+              onSetStatus={setVanStatus}
+              onRemove={removeVan}
+              onResolveMaint={resolveMaint}
+            />
+          ))}
+          <AddVanForm onAdd={addVan} />
+        </div>
+      )}
+
+      {tab==='checkinout' && <ManualCheckInOut vans={vans} rentals={rentals} approvedDrivers={approved} onCheckout={manualCheckout} onCheckin={manualCheckin} />}
+
+      {tab==='schedule' && <ScheduleAdmin vans={vans} approvedDrivers={approved} rentals={rentals} onAdd={addManualReservation} onCancel={cancelReservation} />}
+      {tab==='history' && <RentalHistoryAdmin vans={vans} rentals={rentals} allUsers={allUsers} />}
+      {tab==='recurring' && <RecurringAdmin recurringRequests={recurringRequests} allUsers={allUsers} onApprove={approveRecurring} onDeny={denyRecurring} onEnd={endRecurring} onApproveRenewal={approveRenewal} />}
+      {tab==='team' && <VanTeamAdmin allUsers={allUsers} />}
+      {tab==='repairs' && <RepairsAdmin vans={vans} repairLog={repairLog} onAdd={addRepair} />}
+      {tab==='lights' && <WarningLightsAdmin vans={vans} warningLights={warningLights} onAdd={addWarningLight} />}
+
+      {tab==='alerts' && (
+        <div className="card">
+          <h3>Safety Alerts</h3>
+          {openAlerts.length===0 && <p className="muted">No open alerts.</p>}
+          {openAlerts.map(a=>{
+            const driver = allUsers.find(u=>u.id===a.driverId);
+            const van = vans.find(v=>v.id===a.vanId);
+            const rental = a.rentalId ? rentals.find(r=>r.id===a.rentalId) : null;
+            const isCheckoutBlock = a.type==='safety_light_block' && rental && rental.checkoutBlocked && !rental.checkoutCleared;
+
+            if(isCheckoutBlock){
+              return <SafetyBlockAlertCard key={a.id} alert={a} driver={driver} van={van} rental={rental} onResolveAlert={resolveAlert} />;
+            }
+            return (
+              <div key={a.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+                <div><strong>{driver?.name||'Unknown driver'}</strong> on {van?.name}</div>
+                <div className="muted">"{a.description}"</div>
+                <button className="secondary" style={{marginTop:8}} onClick={()=>resolveAlert(a.id)}>Mark Resolved</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tab==='maint' && (
+        <div className="card">
+          <h3>Maintenance Notes</h3>
+          {maintenanceNotes.length===0 && <p className="muted">No notes.</p>}
+          {maintenanceNotes.slice().reverse().map(m=>{
+            const van = vans.find(v=>v.id===m.vanId);
+            return (
+              <div key={m.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch',opacity:m.resolved?0.5:1}}>
+                <div><strong>{van?.name}</strong></div>
+                <div className="muted">{m.note}</div>
+                {!m.resolved && <button className="secondary" style={{marginTop:8}} onClick={()=>resolveMaint(m.id)}>Mark Resolved</button>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+function VanTeamAdmin({allUsers}){
+  const [search,setSearch] = useState('');
+  const vanAdmins = allUsers.filter(u => u.roles && u.roles.vanAdmin === true);
+  const others = allUsers.filter(u => !(u.roles && u.roles.vanAdmin === true))
+    .filter(u => search && ((u.name||'').toLowerCase().includes(search.toLowerCase()) || (u.email||'').toLowerCase().includes(search.toLowerCase())));
+
+  async function grant(uid_){
+    await db.collection('users').doc(uid_).set({roles:{vanAdmin:true}}, {merge:true});
+  }
+  async function revoke(uid_){
+    if(!confirm('Remove Van Usage admin access for this person?')) return;
+    await db.collection('users').doc(uid_).set({roles:{vanAdmin:false}}, {merge:true});
+  }
+
+  return (
+    <div className="card">
+      <h3>Van Usage Admins</h3>
+      <p className="muted">People with this role can approve drivers, manage vans, and handle scheduling — but nothing outside Van Usage (no Bedside, Graphics, Marketing, or other apps).</p>
+      {vanAdmins.length===0 && <p className="muted">No one else has this yet.</p>}
+      {vanAdmins.map(u=>(
+        <div key={u.id} className="list-item">
+          <div><div>{u.name||u.email}</div><div className="muted">{u.email}</div></div>
+          <button className="secondary" style={{marginTop:0,width:'auto',padding:'8px 14px'}} onClick={()=>revoke(u.id)}>Remove</button>
+        </div>
+      ))}
+
+      <h3 style={{marginTop:24}}>Add Someone</h3>
+      <p className="muted">Search by name or email among people who've already signed into the hub at least once.</p>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or email..." />
+      {search && others.length===0 && <p className="muted" style={{marginTop:10}}>No matches. They need to sign into the hub at least once first.</p>}
+      {others.map(u=>(
+        <div key={u.id} className="list-item">
+          <div><div>{u.name||u.email}</div><div className="muted">{u.email}</div></div>
+          <button className="secondary" style={{marginTop:0,width:'auto',padding:'8px 14px'}} onClick={()=>grant(u.id)}>Make Van Admin</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RecurringAdmin({recurringRequests,allUsers,onApprove,onDeny,onEnd,onApproveRenewal}){
+  function nameFor(uid_){
+    const u = allUsers.find(u=>u.id===uid_);
+    return u?.name || u?.email || 'Unknown';
+  }
+
+  const pendingNew = recurringRequests.filter(r=>r.status==='pending');
+  const renewals = recurringRequests.filter(r=>r.status==='renewal_requested');
+  const active = recurringRequests.filter(r=>r.status==='active');
+  const ended = recurringRequests.filter(r=>r.status==='ended'||r.status==='denied');
+
+  return (
+    <div className="card">
+      <h3>Renewal Requests</h3>
+      <p className="muted">These are already active but the driver has asked to continue for another 3 months.</p>
+      {renewals.length===0 && <p className="muted">None right now.</p>}
+      {renewals.map(r=>(
+        <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+          <div><strong>{nameFor(r.driverId)}</strong> — {DAY_NAMES[r.dayOfWeek]}s, {r.time}–{r.endTime}</div>
+          <div className="muted">Current window ends {r.windowEnd}. Purpose: {r.purpose||'—'}</div>
+          <div style={{display:'flex',gap:8,marginTop:8}}>
+            <button className="primary" style={{marginTop:0}} onClick={()=>onApproveRenewal(r.id)}>Approve — Extend 3 More Months</button>
+            <button className="secondary" style={{marginTop:0}} onClick={()=>onEnd(r.id)}>Let It End</button>
+          </div>
+        </div>
+      ))}
+
+      <h3 style={{marginTop:24}}>New Recurring Requests</h3>
+      {pendingNew.length===0 && <p className="muted">None pending.</p>}
+      {pendingNew.map(r=>(
+        <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+          <div><strong>{nameFor(r.driverId)}</strong> — {DAY_NAMES[r.dayOfWeek]}s, {r.time}–{r.endTime}</div>
+          <div className="muted">Requested window: {r.windowStart} → {r.windowEnd}. Purpose: {r.purpose||'—'}</div>
+          <div style={{display:'flex',gap:8,marginTop:8}}>
+            <button className="primary" style={{marginTop:0}} onClick={()=>onApprove(r.id)}>Approve — Schedule 3 Months</button>
+            <button className="secondary" style={{marginTop:0}} onClick={()=>onDeny(r.id)}>Deny</button>
+          </div>
+        </div>
+      ))}
+
+      <h3 style={{marginTop:24}}>Active Recurring Reservations</h3>
+      {active.length===0 && <p className="muted">None active.</p>}
+      {active.map(r=>{
+        const skipped = r.skippedDates || [];
+        return (
+          <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+            <div><strong>{nameFor(r.driverId)}</strong> — {DAY_NAMES[r.dayOfWeek]}s, {r.time}–{r.endTime}</div>
+            <div className="muted">Window: {r.windowStart} → {r.windowEnd}</div>
+            {skipped.length>0 && <div className="muted" style={{color:'var(--danger)'}}>Couldn't find a van for: {skipped.join(', ')}</div>}
+            <button className="secondary" style={{marginTop:8}} onClick={()=>onEnd(r.id)}>End This Reservation</button>
+          </div>
+        );
+      })}
+
+      {ended.length>0 && (<>
+        <h3 style={{marginTop:24}}>Ended / Denied</h3>
+        {ended.map(r=>(
+          <div key={r.id} className="list-item">
+            <div><div>{nameFor(r.driverId)} — {DAY_NAMES[r.dayOfWeek]}s</div><div className="muted">{r.windowStart} → {r.windowEnd}</div></div>
+            <span className="badge maintenance">{r.status}</span>
+          </div>
+        ))}
+      </>)}
+    </div>
+  );
+}
+
+function ManualCheckInOut({vans,rentals,approvedDrivers,onCheckout,onCheckin}){
+  const pendingCheckouts = rentals.filter(r=>r.status==='assigned' && !r.checkout);
+  const outstandingReturns = rentals.filter(r=>r.checkout && !r.return);
+
+  function nameFor(uid_){
+    const u = approvedDrivers.find(u=>u.id===uid_);
+    return u?.name || u?.email || 'Unknown driver';
+  }
+
+  return (
+    <div className="card">
+      <h3>Check Out a Van</h3>
+      <p className="muted">Complete a checkout on a driver's behalf — useful when you're handing off keys in person.</p>
+      {pendingCheckouts.length===0 && <p className="muted">No vans waiting to be checked out.</p>}
+      {pendingCheckouts.map(r=>{
+        const van = vans.find(v=>v.id===r.vanId);
+        return <ManualCheckoutRow key={r.id} rental={r} van={van} driverName={nameFor(r.driverId)} onSubmit={onCheckout} />;
+      })}
+
+      <h3 style={{marginTop:24}}>Check In a Van</h3>
+      <p className="muted">Complete a return on a driver's behalf.</p>
+      {outstandingReturns.length===0 && <p className="muted">No vans currently out.</p>}
+      {outstandingReturns.map(r=>{
+        const van = vans.find(v=>v.id===r.vanId);
+        return <ManualCheckinRow key={r.id} rental={r} van={van} driverName={nameFor(r.driverId)} onSubmit={onCheckin} />;
+      })}
+    </div>
+  );
+}
+
+function ManualCheckoutRow({rental,van,driverName,onSubmit}){
+  const [mileage,setMileage] = useState('');
+  const [gas,setGas] = useState('');
+  const [saving,setSaving] = useState(false);
+
+  async function submit(){
+    setSaving(true);
+    await onSubmit(rental.id, {mileage, gas: Number(gas)});
+    setSaving(false);
+  }
+
+  return (
+    <div className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+      <div><strong>{van?.name||'Unknown van'}</strong> — {driverName}</div>
+      <div className="muted">Reserved {rental.date} {rental.time} → {rental.endDate} {rental.endTime}</div>
+      <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
+        <input type="number" placeholder={`Mileage (last known: ${van?.mileage||'—'})`} value={mileage} onChange={e=>setMileage(e.target.value)} style={{flex:1,minWidth:140}} />
+        <input type="number" placeholder="Gas %" min="0" max="100" value={gas} onChange={e=>setGas(e.target.value)} style={{width:90}} />
+        <button className="primary" style={{marginTop:0,width:'auto',padding:'10px 16px'}} disabled={!mileage||!gas||saving} onClick={submit}>{saving?'Saving...':'Check Out'}</button>
+      </div>
+    </div>
+  );
+}
+
+function ManualCheckinRow({rental,van,driverName,onSubmit}){
+  const [mileage,setMileage] = useState('');
+  const [gas,setGas] = useState('');
+  const [problems,setProblems] = useState(false);
+  const [problemDetails,setProblemDetails] = useState('');
+  const [saving,setSaving] = useState(false);
+
+  async function submit(){
+    setSaving(true);
+    await onSubmit(rental.id, {mileage, gas: Number(gas), problems, problemDetails});
+    setSaving(false);
+  }
+
+  return (
+    <div className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+      <div><strong>{van?.name||'Unknown van'}</strong> — {driverName}</div>
+      <div className="muted">Out since {rental.checkout?.at ? new Date(rental.checkout.at).toLocaleString() : '—'}</div>
+      <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
+        <input type="number" placeholder="Final mileage" value={mileage} onChange={e=>setMileage(e.target.value)} style={{flex:1,minWidth:140}} />
+        <input type="number" placeholder="Gas %" min="0" max="100" value={gas} onChange={e=>setGas(e.target.value)} style={{width:90}} />
+      </div>
+      <label style={{display:'flex',alignItems:'center',gap:8,marginTop:8,fontSize:14,fontWeight:400,cursor:'pointer'}}>
+        <input type="checkbox" checked={problems} onChange={e=>setProblems(e.target.checked)} style={{width:'auto'}} />
+        Any problems to report?
+      </label>
+      {problems && <textarea placeholder="Describe the problem" value={problemDetails} onChange={e=>setProblemDetails(e.target.value)} style={{marginTop:8}} />}
+      <button className="primary" style={{width:'auto',padding:'10px 16px'}} disabled={!mileage||!gas||saving} onClick={submit}>{saving?'Saving...':'Check In'}</button>
+    </div>
+  );
+}
+
+function RentalHistoryAdmin({vans,rentals,allUsers}){
+  const [search,setSearch] = useState('');
+  const completed = rentals.filter(r=>r.status==='completed').sort((a,b)=>(b.return?.at||0)-(a.return?.at||0));
+
+  function nameFor(uid_){
+    if(!uid_) return 'Unknown';
+    const u = allUsers.find(u=>u.id===uid_);
+    return u?.name || u?.email || 'Unknown';
+  }
+
+  const filtered = completed.filter(r=>{
+    if(!search) return true;
+    const van = vans.find(v=>v.id===r.vanId);
+    const q = search.toLowerCase();
+    return (van?.name||'').toLowerCase().includes(q)
+      || nameFor(r.driverId).toLowerCase().includes(q)
+      || nameFor(r.return?.completedBy).toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="card">
+      <h3>Rental History</h3>
+      <p className="muted">Who checked each van out, and who checked it back in.</p>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by van or driver name..." style={{marginBottom:14}} />
+
+      {filtered.length===0 && <p className="muted">No completed rentals{search?' matching that search':''}.</p>}
+      {filtered.map(r=>{
+        const van = vans.find(v=>v.id===r.vanId);
         const checkoutBy = nameFor(r.driverId);
         const checkinBy = nameFor(r.return?.completedBy);
         const differentPerson = r.return?.completedBy && r.return.completedBy !== r.driverId;
-        return `
-          <div class="card">
-            <div class="card-title">${escHtml(van?.name||'Unknown van')}</div>
-            <div class="card-meta"><span>${r.date||''} ${r.time||''} → ${r.endDate||''} ${r.endTime||''}</span></div>
-            <div class="card-text">Checked out by: ${escHtml(checkoutBy)}</div>
-            <div class="card-text">Checked in by: ${escHtml(checkinBy)}${differentPerson ? ' <strong style="color:var(--blue);">— different from who checked it out</strong>' : ''}</div>
-          </div>`;
-      }).join('');
-    }).catch(err => {
-      document.getElementById('van-history').innerHTML = '<div class="empty-state">Could not load rental history.</div>';
-      console.error(err);
-    });
-  }
-
-  // ── App Access ──
-  const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage', eventRequest: 'Event Request', timeOff: 'Time Off Request' };
-  const ROLE_LABELS = { overview: 'Overview', vanAdmin: 'Van Usage Admin (Department Head)', bedsideAdmin: 'Bedside Admin (Department Head)', graphics: 'Graphics Team (Department Head)', marketing: 'Marketing Team (Department Head)' };
-  function loadModuleManagement() {
-    db.collection('users').onSnapshot(snap => {
-      const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-      const c = document.getElementById('moduleManageList');
-      if (!users.length) { c.innerHTML = '<div class="empty-state">No users found yet.</div>'; return; }
-      c.innerHTML = users.map(u => {
-        const modules = u.modules || {};
-        const roles = u.roles || {};
-        const moduleToggles = Object.keys(MODULE_LABELS).map(key => {
-          const on = modules[key] === true;
-          return `<button class="btn ${on?'btn-approve':'btn-unhide'}" style="margin-right:6px;margin-bottom:6px;" onclick="toggleModule('${u.id}','${key}',${!on})">${MODULE_LABELS[key]}: ${on?'On':'Off'}</button>`;
-        }).join('');
-        const roleToggles = Object.keys(ROLE_LABELS).map(key => {
-          const on = roles[key] === true;
-          return `<button class="btn ${on?'btn-approve':'btn-unhide'}" style="margin-right:6px;margin-bottom:6px;" onclick="toggleRole('${u.id}','${key}',${!on})">${ROLE_LABELS[key]}: ${on?'On':'Off'}</button>`;
-        }).join('');
-        return `<div class="card"><div class="card-title">${escHtml(u.name||'(no name set)')}</div><div class="card-text">${escHtml(u.email||'')}</div>
-          <div class="card-meta" style="margin-bottom:4px;">Apps</div><div class="actions" style="margin-bottom:10px;">${moduleToggles}</div>
-          <div class="card-meta" style="margin-bottom:4px;">Department Admin Roles</div><div class="actions">${roleToggles}</div></div>`;
-      }).join('');
-    });
-  }
-  window.toggleModule = async (uid, key, val) => {
-    await db.collection('users').doc(uid).set({modules:{[key]:val}}, {merge:true});
-    showBanner(`${MODULE_LABELS[key]} ${val?'enabled':'disabled'}.`);
-  };
-  window.toggleRole = async (uid, key, val) => {
-    await db.collection('users').doc(uid).set({roles:{[key]:val}}, {merge:true});
-    showBanner(`${ROLE_LABELS[key]} ${val?'enabled':'disabled'}.`);
-  };
-
-  // ── Access Requests ──
-  let allAccessRequests = [];
-  function loadAccessRequests() {
-    db.collection('accessRequests').where('status','==','pending').orderBy('createdAt','desc').onSnapshot(snap => {
-      allAccessRequests = snap.docs.map(d => ({id:d.id, ...d.data()}));
-      renderAccessRequests();
-      const badge = document.getElementById('requestsCount');
-      if (allAccessRequests.length) { badge.textContent = allAccessRequests.length; badge.style.display = 'inline-block'; }
-      else { badge.style.display = 'none'; }
-    }, err => {
-      document.getElementById('accessRequestsList').innerHTML = '<div class="empty-state">Could not load requests.</div>';
-      console.error(err);
-    });
-  }
-
-  function renderAccessRequests() {
-    const c = document.getElementById('accessRequestsList');
-    if (!allAccessRequests.length) { c.innerHTML = '<div class="empty-state">No pending requests.</div>'; return; }
-    c.innerHTML = allAccessRequests.map(r => {
-      const modLabels = (r.modulesRequested||[]).map(k => MODULE_LABELS[k] || k).join(', ');
-      return `
-        <div class="card">
-          <div class="card-title">${escHtml(r.name)}</div>
-          <div class="card-text">${escHtml(r.email)}</div>
-          <div class="card-meta"><span class="tag tag-hospital">${escHtml(modLabels)}</span></div>
-          ${r.note ? `<div class="card-text">"${escHtml(r.note)}"</div>` : ''}
-          <div class="card-meta"><span>Requested by ${escHtml(r.requestedBy?.name||'unknown')}</span></div>
-          <div class="actions">
-            <button class="btn btn-approve" onclick="approveAccessRequest('${r.id}')">Approve &amp; grant access</button>
-            <button class="btn btn-delete" onclick="dismissAccessRequest('${r.id}')">Dismiss</button>
-          </div>
-        </div>`;
-    }).join('');
-  }
-
-  window.approveAccessRequest = async (reqId) => {
-    const req = allAccessRequests.find(r => r.id === reqId);
-    if (!req) return;
-    const moduleUpdates = {};
-    (req.modulesRequested||[]).forEach(k => moduleUpdates[k] = true);
-
-    // If someone with this email already has an account, update it directly.
-    const existing = await db.collection('users').where('email','==',req.email).limit(1).get();
-    if (!existing.empty) {
-      await db.collection('users').doc(existing.docs[0].id).set({modules: moduleUpdates}, {merge:true});
-    } else {
-      // Otherwise, stash the requested modules so they're applied
-      // automatically the first time this email signs in.
-      await db.collection('hubInvites').doc(req.email).set({
-        email: req.email, name: req.name, modules: moduleUpdates, claimed:false, createdAt: Date.now(),
-      }, {merge:true});
-    }
-    await db.collection('accessRequests').doc(reqId).update({status:'approved', resolvedAt:new Date().toISOString(), resolvedBy: currentUser.uid});
-    showBanner('Access granted.');
-  };
-
-  window.dismissAccessRequest = async (reqId) => {
-    await db.collection('accessRequests').doc(reqId).update({status:'dismissed', resolvedAt:new Date().toISOString(), resolvedBy: currentUser.uid});
-    showBanner('Request dismissed.');
-  };
-
-  // ── Manage Admins ──
-  function loadAdminManagement() {
-    db.collection('users').onSnapshot(snap => {
-      const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b) => {
-        if (!!a.isOwner !== !!b.isOwner) return a.isOwner ? -1 : 1;
-        if (!!a.isAdmin !== !!b.isAdmin) return a.isAdmin ? -1 : 1;
-        return (a.name||'').localeCompare(b.name||'');
-      });
-      const c = document.getElementById('adminManageList');
-      if (!users.length) { c.innerHTML = '<div class="empty-state">No users found yet.</div>'; return; }
-      c.innerHTML = users.map(u => {
-        const isAdmin = u.isAdmin === true;
-        const isOwnerFlag = u.isOwner === true;
-        const isSelf = u.id === currentUser.uid;
-        const adminButton = isSelf
-          ? `<span class="tag tag-public">You${isAdmin ? ' (admin)' : ''}</span>`
-          : (isAdmin
-              ? ((window.currentUserIsOwner || !isOwnerFlag)
-                  ? `<button class="btn btn-hide" onclick="toggleAdmin('${u.id}',false)">Remove admin access</button>`
-                  : '')
-              : `<button class="btn btn-unhide" onclick="toggleAdmin('${u.id}',true)">Make admin</button>`);
-        const ownerButton = (!isSelf && window.currentUserIsOwner)
-          ? (isOwnerFlag
-              ? `<button class="btn btn-hide" onclick="toggleOwner('${u.id}',false)">Remove Owner</button>`
-              : `<button class="btn btn-approve" onclick="toggleOwner('${u.id}',true)">Make Owner</button>`)
-          : '';
-        return `<div class="card"><div class="card-title">${escHtml(u.name||'(no name set)')}</div><div class="card-text">${escHtml(u.email||'')}</div>
-          <div class="actions">${isOwnerFlag ? `<span class="tag tag-hospital">👑 Owner</span>` : ''}${adminButton}${ownerButton}</div></div>`;
-      }).join('');
-    });
-  }
-  window.toggleAdmin = async (uid, makeAdmin) => {
-    if (makeAdmin && !confirm('Give this person full admin access?')) return;
-    if (!makeAdmin && !confirm('Remove admin access for this person?')) return;
-    try {
-      await db.collection('users').doc(uid).set({isAdmin: makeAdmin}, {merge:true});
-    } catch (e) {
-      showBanner('Could not update — this account may be Owner-protected: ' + e.message, true);
-    }
-  };
-  window.toggleOwner = async (uid, makeOwner) => {
-    if (makeOwner && !confirm('Give this person Owner status? They can never be removed by a regular admin afterward — only by another Owner.')) return;
-    if (!makeOwner && !confirm('Remove Owner status from this person?')) return;
-    try {
-      await db.collection('users').doc(uid).set({isOwner: makeOwner}, {merge:true});
-      showBanner(`Owner status ${makeOwner ? 'granted' : 'removed'}.`);
-    } catch (e) {
-      showBanner('Could not update: ' + e.message, true);
-    }
-  };
-
-  function showBanner(msg, isError=false) {
-    const b = document.getElementById('banner');
-    b.textContent = msg;
-    b.style.background = isError ? '#fdecea' : '#eaf4ee';
-    b.style.color = isError ? '#a03030' : '#2e7a52';
-    b.classList.add('show');
-    setTimeout(() => b.classList.remove('show'), 3200);
-  }
-  // ── Event Requests ──
-  let allEventRequests = [];
-  let eventFilter = 'new';
-  function loadEventRequests() {
-    db.collection('eventRequests').orderBy('submittedAt','desc').onSnapshot(snap => {
-      allEventRequests = snap.docs.map(d => ({id:d.id, ...d.data()}));
-      renderEventRequests();
-      const newCount = allEventRequests.filter(r => (r.status||'new')==='new').length;
-      const badge = document.getElementById('eventsCount');
-      if (newCount) { badge.textContent = newCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
-    }, err => {
-      document.getElementById('eventRequestsList').innerHTML = '<div class="empty-state">Could not load event requests.</div>';
-      console.error(err);
-    });
-  }
-  document.querySelectorAll('[data-etab]').forEach(t => {
-    t.addEventListener('click', () => {
-      document.querySelectorAll('[data-etab]').forEach(x => x.classList.remove('active'));
-      t.classList.add('active');
-      eventFilter = t.dataset.etab;
-      renderEventRequests();
-    });
-  });
-
-  const REQUEST_TYPE_LABELS = {
-    church_event: 'Church Event', media_only: 'Media/Graphic Only', facilities: 'Facilities Rental',
-  };
-
-  function renderEventRequests() {
-    const c = document.getElementById('eventRequestsList');
-    const filtered = allEventRequests.filter(r => (r.status||'new') === eventFilter);
-    if (!filtered.length) { c.innerHTML = '<div class="empty-state">Nothing here right now.</div>'; return; }
-
-    c.innerHTML = filtered.map(r => {
-      const typeLabel = REQUEST_TYPE_LABELS[r.requestType] || r.requestType || '';
-      const isEvent = r.requestType === 'church_event';
-      const isMedia = r.requestType === 'church_event' || r.requestType === 'media_only';
-
-      return `
-        <div class="card">
-          <div class="card-title">${escHtml(r.eventTitle || r.projectTitle || 'Untitled request')}</div>
-          <div class="card-meta">
-            <span class="tag tag-hospital">${escHtml(typeLabel)}</span>
-            <span>${escHtml((r.department||[]).join(', '))}</span>
-          </div>
-          <div class="card-text">Requested by ${escHtml(r.requesterName||'')} (${escHtml(r.email||'')})</div>
-          ${r.eventDate ? `<div class="card-meta"><span>${escHtml(r.eventDate)} ${escHtml(r.startTime||'')}${r.endTime ? ' – '+escHtml(r.endTime) : ''}</span></div>` : ''}
-          ${r.eventDesc ? `<div class="card-text">${escHtml(r.eventDesc)}</div>` : ''}
-          ${r.mediaDesc ? `<div class="card-text"><strong>Media needed:</strong> ${escHtml(r.mediaDesc)}</div>` : ''}
-          ${(r.vansNeeded||[]).length && !r.vansNeeded.includes('None') ? `<div class="card-meta"><span>Van requested: ${escHtml(r.vansNeeded.join(', '))} ${r.vanConfirmed ? '✓ confirmed' : '— not yet confirmed'}</span></div>` : ''}
-
-          <div class="actions" style="margin-top:10px;">
-            ${eventFilter==='new' ? `
-              <button class="btn btn-approve" onclick="setEventStatus('${r.id}','approved')">Approve</button>
-              <button class="btn btn-hide" onclick="setEventStatus('${r.id}','denied')">Deny</button>
-            ` : `<button class="btn btn-unhide" onclick="setEventStatus('${r.id}','new')">Move back to New</button>`}
-          </div>
-
-          ${eventFilter==='approved' ? `
-            <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:8px;">
-              <button class="btn ${r.calendarAdded?'btn-approve':'btn-unhide'}" onclick="toggleEventField('${r.id}','calendarAdded',${!r.calendarAdded})">Calendar Added: ${r.calendarAdded?'Yes':'No'}</button>
-              ${isMedia ? `<button class="btn ${r.graphicStatus==='Completed'?'btn-approve':'btn-unhide'}" onclick="cycleGraphicStatus('${r.id}','${r.graphicStatus||''}')">Graphic Status: ${escHtml(r.graphicStatus||'Not started')}</button>` : ''}
-              ${isMedia ? `<button class="btn ${r.marketingStatus==='Completed'?'btn-approve':'btn-unhide'}" onclick="cycleMarketingStatus('${r.id}','${r.marketingStatus||''}')">Marketing Status: ${escHtml(r.marketingStatus||'Not started')}</button>` : ''}
-              ${(r.vansNeeded||[]).length && !r.vansNeeded.includes('None') ? `<button class="btn ${r.vanConfirmed?'btn-approve':'btn-unhide'}" onclick="toggleEventField('${r.id}','vanConfirmed',${!r.vanConfirmed})">Van Confirmed: ${r.vanConfirmed?'Yes':'No'}</button>` : ''}
+        const adminCompleted = r.checkout?.completedByAdmin;
+        return (
+          <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+            <div><strong>{van?.name}</strong></div>
+            <div className="muted">{r.date} {r.time} → {r.endDate} {r.endTime}</div>
+            <div className="muted">Checked out by: {checkoutBy}{adminCompleted && ' (checkout completed by admin)'}</div>
+            <div className="muted">
+              Checked in by: {checkinBy}
+              {differentPerson && <span style={{color:'var(--blue)', fontWeight:600}}> — different from who checked it out</span>}
             </div>
-          ` : ''}
-        </div>`;
-    }).join('');
+            {r.return?.problems && <div className="muted" style={{color:'var(--danger)'}}>Problems reported at return</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ScheduleAdmin({vans,approvedDrivers,rentals,onAdd,onCancel}){
+  const [vanId,setVanId] = useState(vans[0]?.id||'');
+  const [driverId,setDriverId] = useState('');
+  const [date,setDate] = useState('');
+  const [time,setTime] = useState('');
+  const [endDate,setEndDate] = useState('');
+  const [endTime,setEndTime] = useState('');
+  const [purpose,setPurpose] = useState('');
+  const [error,setError] = useState('');
+  const activeRentals = rentals.filter(r=>r.status!=='completed' && r.status!=='cancelled');
+
+  async function submit(){
+    setError('');
+    if(!vanId || !date || !time || !endDate || !endTime){ setError('Fill in van, start, and end.'); return; }
+    const start = new Date(`${date}T${time}`);
+    const end = new Date(`${endDate}T${endTime}`);
+    if(!(start < end)){ setError('End date/time must be after start date/time.'); return; }
+    const conflict = activeRentals.some(r=>{
+      if(r.vanId!==vanId || !r.date || !r.time) return false;
+      const rStart = new Date(`${r.date}T${r.time}`);
+      const rEnd = r.endDate && r.endTime ? new Date(`${r.endDate}T${r.endTime}`) : new Date(rStart.getTime()+4*60*60*1000);
+      return start < rEnd && rStart < end;
+    });
+    if(conflict){ setError('That van already has an overlapping reservation for this window.'); return; }
+    await onAdd({vanId,driverId:driverId||null,date,time,endDate,endTime,purpose});
+    setDate('');setTime('');setEndDate('');setEndTime('');setPurpose('');setDriverId('');
   }
 
-  window.setEventStatus = async (id, status) => {
-    await db.collection('eventRequests').doc(id).update({status, statusChangedAt:new Date().toISOString(), statusChangedBy: currentUser.uid});
-    showBanner('Request updated.');
-  };
-  window.toggleEventField = async (id, field, val) => {
-    await db.collection('eventRequests').doc(id).update({[field]: val});
-  };
+  const upcoming = activeRentals.slice().sort((a,b)=> new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
 
-  // ── Time Off Requests ──
-  let allTimeOffRequests = [];
-  let timeOffFilter = 'pending';
-  function loadTimeOffRequests() {
-    db.collection('timeOffRequests').orderBy('submittedAt','desc').onSnapshot(snap => {
-      allTimeOffRequests = snap.docs.map(d => ({id:d.id, ...d.data()}));
-      renderTimeOffRequests();
-      const pendingCount = allTimeOffRequests.filter(r => (r.status||'pending')==='pending').length;
-      const badge = document.getElementById('timeOffCount');
-      if (pendingCount) { badge.textContent = pendingCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
-    }, err => {
-      document.getElementById('timeOffList').innerHTML = '<div class="empty-state">Could not load time off requests.</div>';
-      console.error(err);
-    });
+  return (
+    <div className="card">
+      <h3>Upcoming Reservations</h3>
+      {upcoming.length===0 && <p className="muted">Nothing scheduled.</p>}
+      {upcoming.map(r=>{
+        const van = vans.find(v=>v.id===r.vanId);
+        const driver = approvedDrivers.find(d=>d.id===r.driverId);
+        return (
+          <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+            <div><strong>{van?.name}</strong> {r.createdByAdmin && <span className="badge admin">admin-scheduled</span>}</div>
+            <div className="muted">{driver ? driver.name : (r.purpose||'No driver linked')}</div>
+            <div className="muted">{r.date} {r.time} → {r.endDate} {r.endTime}</div>
+            <button className="secondary" style={{marginTop:8}} onClick={()=>onCancel(r.id)}>Cancel Reservation</button>
+          </div>
+        );
+      })}
+
+      <h3 style={{marginTop:24}}>Add a Reservation / Block Dates</h3>
+      <p className="muted">Use this to book a van on someone's behalf, or to block a van out (e.g. for maintenance) so it won't be auto-assigned during that window.</p>
+      <label>Van</label>
+      <select value={vanId} onChange={e=>setVanId(e.target.value)}>{vans.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select>
+      <label>Driver (optional — leave blank to just block the dates)</label>
+      <select value={driverId} onChange={e=>setDriverId(e.target.value)}>
+        <option value="">No driver / blackout dates</option>
+        {approvedDrivers.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+      </select>
+      <label>Start Date</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} />
+      <label>Start Time</label><input type="time" value={time} onChange={e=>setTime(e.target.value)} />
+      <label>End Date</label><input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} />
+      <label>End Time</label><input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} />
+      <label>Purpose / Notes (optional)</label><input value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="e.g. Oil change appointment" />
+      {error && <div className="banner-danger">{error}</div>}
+      <button className="primary" onClick={submit}>Add to Schedule</button>
+    </div>
+  );
+}
+
+function RepairsAdmin({vans,repairLog,onAdd}){
+  const [vanId,setVanId] = useState(vans[0]?.id||'');
+  const [date,setDate] = useState('');
+  const [serviceType,setServiceType] = useState('');
+  const [customType,setCustomType] = useState('');
+  const [notes,setNotes] = useState('');
+  const [performedBy,setPerformedBy] = useState('');
+  const commonTypes = ['Oil Change','Tire Rotation','Check Engine Light Diagnosis','Brake Service','Battery Replacement','Inspection','Other'];
+
+  async function submit(){
+    const type = serviceType==='Other' ? customType : serviceType;
+    await onAdd(vanId,date,type,notes,performedBy);
+    setDate('');setServiceType('');setCustomType('');setNotes('');setPerformedBy('');
   }
-  document.querySelectorAll('[data-totab]').forEach(t => {
-    t.addEventListener('click', () => {
-      document.querySelectorAll('[data-totab]').forEach(x => x.classList.remove('active'));
-      t.classList.add('active');
-      timeOffFilter = t.dataset.totab;
-      renderTimeOffRequests();
-    });
-  });
+  const canSubmit = vanId && date && (serviceType && (serviceType!=='Other' || customType));
+  const sorted = repairLog.slice().sort((a,b)=>b.createdAt-a.createdAt);
 
-  function renderTimeOffRequests() {
-    const c = document.getElementById('timeOffList');
-    const filtered = allTimeOffRequests.filter(r => (r.status||'pending') === timeOffFilter);
-    if (!filtered.length) { c.innerHTML = '<div class="empty-state">Nothing here right now.</div>'; return; }
+  return (
+    <div className="card">
+      <h3>Repair History</h3>
+      {sorted.length===0 && <p className="muted">No repair records yet.</p>}
+      {sorted.map(r=>{
+        const van = vans.find(v=>v.id===r.vanId);
+        return (
+          <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
+            <div><strong>{van?.name}</strong> — {r.date}</div>
+            <div className="muted">{r.serviceType}{r.performedBy ? ` · by ${r.performedBy}` : ''}</div>
+            {r.notes && <div className="muted">{r.notes}</div>}
+          </div>
+        );
+      })}
+      <h3 style={{marginTop:20}}>Log a Repair</h3>
+      <label>Van</label>
+      <select value={vanId} onChange={e=>setVanId(e.target.value)}>{vans.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select>
+      <label>Date</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} />
+      <label>What was done?</label>
+      <select value={serviceType} onChange={e=>setServiceType(e.target.value)}>
+        <option value="">Select...</option>
+        {commonTypes.map(t=><option key={t} value={t}>{t}</option>)}
+      </select>
+      {serviceType==='Other' && (<><label>Describe the service</label><input value={customType} onChange={e=>setCustomType(e.target.value)} /></>)}
+      <label>Notes (optional)</label><textarea value={notes} onChange={e=>setNotes(e.target.value)} />
+      <label>Performed By (optional)</label><input value={performedBy} onChange={e=>setPerformedBy(e.target.value)} placeholder="Shop name or staff member" />
+      <button className="primary" disabled={!canSubmit} onClick={submit}>Add Repair Record</button>
+    </div>
+  );
+}
 
-    c.innerHTML = filtered.map(r => `
-      <div class="card">
-        <div class="card-title">${escHtml(r.name||'')}</div>
-        <div class="card-meta"><span class="tag tag-hospital">${escHtml(r.requestType||'')}</span><span>${escHtml(r.startDate||'')} → ${escHtml(r.endDate||'')}</span></div>
-        <div class="card-text">Amount off: ${escHtml(r.amountOff||'')}</div>
-        <div class="card-text">Coverage: ${escHtml(r.coverage||'')}</div>
-        ${r.officeReturnDate ? `<div class="card-meta"><span>Office return: ${escHtml(r.officeReturnDate)}</span></div>` : ''}
-        <div class="card-meta"><span>${escHtml(r.email||'')}</span></div>
-        <div class="actions" style="margin-top:10px;">
-          ${timeOffFilter==='pending' ? `
-            <button class="btn btn-approve" onclick="setTimeOffStatus('${r.id}','approved')">Approve</button>
-            <button class="btn btn-hide" onclick="setTimeOffStatus('${r.id}','denied')">Deny</button>
-          ` : `<button class="btn btn-unhide" onclick="setTimeOffStatus('${r.id}','pending')">Move back to Pending</button>`}
+function WarningLightsAdmin({vans,warningLights,onAdd}){
+  const [name,setName] = useState('');
+  const [safety,setSafety] = useState(false);
+  const [feedback,setFeedback] = useState('');
+  const [vanId,setVanId] = useState('');
+  return (
+    <div className="card">
+      <h3>Known Warning Lights</h3>
+      {warningLights.map(l=>(
+        <div key={l.id} className="list-item">
+          <div><div>{l.name}</div>{l.van && <div className="muted">Van-specific</div>}</div>
+          <span className={`badge ${l.safety?'maintenance':'available'}`}>{l.safety?'safety':'non-safety'}</span>
         </div>
-      </div>`).join('');
+      ))}
+      <h3 style={{marginTop:20}}>Add New Light</h3>
+      <label>Light Name</label><input value={name} onChange={e=>setName(e.target.value)} />
+      <label>Is this a safety issue?</label>
+      <YesNo value={safety} onChange={setSafety} />
+      {!safety && (<><label>Feedback to show drivers</label><textarea value={feedback} onChange={e=>setFeedback(e.target.value)} /></>)}
+      <label>Specific to one van? (optional)</label>
+      <select value={vanId} onChange={e=>setVanId(e.target.value)}>
+        <option value="">All vans</option>
+        {vans.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+      </select>
+      <button className="primary" disabled={!name} onClick={()=>{onAdd(name,safety,feedback,vanId); setName('');setFeedback('');setVanId('');setSafety(false);}}>Add Light</button>
+    </div>
+  );
+}
+
+// ---------- Root App ----------
+function LoginScreen(){
+  function signIn(){
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err=>alert('Sign-in failed: '+err.message));
   }
+  return (
+    <div className="content">
+      <div className="login-mark">🚐</div>
+      <div className="login-title">RCC Van Admin</div>
+      <p className="login-sub">Sign in to manage the fleet and driver approvals.</p>
+      <button id="googleSignInBtn" onClick={signIn}>
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Sign in with Google
+      </button>
+    </div>
+  );
+}
 
-  window.setTimeOffStatus = async (id, status) => {
-    const req = allTimeOffRequests.find(r=>r.id===id);
-    await db.collection('timeOffRequests').doc(id).update({
-      status, approvedBy: status==='approved' ? currentUser.uid : null,
-      statusChangedAt: new Date().toISOString(),
-    });
-    // Notify the requester via the same Apps Script webhook — this is
-    // a separate call from the initial submission sync, fired the
-    // moment an admin approves/denies from inside the app.
-    if (req && TIME_OFF_WEBHOOK_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
-      fetch(TIME_OFF_WEBHOOK_URL, {
-        method: 'POST', mode: 'no-cors', headers: {'Content-Type':'text/plain'},
-        body: JSON.stringify({
-          action: 'statusChanged', requestId: id, status,
-          requesterEmail: req.email, requesterName: req.name,
-          startDate: req.startDate, endDate: req.endDate,
-        })
-      }).catch(() => {});
-    }
-    showBanner('Request updated.');
-  };
-  // 🔧 Same Apps Script Web App URL as time-off.html's SHEET_SYNC_URL
-  // — paste it here too once deployed, so approve/deny actions taken
-  // in the admin screen can trigger the requester notification email.
-  const TIME_OFF_WEBHOOK_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
+// Loads admin-only collections (maintenance, repairs, alerts, all
+// users) only once the admin dashboard is actually opened, instead of
+// on every sign-in. Shows a brief loading state the first time, then
+// stays subscribed for the rest of the session so switching tabs is
+// instant afterward.
+function AdminDataLoader({vans,rentals,warningLights}){
+  const [maintenanceNotes,setMaintenanceNotes] = useState([]);
+  const [repairLog,setRepairLog] = useState([]);
+  const [alerts,setAlerts] = useState([]);
+  const [allUsers,setAllUsers] = useState([]);
+  const [recurringRequests,setRecurringRequests] = useState([]);
+  const [ready,setReady] = useState(false);
 
-  // ── Notification Email Settings ──
-  // Stored in a single small doc so the Apps Script webhook can read
-  // it fresh on every submission, without needing code changes here
-  // whenever the emails change.
-  function loadNotificationEmails() {
-    db.collection('settings').doc('timeOffNotifications').get().then(doc => {
-      if (doc.exists) {
-        const data = doc.data();
-        document.getElementById('notifyEmail1').value = data.email1 || '';
-        document.getElementById('notifyEmail2').value = data.email2 || '';
+  useEffect(()=>{
+    const unsubs = [];
+    unsubs.push(db.collection('vanMaintenanceNotes').onSnapshot(s=>setMaintenanceNotes(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vanRepairLog').onSnapshot(s=>setRepairLog(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vanAlerts').onSnapshot(s=>setAlerts(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vanRecurringRequests').onSnapshot(s=>setRecurringRequests(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('users').onSnapshot(s=>{setAllUsers(s.docs.map(d=>({id:d.id,...d.data()}))); setReady(true);}));
+    return ()=>unsubs.forEach(u=>u());
+  },[]);
+
+  if(!ready){
+    return <div className="content"><div className="loading">Loading admin data...</div></div>;
+  }
+  return <AdminDashboard allUsers={allUsers} vans={vans} rentals={rentals} warningLights={warningLights} maintenanceNotes={maintenanceNotes} repairLog={repairLog} alerts={alerts} recurringRequests={recurringRequests} />;
+}
+
+function App(){
+  const [user,setUser] = useState(undefined); // undefined = checking, null = signed out
+  const [canAccessAdmin,setCanAccessAdmin] = useState(false);
+  const [checkedAccess,setCheckedAccess] = useState(false);
+  const [vans,setVans] = useState([]);
+  const [rentals,setRentals] = useState([]);
+  const [warningLights,setWarningLights] = useState([]);
+  const [loadingData,setLoadingData] = useState(true);
+
+  useEffect(()=>{
+    auth.onAuthStateChanged(async u=>{
+      setUser(u);
+      if(u){
+        await ensureVansSeeded();
+        await ensureWarningLightsSeeded();
+        const doc = await db.collection('users').doc(u.uid).get();
+        const data = doc.exists ? doc.data() : {};
+        setCanAccessAdmin(data.isAdmin===true || (data.roles && data.roles.vanAdmin===true));
+      } else {
+        setCanAccessAdmin(false);
       }
+      setCheckedAccess(true);
     });
+  },[]);
+
+  useEffect(()=>{
+    if(!user || !canAccessAdmin) return;
+    const unsubs = [];
+    unsubs.push(db.collection('vans').onSnapshot(s=>setVans(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vanRentals').onSnapshot(s=>setRentals(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vanWarningLights').onSnapshot(s=>setWarningLights(s.docs.map(d=>({id:d.id,...d.data()})))));
+    setLoadingData(false);
+    return ()=>unsubs.forEach(u=>u());
+  },[user,canAccessAdmin]);
+
+  if(user===undefined || !checkedAccess){
+    return <div className="app"><div className="loading">Loading...</div></div>;
   }
-  window.saveNotificationEmails = async () => {
-    const email1 = document.getElementById('notifyEmail1').value.trim();
-    const email2 = document.getElementById('notifyEmail2').value.trim();
-    await db.collection('settings').doc('timeOffNotifications').set({ email1, email2 }, { merge: true });
-    showBanner('Notification emails saved.');
-  };
+  if(!user){
+    return (
+      <div className="app">
+        <TopBar title="RCC Van Admin" hubLink />
+        <LoginScreen />
+      </div>
+    );
+  }
+  if(!canAccessAdmin){
+    return (
+      <div className="app">
+        <TopBar title="Van Admin" hubLink right={<button className="plain" onClick={()=>auth.signOut()}>Sign out</button>} />
+        <div className="content">
+          <div className="card center">
+            <h2>Access Restricted</h2>
+            <p className="muted">This page is limited to Van Usage admins. Ask an owner or admin if you believe this is a mistake.</p>
+            <a className="link-btn" href="index.html">← Back to Van Usage</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if(loadingData){
+    return <div className="app"><div className="loading">Loading admin data...</div></div>;
+  }
 
-  window.cycleGraphicStatus = async (id, current) => {
-    const order = ['', 'In Progress', 'Completed'];
-    const next = order[(order.indexOf(current)+1) % order.length];
-    await db.collection('eventRequests').doc(id).update({graphicStatus: next});
-  };
-  window.cycleMarketingStatus = async (id, current) => {
-    const order = ['', 'In Progress', 'Completed'];
-    const next = order[(order.indexOf(current)+1) % order.length];
-    await db.collection('eventRequests').doc(id).update({marketingStatus: next});
-  };
+  return (
+    <div className="app">
+      <TopBar
+        title="Van Admin"
+        hubLink
+        right={<>
+          <a className="plain" href="index.html" style={{textDecoration:'none', display:'inline-block', textAlign:'center'}}>Driver view</a>
+          <button className="plain" onClick={()=>auth.signOut()}>Sign out</button>
+        </>}
+      />
+      <AdminDataLoader vans={vans} rentals={rentals} warningLights={warningLights} />
+    </div>
+  );
+}
 
-  function escHtml(str) { return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
