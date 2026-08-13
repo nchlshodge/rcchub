@@ -694,6 +694,47 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
     }
   }
 
+  // Lets an admin pick a driver + a specific van directly and check
+  // it out right away, without a pre-existing reservation. Creates
+  // the vanRentals record and completes checkout in one motion.
+  // Still checks for conflicts against the van's other active
+  // rentals for today, so this can't silently double-book a van
+  // that's already out or reserved for right now.
+  async function assignVanDirectly(driverId, vanId, {mileage, gas, purpose}){
+    const van = vans.find(v=>v.id===vanId);
+    if(!van) return {error: 'Van not found.'};
+    if(van.status==='maintenance') return {error: 'That van is currently in maintenance.'};
+
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toTimeString().slice(0,5);
+    const nowTime = now.getTime();
+
+    const conflict = rentals.some(r=>{
+      if(r.vanId!==vanId || r.status==='completed' || r.status==='cancelled') return false;
+      if(!r.checkout) return false; // not out yet, no conflict with a fresh checkout
+      if(r.return) return false; // already back
+      return true; // van is currently checked out to someone else
+    });
+    if(conflict) return {error: 'That van is currently checked out to someone else.'};
+
+    const rentalRef = db.collection('vanRentals').doc();
+    await rentalRef.set({
+      driverId, vanId, date: dateStr, time: timeStr, endDate: dateStr, endTime: timeStr,
+      purpose: purpose || '', status: 'assigned', createdAt: Date.now(), createdByAdmin: true,
+      checkout: {
+        mileage, gas, dashPhoto: null, warningLightsOn: [],
+        otherLightReported: false, otherLightDesc: '',
+        clean: null, cleanPhoto: null, at: Date.now(),
+        completedByAdmin: true, completedByAdminUid: currentUserUid(),
+      },
+    });
+    await db.collection('vans').doc(vanId).update({
+      mileage: Number(mileage)||van.mileage, gas: Number(gas)||van.gas, status:'inuse',
+    });
+    return {success: true};
+  }
+
   return (
     <div className="content">
       <div className="nav-tabs">
@@ -758,7 +799,7 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
         </div>
       )}
 
-      {tab==='checkinout' && <ManualCheckInOut vans={vans} rentals={rentals} approvedDrivers={approved} onCheckout={manualCheckout} onCheckin={manualCheckin} />}
+      {tab==='checkinout' && <ManualCheckInOut vans={vans} rentals={rentals} approvedDrivers={approved} onCheckout={manualCheckout} onCheckin={manualCheckin} onAssignDirectly={assignVanDirectly} />}
 
       {tab==='schedule' && <ScheduleAdmin vans={vans} approvedDrivers={approved} rentals={rentals} onAdd={addManualReservation} onCancel={cancelReservation} />}
       {tab==='history' && <RentalHistoryAdmin vans={vans} rentals={rentals} allUsers={allUsers} />}
@@ -920,9 +961,10 @@ function RecurringAdmin({recurringRequests,allUsers,onApprove,onDeny,onEnd,onApp
   );
 }
 
-function ManualCheckInOut({vans,rentals,approvedDrivers,onCheckout,onCheckin}){
+function ManualCheckInOut({vans,rentals,approvedDrivers,onCheckout,onCheckin,onAssignDirectly}){
   const pendingCheckouts = rentals.filter(r=>r.status==='assigned' && !r.checkout);
   const outstandingReturns = rentals.filter(r=>r.checkout && !r.return);
+  const availableVans = vans.filter(v=>v.status!=='maintenance');
 
   function nameFor(uid_){
     const u = approvedDrivers.find(u=>u.id===uid_);
@@ -931,7 +973,11 @@ function ManualCheckInOut({vans,rentals,approvedDrivers,onCheckout,onCheckin}){
 
   return (
     <div className="card">
-      <h3>Check Out a Van</h3>
+      <h3>Assign a Specific Van</h3>
+      <p className="muted">Pick a driver and a specific van to check out directly — no reservation needed first.</p>
+      <DirectAssignForm vans={availableVans} approvedDrivers={approvedDrivers} onAssign={onAssignDirectly} />
+
+      <h3 style={{marginTop:24}}>Check Out a Van</h3>
       <p className="muted">Complete a checkout on a driver's behalf — useful when you're handing off keys in person.</p>
       {pendingCheckouts.length===0 && <p className="muted">No vans waiting to be checked out.</p>}
       {pendingCheckouts.map(r=>{
@@ -946,6 +992,50 @@ function ManualCheckInOut({vans,rentals,approvedDrivers,onCheckout,onCheckin}){
         const van = vans.find(v=>v.id===r.vanId);
         return <ManualCheckinRow key={r.id} rental={r} van={van} driverName={nameFor(r.driverId)} onSubmit={onCheckin} />;
       })}
+    </div>
+  );
+}
+
+function DirectAssignForm({vans,approvedDrivers,onAssign}){
+  const [driverId,setDriverId] = useState('');
+  const [vanId,setVanId] = useState('');
+  const [mileage,setMileage] = useState('');
+  const [gas,setGas] = useState('');
+  const [purpose,setPurpose] = useState('');
+  const [saving,setSaving] = useState(false);
+  const [error,setError] = useState('');
+
+  const selectedVan = vans.find(v=>v.id===vanId);
+  const canSubmit = driverId && vanId && mileage && gas && !saving;
+
+  async function submit(){
+    setError(''); setSaving(true);
+    const result = await onAssign(driverId, vanId, {mileage, gas, purpose});
+    setSaving(false);
+    if(result?.error){ setError(result.error); return; }
+    setDriverId(''); setVanId(''); setMileage(''); setGas(''); setPurpose('');
+  }
+
+  return (
+    <div style={{border:'1px solid var(--border)', borderRadius:10, padding:14, marginTop:10}}>
+      <label>Driver</label>
+      <select value={driverId} onChange={e=>setDriverId(e.target.value)}>
+        <option value="">Select a driver...</option>
+        {approvedDrivers.map(d=><option key={d.id} value={d.id}>{d.name||d.email}</option>)}
+      </select>
+      <label>Van</label>
+      <select value={vanId} onChange={e=>setVanId(e.target.value)}>
+        <option value="">Select a van...</option>
+        {vans.map(v=><option key={v.id} value={v.id}>{v.name} ({v.status})</option>)}
+      </select>
+      <label>Mileage</label>
+      <input type="number" value={mileage} onChange={e=>setMileage(e.target.value)} placeholder={selectedVan ? `Last known: ${selectedVan.mileage}` : 'Mileage'} />
+      <label>Gas %</label>
+      <input type="number" min="0" max="100" value={gas} onChange={e=>setGas(e.target.value)} />
+      <label>Purpose (optional)</label>
+      <input type="text" value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="e.g. Youth group errand" />
+      {error && <div className="banner-danger">{error}</div>}
+      <button className="primary" disabled={!canSubmit} onClick={submit}>{saving?'Assigning...':'Assign & Check Out'}</button>
     </div>
   );
 }
