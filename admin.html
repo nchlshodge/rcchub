@@ -600,7 +600,7 @@
         <div class="card">
           <div class="card-title">${escHtml(u.name||'Unnamed')}</div>
           <div class="card-text">${escHtml(u.phone||'')} · License expires: ${escHtml(vr.licenseExp||'(not set)')}
-            <button class="btn btn-unhide" style="padding:2px 8px;font-size:12px;" onclick="vanEditExp('${u.id}','${escHtml(vr.licenseExp||'')}')">Edit</button>
+            <button class="btn btn-unhide" style="padding:2px 8px;font-size:12px;" onclick="vanEditExp('${u.id}','${escJsAttr(vr.licenseExp||'')}')">Edit</button>
           </div>
           <div class="card-meta"><span>License check: <strong style="color:${vr.licenseVerifiedInPerson ? 'var(--green)' : 'var(--red)'}">${vr.licenseVerifiedInPerson ? 'Verified in person ✓' : 'Not yet verified in person'}</strong></span></div>
           <div class="card-meta"><span>Insurance cancelled: ${vr.insuranceCancelled ? 'YES' : 'No'} · License revoked/suspended: ${vr.licenseRevokedSuspended ? 'YES' : 'No'}</span></div>
@@ -925,8 +925,8 @@
           ${eventFilter==='approved' ? `
             <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:8px;">
               <button class="btn ${r.calendarAdded?'btn-approve':'btn-unhide'}" onclick="toggleEventField('${r.id}','calendarAdded',${!r.calendarAdded})">Calendar Added: ${r.calendarAdded?'Yes':'No'}</button>
-              ${isMedia ? `<button class="btn ${r.graphicStatus==='Completed'?'btn-approve':'btn-unhide'}" onclick="cycleGraphicStatus('${r.id}','${r.graphicStatus||''}')">Graphic Status: ${escHtml(r.graphicStatus||'Not started')}</button>` : ''}
-              ${isMedia ? `<button class="btn ${r.marketingStatus==='Completed'?'btn-approve':'btn-unhide'}" onclick="cycleMarketingStatus('${r.id}','${r.marketingStatus||''}')">Marketing Status: ${escHtml(r.marketingStatus||'Not started')}</button>` : ''}
+              ${isMedia ? `<button class="btn ${r.graphicStatus==='Completed'?'btn-approve':'btn-unhide'}" onclick="cycleGraphicStatus('${r.id}','${escJsAttr(r.graphicStatus||'')}')">Graphic Status: ${escHtml(r.graphicStatus||'Not started')}</button>` : ''}
+              ${isMedia ? `<button class="btn ${r.marketingStatus==='Completed'?'btn-approve':'btn-unhide'}" onclick="cycleMarketingStatus('${r.id}','${escJsAttr(r.marketingStatus||'')}')">Marketing Status: ${escHtml(r.marketingStatus||'Not started')}</button>` : ''}
               ${(r.vansNeeded||[]).length && !r.vansNeeded.includes('None') ? `<button class="btn ${r.vanConfirmed?'btn-approve':'btn-unhide'}" onclick="toggleEventField('${r.id}','vanConfirmed',${!r.vanConfirmed})">Van Confirmed: ${r.vanConfirmed?'Yes':'No'}</button>` : ''}
             </div>
           ` : ''}
@@ -1004,6 +1004,7 @@
           action: 'statusChanged', requestId: id, status,
           requesterEmail: req.email, requesterName: req.name,
           startDate: req.startDate, endDate: req.endDate,
+          token: TIME_OFF_WEBHOOK_TOKEN,
         })
       }).catch(() => {});
     }
@@ -1013,6 +1014,9 @@
   // — paste it here too once deployed, so approve/deny actions taken
   // in the admin screen can trigger the requester notification email.
   const TIME_OFF_WEBHOOK_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
+  // Must match WEBHOOK_TOKEN in timeoffscript.gs (same value as
+  // time-off.html's SHEET_SYNC_TOKEN).
+  const TIME_OFF_WEBHOOK_TOKEN = "PASTE_A_LONG_RANDOM_STRING_HERE";
 
   // ── Notification Email Settings ──
   // Stored in a single small doc so the Apps Script webhook can read
@@ -1046,6 +1050,13 @@
   };
 
   function escHtml(str) { return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  // For values placed inside onclick="fn('...')" — HTML-entity-escaping
+  // alone does NOT stop a ' from breaking out of that inner JS string
+  // (the browser decodes entities before handing the attribute text to
+  // the JS parser), so quotes/backslashes need real JS escaping too.
+  function escJsAttr(str) {
+    return escHtml(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  }
 </script>
 </body>
 </html>

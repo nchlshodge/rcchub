@@ -173,6 +173,8 @@
   // is what sends the new-submission notification email and syncs
   // each request into your Google Sheet.
   var SHEET_SYNC_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
+  // Must match WEBHOOK_TOKEN in timeoffscript.gs.
+  var SHEET_SYNC_TOKEN = "PASTE_A_LONG_RANDOM_STRING_HERE";
 
   document.getElementById('googleSignInBtn').addEventListener('click', function(){
     var provider = new firebase.auth.GoogleAuthProvider();
@@ -255,6 +257,7 @@
               submittedAt: new Date().toISOString(),
               notifyEmail1: settings.email1 || '',
               notifyEmail2: settings.email2 || '',
+              token: SHEET_SYNC_TOKEN,
             }))
           }).catch(function(){ /* best-effort, don't block the user on it */ });
         }

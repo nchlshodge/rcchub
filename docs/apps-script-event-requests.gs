@@ -1,4 +1,17 @@
 /**
+ * ⚠ SUPERSEDED — DO NOT DEPLOY THIS FILE.
+ * Use apps-script-merged.gs instead. This older version writes only 30
+ * of the sheet's real 32 columns (missing the "I understand" agreement
+ * column), so if it's ever pasted into the Apps Script editor and
+ * redeployed, every request's data will silently land one column off.
+ * It also predates the notifyOnNewRequest() staff-email logic and the
+ * WEBHOOK_TOKEN auth check added to the merged version. Kept here only
+ * for reference — confirm which script is actually deployed at your
+ * Apps Script project's URL, and if it's this one, replace it with
+ * apps-script-merged.gs.
+ */
+
+/**
  * Apps Script Web App — Event Request Sheet Sync
  * ================================================
  *

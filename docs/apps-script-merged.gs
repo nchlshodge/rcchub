@@ -38,6 +38,23 @@ var JOSHUA = "joshua@rochesterchristian.church";
 
 var SHEET_NAME = "Form Responses 1"; // change if your tab is named differently
 
+// The web app is deployed "Anyone" access and its URL is visible in the
+// Event Request page's own source, so this shared secret is what
+// actually stops a stranger from spamming staff emails / filling the
+// sheet with junk rows. Set this to a long random string and put the
+// same value in event-request-index.html's WEBHOOK_TOKEN constant.
+var WEBHOOK_TOKEN = "PASTE_A_LONG_RANDOM_STRING_HERE";
+
+// Google Sheets treats a cell value starting with = + - @ as a formula.
+// This endpoint accepts unauthenticated-shaped input (protected only by
+// the token above), so every value that lands in a cell must be
+// escaped or a submission could run an arbitrary IMPORTXML/HYPERLINK
+// formula the moment staff open the sheet.
+function sanitizeForSheet(value) {
+  var str = (value === null || value === undefined) ? '' : String(value);
+  return /^[=+\-@]/.test(str) ? "'" + str : str;
+}
+
 // ============================================================
 // SHARED NOTIFICATION LOGIC
 // Both the Google Form path and the new app's webhook path call this
@@ -107,6 +124,12 @@ function onFormSubmit(e) {
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
+
+    if (WEBHOOK_TOKEN === "PASTE_A_LONG_RANDOM_STRING_HERE" || data.token !== WEBHOOK_TOKEN) {
+      return ContentService.createTextOutput(JSON.stringify({success:false, error: 'Unauthorized'}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = SHEET_NAME ? ss.getSheetByName(SHEET_NAME) : ss.getSheets()[0];
 
@@ -123,25 +146,25 @@ function doPost(e) {
     // column if it's skipped).
     var row = [
       data.submittedAt || new Date().toISOString(),   // 1. Timestamp
-      data.email || '',                                // 2. Email Address
-      requestTypeLabel_,                                // 3. Request Type
-      data.requesterName || '',                         // 4. Requester Name
-      (data.department || []).join(', '),               // 5. Ministry Department
-      data.eventTitle || '',                             // 6. Event Title
-      data.eventDate || '',                              // 7. Event Date Requested
-      data.eventDesc || '',                              // 8. Event Details/Description
-      data.projectTitle || '',                           // 9. Project/Graphic Title
-      mediaSizesLabel,                                    // 10. Multimedia Size(s) Needed
-      data.mediaDesc || '',                              // 11. Details/Description of what's needed
-      vanLabel || 'None',                                 // 12. Church Van Needed?
+      sanitizeForSheet(data.email),                     // 2. Email Address
+      sanitizeForSheet(requestTypeLabel_),              // 3. Request Type
+      sanitizeForSheet(data.requesterName),             // 4. Requester Name
+      sanitizeForSheet((data.department || []).join(', ')), // 5. Ministry Department
+      sanitizeForSheet(data.eventTitle),                // 6. Event Title
+      sanitizeForSheet(data.eventDate),                 // 7. Event Date Requested
+      sanitizeForSheet(data.eventDesc),                 // 8. Event Details/Description
+      sanitizeForSheet(data.projectTitle),              // 9. Project/Graphic Title
+      sanitizeForSheet(mediaSizesLabel),                // 10. Multimedia Size(s) Needed
+      sanitizeForSheet(data.mediaDesc),                 // 11. Details/Description of what's needed
+      sanitizeForSheet(vanLabel || 'None'),             // 12. Church Van Needed?
       data.ticketsNeeded === 'yes' ? 'Yes' : (data.ticketsNeeded === 'no' ? 'No' : ''), // 13. Ticket Sales Needed?
-      data.ticketPrice || '',                            // 14. Ticket Price
-      marketingLabel,                                     // 15. Marketing Requests
+      sanitizeForSheet(data.ticketPrice),               // 14. Ticket Price
+      sanitizeForSheet(marketingLabel),                 // 15. Marketing Requests
       'I understand',                                     // 16. Agreement column — form already required this checkbox before submit
-      data.location || '',                               // 17. Event Location
-      joinWithOther(data.onsiteRoom, data.onsiteRoomOther), // 18. If OnSite what Room
-      data.startTime || '',                              // 19. Event Start Time
-      data.endTime || '',                                // 20. Event End Time
+      sanitizeForSheet(data.location),                  // 17. Event Location
+      sanitizeForSheet(joinWithOther(data.onsiteRoom, data.onsiteRoomOther)), // 18. If OnSite what Room
+      sanitizeForSheet(data.startTime),                 // 19. Event Start Time
+      sanitizeForSheet(data.endTime),                   // 20. Event End Time
       'Pending Approval',                                 // 21. Overall Status — matches the Form path's starting status
       '',                                                  // 22. Approved By (Date)
       '',                                                  // 23. Calendar Added? (matches real data: blank until set, not defaulted to "No")

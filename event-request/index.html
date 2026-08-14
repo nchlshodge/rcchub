@@ -259,6 +259,10 @@
   // apps-script-event-requests.gs / SETUP notes) — this is what pushes
   // each new request into your Google Sheet automatically.
   var SHEET_SYNC_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
+  // Must match WEBHOOK_TOKEN in apps-script-merged.gs — the web app is
+  // deployed "Anyone" access, so this is what stops a stranger from
+  // spamming staff emails / junk rows by POSTing to the URL directly.
+  var SHEET_SYNC_TOKEN = "PASTE_A_LONG_RANDOM_STRING_HERE";
 
   auth.onAuthStateChanged(function(user){
     if(user && user.email){
@@ -384,7 +388,7 @@
           method: 'POST',
           mode: 'no-cors',
           headers: {'Content-Type':'text/plain'},
-          body: JSON.stringify(Object.assign({}, request, {id: docRef.id, submittedAt: new Date().toISOString()}))
+          body: JSON.stringify(Object.assign({}, request, {id: docRef.id, submittedAt: new Date().toISOString(), token: SHEET_SYNC_TOKEN}))
         }).catch(function(){ /* sheet sync is best-effort, don't block the user on it */ });
       }
       document.getElementById('ev-form').style.display = 'none';

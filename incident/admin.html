@@ -186,7 +186,7 @@
       return `
         <div class="card">
           <div class="card-title">${escHtml(r.location||'Unknown location')}</div>
-          <div class="card-meta"><span class="tag ${hasInjury?'tag-pending':''}">${escHtml((r.incidentTypes||[]).join(', ')||'Type not specified')}</span><span>${r.incidentDate||''} ${r.incidentTime||''}</span></div>
+          <div class="card-meta"><span class="tag ${hasInjury?'tag-pending':''}">${escHtml((r.incidentTypes||[]).join(', ')||'Type not specified')}</span><span>${escHtml(r.incidentDate||'')} ${escHtml(r.incidentTime||'')}</span></div>
           <div class="card-text">${escHtml(r.description||'')}</div>
           ${hasInjury ? `<div class="card-text" style="color:#a03030;"><strong>Injury:</strong> ${escHtml(r.injuryDesc||'no detail')} — treatment: ${escHtml(r.treatment||'n/a')}</div>` : ''}
           <div class="card-meta"><span>Reported by ${escHtml(r.reporterName||'unknown')}${r.reporterPhone?' · '+escHtml(r.reporterPhone):''}</span></div>
@@ -199,7 +199,7 @@
           ${window.currentUserCanEmailInsurance && incidentFilter==='reviewed' ? `
             <div class="actions">
               <button class="btn btn-unhide" onclick="sendToInsurance('${r.id}')">${r.insuranceSentAt ? 'Re-send to Insurance' : 'Send to Insurance'}</button>
-              ${r.insuranceSentAt ? `<span class="tag tag-public">Sent ${new Date(r.insuranceSentAt).toLocaleDateString()}</span>` : ''}
+              ${r.insuranceSentAt ? `<span class="tag tag-public" title="The browser can't confirm Apps Script actually delivered the email — this only means the request was sent.">Requested ${new Date(r.insuranceSentAt).toLocaleDateString()}</span>` : ''}
             </div>
           ` : ''}
         </div>`;
@@ -232,6 +232,13 @@
     if (INSURANCE_WEBHOOK_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL') { alert('Insurance email isn\'t set up yet — the Apps Script URL still needs to be added.'); return; }
 
     try {
+      // mode:'no-cors' is required to call an Apps Script web app from
+      // here (its redirect response isn't readable cross-origin any
+      // other way), but it means this always "succeeds" from the
+      // browser's point of view even if the script errored or the
+      // email never went out — there's no way to read a real status
+      // back. insuranceSentAt below means "requested," not "confirmed
+      // delivered" (see the label in the UI).
       await fetch(INSURANCE_WEBHOOK_URL, {
         method: 'POST', mode: 'no-cors', headers: {'Content-Type':'text/plain'},
         body: JSON.stringify({ insuranceEmail, report }),

@@ -477,6 +477,10 @@
   const db   = firebase.firestore();
 
   const ADMIN_TRIGGER_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
+  // Must match CONFIG.WEB_ENDPOINT_TOKEN in apps-script.gs — the web app
+  // is deployed "Anyone" access, so this token is what actually stops a
+  // stranger with the URL from triggering prayer-sheet generation/emails.
+  const ADMIN_TRIGGER_TOKEN = "PASTE_A_LONG_RANDOM_STRING_HERE";
 
   let currentUser = null;
 
@@ -901,7 +905,7 @@
     status.textContent = 'This may take a few seconds...';
 
     try {
-      const res = await fetch(`${ADMIN_TRIGGER_URL}?action=generatePrayerSheet`);
+      const res = await fetch(`${ADMIN_TRIGGER_URL}?action=generatePrayerSheet&token=${encodeURIComponent(ADMIN_TRIGGER_TOKEN)}`);
       const data = await res.json();
 
       if (data.success) {

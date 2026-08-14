@@ -37,9 +37,30 @@
 
 var SHEET_NAME = "Form Responses 1"; // change to match your actual tab name
 
+// The web app is deployed "Anyone" access and its URL is visible in
+// both time-off.html and admin.html's source, so this shared secret is
+// what actually stops a stranger from POSTing directly to this URL —
+// e.g. to send a fake "your time off was approved/denied" email to any
+// address, or spam junk rows into the Sheet. Set this to a long random
+// string and put the same value in both HTML files' matching constant.
+var WEBHOOK_TOKEN = "PASTE_A_LONG_RANDOM_STRING_HERE";
+
+// Google Sheets treats a cell value starting with = + - @ as a formula;
+// escape it so a submission can't run an arbitrary formula when the
+// Sheet is opened.
+function sanitizeForSheet(value) {
+  var str = (value === null || value === undefined) ? '' : String(value);
+  return /^[=+\-@]/.test(str) ? "'" + str : str;
+}
+
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
+
+    if (WEBHOOK_TOKEN === "PASTE_A_LONG_RANDOM_STRING_HERE" || data.token !== WEBHOOK_TOKEN) {
+      return ContentService.createTextOutput(JSON.stringify({success:false, error: 'Unauthorized'}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
 
     if (data.action === 'statusChanged') {
       return handleStatusChange(data);
@@ -51,21 +72,31 @@ function doPost(e) {
   }
 }
 
+// NOTE on trust boundary: the token check above stops outside strangers
+// from calling this endpoint, but data.notifyEmail1/2 (below) and
+// data.requesterEmail/requesterName (in handleStatusChange) are still
+// taken from the POST body as sent by the browser. Someone who already
+// has legitimate access to the app (and so can read the token out of
+// the page source) could still edit these in devtools before the
+// request goes out, e.g. to redirect a notification email elsewhere.
+// Closing that fully would mean this script reading the Firestore
+// settings doc itself (via a service account, like Bedside's
+// apps-script.gs does) instead of trusting values the client sends.
 function handleNewSubmission(data) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
 
   var row = [
     data.submittedAt || new Date().toISOString(), // Timestamp
-    data.name || '',                               // Name
-    data.startDate || '',                          // Beginning On
-    data.endDate || '',                            // Ending On
-    data.officeReturnDate || '',                   // Office Return Date
-    data.amountOff || '',                          // How many days/hours off
-    data.coverage || '',                           // Who's covering
-    data.requestType || '',                        // Type of Request
+    sanitizeForSheet(data.name),                   // Name
+    sanitizeForSheet(data.startDate),              // Beginning On
+    sanitizeForSheet(data.endDate),                // Ending On
+    sanitizeForSheet(data.officeReturnDate),       // Office Return Date
+    sanitizeForSheet(data.amountOff),              // How many days/hours off
+    sanitizeForSheet(data.coverage),               // Who's covering
+    sanitizeForSheet(data.requestType),            // Type of Request
     'Pending',                                      // Status (your own tracking column, if you have one — adjust position if needed)
-    data.email || '',                               // Requester email (for reference)
+    sanitizeForSheet(data.email),                  // Requester email (for reference)
   ];
   sheet.appendRow(row);
 

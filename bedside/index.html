@@ -849,7 +849,7 @@ function renderVisits(visits) {
     let statusLabel, statusClass;
     if (iVisited)       { statusLabel = '✓ You visited today';                              statusClass = 'status-visited'; }
     else if (iClaimed)  { statusLabel = '● You are visiting today';                         statusClass = 'status-claimed'; }
-    else if (claimed)   { statusLabel = `● ${v.claimedBy.map(c=>c.name).join(', ')} visiting`; statusClass = 'status-claimed'; }
+    else if (claimed)   { statusLabel = `● ${escHtml(v.claimedBy.map(c=>c.name).join(', '))} visiting`; statusClass = 'status-claimed'; }
     else                { statusLabel = 'No visitor yet today';                             statusClass = 'status-open';   }
 
     const cardClass = iVisited ? 'visited' : (claimed ? 'claimed' : '');
@@ -860,11 +860,11 @@ function renderVisits(visits) {
     }
     if (iClaimed && !iVisited) {
       actions += `<button class="btn btn-success" onclick="markVisited('${v.id}')">I visited — mark as done</button>`;
-      actions += `<button class="btn btn-outline" onclick="openUpdateModal('${v.id}', '${escHtml(v.patientName)}')">Log an update</button>`;
+      actions += `<button class="btn btn-outline" onclick="openUpdateModal('${v.id}', '${escJsAttr(v.patientName)}')">Log an update</button>`;
       actions += `<button class="btn btn-ghost" onclick="unclaimVisit('${v.id}')">I can't make it today</button>`;
     }
     if (iVisited) {
-      actions += `<button class="btn btn-outline" onclick="openUpdateModal('${v.id}', '${escHtml(v.patientName)}')">Add notes</button>`;
+      actions += `<button class="btn btn-outline" onclick="openUpdateModal('${v.id}', '${escJsAttr(v.patientName)}')">Add notes</button>`;
     }
 
     const updates = (v.updates || [])
@@ -872,7 +872,7 @@ function renderVisits(visits) {
       .slice().reverse().map(u => `
       <div class="update-item">
         ${escHtml(u.text)}
-        <div class="update-meta">${u.byName} · ${formatDate(u.at)}</div>
+        <div class="update-meta">${escHtml(u.byName)} · ${formatDate(u.at)}</div>
       </div>`).join('');
 
     const updatesSection = updates ? `
@@ -1101,6 +1101,14 @@ function showBanner(msg, isError = false) {
 
 function escHtml(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// For values placed inside onclick="fn('...')" — HTML-entity-escaping
+// alone does NOT stop a ' from breaking out of that inner JS string
+// (the browser decodes entities before handing the attribute text to
+// the JS parser), so quotes/backslashes need real JS escaping too.
+function escJsAttr(str) {
+  return escHtml(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 function formatDate(iso) {
