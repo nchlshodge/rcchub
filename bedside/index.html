@@ -13,6 +13,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js"></script>
 
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
@@ -721,6 +722,36 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
+// Public key identifying this app to the browser's push service — not
+// a secret, safe to be visible in client code (same category as the
+// Firebase apiKey above).
+const VAPID_PUBLIC_KEY = "BBmeZ0dXYXp4_3N8q76N7_teXTbVjY7KoVshMf0rWnNe9-j9GylIXMsexSnXmPEsJrilUCP6QJ-saVcwX31OhcU";
+
+// Registers the service worker, asks for notification permission if
+// needed, and saves this device's push token onto the user's own
+// profile so the Cloud Function can push reminders to it. Silently
+// does nothing on browsers that don't support push (e.g. iOS Safari
+// unless the site's been added to the home screen).
+async function enablePushNotifications() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+
+  try {
+    const registration = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return null;
+
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({
+      vapidKey: VAPID_PUBLIC_KEY,
+      serviceWorkerRegistration: registration,
+    });
+    return token || null;
+  } catch (e) {
+    console.error('Push notification setup failed:', e);
+    return null;
+  }
+}
+
 let currentUser    = null;
 let currentVisitId = null;
 let visitsUnsubscribe = null;
@@ -1078,10 +1109,21 @@ document.getElementById('saveProfileBtn').addEventListener('click', async () => 
 
   if (!name || !email) { showBanner('Please enter your name and email.', true); return; }
 
-  await db.collection('users').doc(currentUser.uid).set({
+  const profileUpdate = {
     name, email, phone, carrier, notifyOptIn, uid: currentUser.uid,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
+  };
+
+  // Only prompt for notification permission when the person just opted
+  // in — not on every save, and never for someone who's opted out.
+  if (notifyOptIn) {
+    const token = await enablePushNotifications();
+    if (token) {
+      profileUpdate.pushTokens = firebase.firestore.FieldValue.arrayUnion(token);
+    }
+  }
+
+  await db.collection('users').doc(currentUser.uid).set(profileUpdate, { merge: true });
 
   showBanner('Info saved!');
 });
