@@ -1,5 +1,6 @@
-// Runs in the background (even when Bedside isn't open in a tab) to
-// receive pushes and show them as real phone/desktop notifications.
+// Shared across every app in the hub (registered with hub-wide scope
+// from whichever app the person enabled notifications in) — receives
+// pushes in the background and shows them as real notifications.
 importScripts('https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js');
 
@@ -13,17 +14,22 @@ firebase.initializeApp({
 });
 
 const messaging = firebase.messaging();
+const DEFAULT_ICON = 'assets/rcc-logo-plain.png';
+const DEFAULT_URL = 'https://nchlshodge.github.io/rcchub/';
 
 messaging.onBackgroundMessage((payload) => {
   const { title, body } = payload.notification || {};
-  self.registration.showNotification(title || 'Bedside', {
+  const url = (payload.data && payload.data.url) || DEFAULT_URL;
+  self.registration.showNotification(title || 'RCC App Hub', {
     body: body || '',
-    icon: 'icon-192.png',
-    badge: 'icon-192.png',
+    icon: DEFAULT_ICON,
+    badge: DEFAULT_ICON,
+    data: { url },
   });
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(clients.openWindow('https://nchlshodge.github.io/rcchub/bedside/'));
+  const url = (event.notification.data && event.notification.data.url) || DEFAULT_URL;
+  event.waitUntil(clients.openWindow(url));
 });
