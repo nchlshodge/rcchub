@@ -258,11 +258,11 @@
   // 🔧 Paste your Apps Script Web App URL here once deployed (see
   // apps-script-event-requests.gs / SETUP notes) — this is what pushes
   // each new request into your Google Sheet automatically.
-  var SHEET_SYNC_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
+  var SHEET_SYNC_URL = "https://script.google.com/a/macros/rochesterchristian.church/s/AKfycbzwXpIevD_atUcIZbGd5ywvMRXClT0Ca9HDynFL1X0K1LNPnK2KhwnbJOUXEwsngQk/exec";
   // Must match WEBHOOK_TOKEN in apps-script-merged.gs — the web app is
   // deployed "Anyone" access, so this is what stops a stranger from
   // spamming staff emails / junk rows by POSTing to the URL directly.
-  var SHEET_SYNC_TOKEN = "PASTE_A_LONG_RANDOM_STRING_HERE";
+  var SHEET_SYNC_TOKEN = "9PGTdz8dCn_9DV0brhR67k0-DoodYyyviwimrC-0R3g";
 
   auth.onAuthStateChanged(function(user){
     if(user && user.email){
