@@ -1213,8 +1213,41 @@ function ManualCheckinRow({rental,van,vans,approvedDrivers,driverName,onSubmit,o
   );
 }
 
+function RentalReportSide({title,report}){
+  if(!report) return <div><div style={{fontWeight:600, marginBottom:4}}>{title}</div><p className="muted">Not recorded.</p></div>;
+  return (
+    <div>
+      <div style={{fontWeight:600, marginBottom:4}}>{title}</div>
+      <div className="muted">Mileage: {report.mileage ?? '—'} · Gas: {report.gas ?? '—'}%</div>
+      <div className="muted">Interior clean: {report.clean===true ? 'Yes' : report.clean===false ? 'No' : '—'}</div>
+      {report.warningLightsOn?.length>0 && (
+        <div className="muted" style={{color:'var(--danger)'}}>Warning lights: {report.warningLightsOn.join(', ')}</div>
+      )}
+      {report.otherLightReported && report.otherLightDesc && (
+        <div className="muted" style={{color:'var(--danger)'}}>Other light: {report.otherLightDesc}</div>
+      )}
+      {report.problems && (
+        <div className="muted" style={{color:'var(--danger)'}}>Problem reported: {report.problemDetails||'(no details given)'}</div>
+      )}
+      <div style={{display:'flex', gap:8, marginTop:8, flexWrap:'wrap'}}>
+        {report.dashPhoto && (
+          <a href={report.dashPhoto} target="_blank" rel="noopener">
+            <img src={report.dashPhoto} alt="Dashboard/mileage photo" style={{maxWidth:160, borderRadius:8}} />
+          </a>
+        )}
+        {report.cleanPhoto && (
+          <a href={report.cleanPhoto} target="_blank" rel="noopener">
+            <img src={report.cleanPhoto} alt="Interior photo" style={{maxWidth:160, borderRadius:8}} />
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function RentalHistoryAdmin({vans,rentals,allUsers}){
   const [search,setSearch] = useState('');
+  const [expandedId,setExpandedId] = useState(null);
   const completed = rentals.filter(r=>r.status==='completed').sort((a,b)=>(b.return?.at||0)-(a.return?.at||0));
 
   function nameFor(uid_){
@@ -1263,6 +1296,19 @@ function RentalHistoryAdmin({vans,rentals,allUsers}){
               </div>
             )}
             {r.return?.problems && <div className="muted" style={{color:'var(--danger)'}}>Problems reported at return</div>}
+            <button
+              className="secondary"
+              style={{marginTop:8, width:'auto', padding:'6px 12px', fontSize:13}}
+              onClick={()=>setExpandedId(expandedId===r.id ? null : r.id)}
+            >
+              {expandedId===r.id ? 'Hide Full Report' : 'View Full Report'}
+            </button>
+            {expandedId===r.id && (
+              <div style={{display:'flex', gap:20, marginTop:10, paddingTop:10, borderTop:'1px solid var(--border)', flexWrap:'wrap'}}>
+                <div style={{flex:'1 1 220px'}}><RentalReportSide title="At checkout" report={r.checkout} /></div>
+                <div style={{flex:'1 1 220px'}}><RentalReportSide title="At return" report={r.return} /></div>
+              </div>
+            )}
           </div>
         );
       })}
