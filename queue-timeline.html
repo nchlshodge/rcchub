@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCC — Creative Timeline</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+<style>
+  :root {
+    --bg:         #f7f6f3;
+    --bg-card:    #ffffff;
+    --bg-raised:  #f0ece4;
+    --border:     #e8e4dc;
+    --border-mid: rgba(0,0,0,0.14);
+    --text:       #1a1a1a;
+    --text-mid:   #5c5650;
+    --text-soft:  #9e9890;
+    --blue:       #2557b8;
+    --blue-dim:   rgba(37,87,184,0.08);
+    --blue-glow:  rgba(37,87,184,0.20);
+    --gold:       #b5892a;
+    --gold-dim:   rgba(181,137,42,0.10);
+    --gold-glow:  rgba(181,137,42,0.22);
+    --green:      #2e7a52;
+    --green-dim:  rgba(46,122,82,0.10);
+    --red:        #a03030;
+    --red-dim:    rgba(160,48,48,0.10);
+    --radius:     14px;
+    --radius-sm:  8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  a { color: var(--blue); }
+
+  .nav {
+    background: #fff; border-bottom: 1px solid var(--border); padding: 0 2rem; height: 60px;
+    display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10;
+  }
+  .nav-brand { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--blue); text-decoration: none; }
+  .nav-brand span { font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text-soft); margin-left: 6px; }
+  .nav-links { display: flex; align-items: center; gap: 18px; }
+  .nav-links a { font-size: 13px; color: var(--text-mid); text-decoration: none; }
+  .nav-links a:hover { color: var(--blue); }
+  .nav-user { font-size: 13px; color: var(--text-mid); }
+  .nav-signout { background: none; border: none; font-size: 13px; color: var(--text-soft); cursor: pointer; }
+
+  .page { max-width: 1180px; margin: 0 auto; padding: 2.25rem 1.5rem 4rem; }
+  .page-title { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 600; margin-bottom: 6px; }
+  .page-sub { font-size: 14px; color: var(--text-mid); max-width: 62ch; line-height: 1.5; margin-bottom: 10px; }
+  .meta-line { font-size: 12.5px; color: var(--text-soft); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 1.4rem; }
+  .meta-line b { color: var(--text-mid); font-weight: 600; }
+  .live-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--green-dim); color: var(--green); padding: 3px 10px; border-radius: 999px; font-weight: 600; font-size: 12px; }
+  .live-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 1.8rem; }
+  .controls input[type="search"], .controls select {
+    border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: var(--radius-sm);
+    padding: 8px 11px; font-family: 'Inter', sans-serif; font-size: 13.5px;
+  }
+  .controls input[type="search"] { flex: 1 1 180px; min-width: 160px; }
+  .controls label.toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-mid); white-space: nowrap; }
+  .count-pill { font-size: 12.5px; color: var(--text-soft); margin-left: auto; white-space: nowrap; }
+  .count-pill b { color: var(--text); }
+
+  .section-heading { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .section-heading h2 { font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 600; }
+  .section-heading .hint { font-size: 12px; color: var(--text-soft); }
+
+  .gantt-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); margin-bottom: 2.4rem; }
+  .gantt { min-width: 820px; padding: 14px 16px 18px; }
+  .gantt-axis { display: grid; grid-template-columns: 220px 1fr; font-size: 11px; color: var(--text-soft); margin-bottom: 8px; position: relative; }
+  .gantt-axis .months { position: relative; height: 18px; }
+  .gantt-axis .months span { position: absolute; transform: translateX(-2px); text-transform: uppercase; letter-spacing: 0.04em; }
+  .gantt-row { display: grid; grid-template-columns: 220px 1fr; align-items: center; gap: 12px; padding: 5px 0; border-top: 1px solid var(--bg-raised); }
+  .gantt-row:first-of-type { border-top: none; }
+  .gantt-row .label { font-size: 12.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 6px; }
+  .gantt-row .label .dept { display: block; font-size: 10.5px; color: var(--text-soft); }
+  .gantt-track { position: relative; height: 20px; background: var(--bg-raised); border-radius: 5px; }
+  .gantt-bar { position: absolute; top: 3px; bottom: 3px; border-radius: 4px; min-width: 6px; }
+  .gantt-marker { position: absolute; top: -3px; bottom: -3px; width: 2px; }
+  .gantt-today { position: absolute; top: -8px; bottom: -8px; width: 2px; background: var(--blue); z-index: 3; }
+  .gantt-today-label { position: absolute; top: -20px; transform: translateX(-50%); font-size: 10px; color: var(--blue); letter-spacing: 0.04em; white-space: nowrap; font-weight: 600; }
+
+  .lanes { display: flex; flex-direction: column; gap: 30px; }
+  .lane-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .lane-rail { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .lane-head h3 { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 600; }
+  .lane-head .lane-count { font-size: 12px; color: var(--text-soft); }
+  .lane-desc { font-size: 12px; color: var(--text-soft); margin-left: auto; text-align: right; max-width: 38ch; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 14px; }
+
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .card.is-complete { opacity: 0.68; }
+  .card.is-complete h4 { text-decoration: line-through; text-decoration-color: var(--green); }
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .chip { font-size: 11px; letter-spacing: 0.02em; font-weight: 700; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .chip.dept { background: var(--bg-raised); color: var(--text-soft); text-transform: none; font-weight: 600; letter-spacing: 0; font-size: 11.5px; }
+  .card h4 { font-family: 'Playfair Display', serif; font-size: 16.5px; font-weight: 600; line-height: 1.28; }
+  .card .who { font-size: 12.5px; color: var(--text-mid); margin-top: -4px; }
+  .due-line { font-size: 12.5px; color: var(--text-mid); display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+  .due-line .approx { color: var(--text-soft); font-size: 11.5px; }
+
+  .mini-track { position: relative; height: 6px; background: var(--bg-raised); border-radius: 4px; }
+  .mini-bar { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+  .mini-today { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--blue); }
+
+  .desc-text { font-size: 12.5px; color: var(--text-mid); line-height: 1.5; background: var(--bg-raised); border-radius: 8px; padding: 8px 10px; }
+
+  .status-fields { display: flex; flex-direction: column; gap: 8px; }
+  .status-field { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .status-field .field-label { font-size: 12px; color: var(--text-soft); width: 66px; flex-shrink: 0; font-weight: 600; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+  .seg-btn { font-family: 'Inter', sans-serif; font-size: 11.5px; font-weight: 600; color: var(--text-mid); background: var(--bg); border: none; border-right: 1px solid var(--border); padding: 5px 9px; cursor: pointer; }
+  .seg-btn:last-child { border-right: none; }
+  .seg-btn:hover { background: var(--bg-raised); }
+  .seg-btn:disabled, .due-input:disabled { cursor: not-allowed; opacity: 0.55; }
+  .seg-btn:disabled:hover { background: var(--bg); }
+  .locked-hint { font-size: 10.5px; color: var(--text-soft); font-style: italic; }
+  .cal-toggle input:disabled { cursor: not-allowed; opacity: 0.55; }
+  .seg-btn.active[data-value="Completed"] { background: var(--green); color: #fff; }
+  .seg-btn.active[data-value="In Progress"] { background: var(--gold); color: #fff; }
+  .seg-btn.active[data-value=""] { background: var(--text-soft); color: #fff; }
+  .due-input { border: 1px solid var(--border); border-radius: 6px; padding: 4px 7px; font-size: 11.5px; font-family: 'Inter', sans-serif; color: var(--text-mid); background: var(--bg); }
+  .cal-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-mid); cursor: pointer; }
+  .cal-toggle input { width: 15px; height: 15px; accent-color: var(--blue); cursor: pointer; }
+
+  .chips-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips-row .tag { font-size: 11.5px; background: var(--bg-raised); color: var(--text-mid); padding: 3px 9px; border-radius: 999px; }
+
+  .note-field textarea { width: 100%; font-family: 'Inter', sans-serif; font-size: 12.5px; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 9px; resize: vertical; min-height: 44px; background: var(--bg); }
+  .note-field label, .link-field label { font-size: 11px; color: var(--text-soft); font-weight: 600; display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .link-field input { width: 100%; font-family: 'Inter', sans-serif; font-size: 12.5px; border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; background: var(--bg); color: var(--text); }
+
+  .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: auto; gap: 8px; }
+  .btn-complete-all { font-size: 11.5px; font-weight: 600; color: var(--green); background: var(--green-dim); border: none; border-radius: 7px; padding: 6px 10px; cursor: pointer; }
+  .btn-complete-all:hover { background: rgba(46,122,82,0.18); }
+  .link-open { font-size: 11.5px; color: var(--blue); text-decoration: none; font-weight: 600; }
+
+  details.lane-completed summary { cursor: pointer; font-family: 'Playfair Display', serif; font-weight: 600; font-size: 17px; color: var(--text-mid); list-style: none; }
+  details.lane-completed summary::-webkit-details-marker { display: none; }
+  details.lane-completed summary::before { content: "▸ "; }
+  details.lane-completed[open] summary::before { content: "▾ "; }
+
+  .empty-note, .loading { color: var(--text-soft); font-size: 13.5px; font-style: italic; padding: 20px 0; }
+
+  #loginScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px; text-align: center; }
+  #googleSignInBtn { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #d1cdc4; border-radius:12px; padding:14px 24px; font-size:15px; cursor:pointer; }
+  .access-denied { text-align: center; padding: 60px 24px; }
+  .access-denied .title { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--red); margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <h1 style="font-family:'Playfair Display',serif; font-size:28px; margin-bottom:20px;">RCC Creative Timeline</h1>
+  <button id="googleSignInBtn">
+    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+    Sign in with Google
+  </button>
+</div>
+
+<div id="appShell" style="display:none;">
+  <nav class="nav">
+    <a href="index.html" class="nav-brand">RCC <span>· Creative Timeline</span></a>
+    <div class="nav-links">
+      <span class="nav-user" id="navUser"></span>
+      <button class="nav-signout" id="signOutBtn">Sign out</button>
+    </div>
+  </nav>
+
+  <div class="page">
+    <div id="accessCheck" class="loading">Checking access…</div>
+
+    <div id="timelineUI" style="display:none;">
+      <h1 class="page-title">Creative Timeline</h1>
+      <p class="page-sub">Every open request from the Event Request form, grouped by what's still outstanding — approval, calendar, graphic, marketing — and colored by how soon it's due. Check things off, update status, and everyone sees the same board.</p>
+      <div class="meta-line">
+        <span class="live-pill"><span class="dot"></span>Live — synced to Firestore</span>
+        <span>·</span>
+        <span><b id="statTotal">–</b> requests in queue</span>
+        <span id="statExcluded"></span>
+      </div>
+
+      <div class="controls">
+        <input type="search" id="search" placeholder="Search by title or name…" aria-label="Search requests">
+        <select id="deptFilter" aria-label="Filter by ministry department"><option value="">All departments</option></select>
+        <label class="toggle"><input type="checkbox" id="hideDone"> Hide completed</label>
+        <span class="count-pill"><b id="statShown">–</b> shown</span>
+      </div>
+
+      <div class="section-heading">
+        <h2>Timeline</h2>
+        <span class="hint">bar runs from today to the due date · diamond marks the event date · blue line is today</span>
+      </div>
+      <div class="gantt-scroll"><div class="gantt" id="gantt"></div></div>
+
+      <div class="lanes" id="lanes"></div>
+    </div>
+
+    <div id="accessDenied" class="access-denied" style="display:none;">
+      <div class="title">No Timeline Access</div>
+      <p style="color: var(--text-soft); font-size:14px;">Ask an admin to add you to the Graphics or Marketing team to see this page.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+    authDomain: "bedsidercc.firebaseapp.com",
+    projectId: "bedsidercc",
+    storageBucket: "bedsidercc.firebasestorage.app",
+    messagingSenderId: "950958384975",
+    appId: "1:950958384975:web:6f43dec5a7ba842c69c73a"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  let currentUser = null;
+  let allRequests = [];
+  let excludedCount = 0;
+  let myRoles = { graphics: false, marketing: false, isAdmin: false };
+
+  document.getElementById('googleSignInBtn').addEventListener('click', () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err => alert('Sign-in failed: ' + err.message));
+  });
+  document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+
+  auth.onAuthStateChanged(async user => {
+    if (user) {
+      currentUser = user;
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appShell').style.display = 'block';
+      document.getElementById('navUser').textContent = user.displayName || user.email;
+
+      const doc = await db.collection('users').doc(user.uid).get();
+      const data = doc.exists ? doc.data() : {};
+      const roles = data.roles || {};
+      myRoles = { graphics: roles.graphics === true, marketing: roles.marketing === true, isAdmin: data.isAdmin === true };
+      document.getElementById('accessCheck').style.display = 'none';
+
+      if (myRoles.graphics || myRoles.marketing || myRoles.isAdmin) {
+        document.getElementById('timelineUI').style.display = 'block';
+        loadRequests();
+      } else {
+        document.getElementById('accessDenied').style.display = 'block';
+      }
+    } else {
+      currentUser = null;
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('appShell').style.display = 'none';
+    }
+  });
+
+  function loadRequests() {
+    db.collection('eventRequests').onSnapshot(snap => {
+      allRequests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      render();
+    }, err => {
+      document.getElementById('lanes').innerHTML = '<p class="empty-note">Could not load requests: ' + err.message + '</p>';
+      console.error(err);
+    });
+  }
+
+  /* ---------- derive + classify ---------- */
+  const DAY = 86400000;
+  function startOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  const TODAY = startOfDay(new Date());
+  function parseISO(s){ if(!s) return null; const p = s.split("-").map(Number); if(p.length!==3||p.some(isNaN)) return null; return new Date(p[0], p[1]-1, p[2]); }
+  function fmtDate(d){ return d ? d.toLocaleDateString("en-US",{month:"short", day:"numeric", year:"numeric"}) : "—"; }
+
+  // Urgency: drives the colored badge on each card and the Gantt bars —
+  // purely about timing, independent of which section(s) a card sits in.
+  const URGENCY = [
+    {key:"overdue",  label:"Overdue",           color:"var(--red)",       bg:"var(--red-dim)"},
+    {key:"week",     label:"Due This Week",     color:"var(--gold)",      bg:"var(--gold-dim)"},
+    {key:"blocked",  label:"Awaiting Approval", color:"var(--blue)",      bg:"var(--blue-dim)"},
+    {key:"month",    label:"Due This Month",    color:"var(--gold)",      bg:"rgba(181,137,42,0.06)"},
+    {key:"upcoming", label:"Upcoming",          color:"var(--blue)",      bg:"rgba(37,87,184,0.05)"},
+    {key:"later",    label:"Later / No Date",   color:"var(--text-soft)", bg:"var(--bg-raised)"},
+    {key:"done",     label:"Completed",         color:"var(--green)",     bg:"var(--green-dim)"}
+  ];
+  const URGENCY_RANK = Object.fromEntries(URGENCY.map((u,i)=>[u.key,i]));
+  function urgencyOf(key){ return URGENCY.find(u=>u.key===key) || URGENCY[URGENCY.length-1]; }
+
+  // Sections: what's still outstanding. A request can sit in more than
+  // one "Needs ___" section at once — Calendar, Graphic and Marketing
+  // are independent tracks, not sequential steps.
+  const SECTIONS = [
+    {key:"blocked",   label:"Awaiting Approval", desc:"Can't start creative work until approved"},
+    {key:"calendar",  label:"Needs Calendar",     desc:"Hasn't been added to the church calendar yet"},
+    {key:"graphic",   label:"Needs Graphic",      desc:"Graphic or media work still outstanding"},
+    {key:"marketing", label:"Needs Marketing",    desc:"Marketing push still outstanding"},
+    {key:"done",      label:"Completed",          desc:"Everything needed is done"}
+  ];
+  const SECTION_COLOR = { blocked:"var(--blue)", calendar:"var(--gold)", graphic:"var(--gold)", marketing:"var(--gold)", done:"var(--green)" };
+
+  function marketingHasWork(arr){ return Array.isArray(arr) && arr.length>0 && !(arr.length===1 && arr[0]==='None'); }
+
+  function derive(r){
+    const hasCalendar = r.requestType === 'church_event';
+    const hasGraphic = Array.isArray(r.mediaSizes) && r.mediaSizes.length > 0;
+    const hasMarketing = marketingHasWork(r.marketing);
+    const relevant = hasCalendar || hasGraphic || hasMarketing;
+
+    const completed = relevant &&
+      (!hasCalendar || r.calendarAdded === true) &&
+      (!hasGraphic || r.graphicStatus === 'Completed') &&
+      (!hasMarketing || r.marketingStatus === 'Completed');
+
+    const pending = r.status !== 'approved' && r.status !== 'denied';
+
+    const dueCandidates = [];
+    if (hasGraphic && r.graphicDueDate) dueCandidates.push(r.graphicDueDate);
+    if (hasMarketing && r.marketingDueDate) dueCandidates.push(r.marketingDueDate);
+    dueCandidates.sort();
+    let dueDate = dueCandidates[0] || null;
+    let dueApprox = false;
+    if (!dueDate && r.eventDate) { dueDate = r.eventDate; dueApprox = true; }
+
+    let urgencyKey;
+    if (completed) urgencyKey = "done";
+    else if (pending) urgencyKey = "blocked";
+    else {
+      const due = parseISO(dueDate);
+      if (!due) urgencyKey = "later";
+      else {
+        const diff = Math.round((due - TODAY)/DAY);
+        urgencyKey = diff < 0 ? "overdue" : diff <= 7 ? "week" : diff <= 30 ? "month" : diff <= 90 ? "upcoming" : "later";
+      }
+    }
+
+    const sections = [];
+    if (pending) sections.push('blocked');
+    else if (completed) sections.push('done');
+    else {
+      if (hasCalendar && !r.calendarAdded) sections.push('calendar');
+      if (hasGraphic && r.graphicStatus !== 'Completed') sections.push('graphic');
+      if (hasMarketing && r.marketingStatus !== 'Completed') sections.push('marketing');
+    }
+
+    return { ...r, hasCalendar, hasGraphic, hasMarketing, relevant, completed, pending, dueDate, dueApprox, urgencyKey, sections };
+  }
+
+  /* ---------- rendering ---------- */
+  function render(){
+    const derived = allRequests.filter(r => r.status !== 'denied').map(derive);
+    excludedCount = allRequests.length - derived.filter(r=>r.relevant).length;
+    let items = derived.filter(r => r.relevant);
+
+    const q = document.getElementById('search').value.trim().toLowerCase();
+    const dept = document.getElementById('deptFilter').value;
+    const hideDone = document.getElementById('hideDone').checked;
+
+    const deptSet = new Set();
+    items.forEach(r => (r.department||[]).forEach(d=>deptSet.add(d)));
+    const sel = document.getElementById('deptFilter');
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">All departments</option>' + [...deptSet].sort().map(d=>`<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
+    sel.value = prev;
+
+    let visible = items.filter(r => {
+      const title = (r.eventTitle || r.projectTitle || '').toLowerCase();
+      const who = (r.requesterName||'').toLowerCase();
+      const matchesText = !q || title.includes(q) || who.includes(q);
+      const matchesDept = !dept || (r.department||[]).includes(dept);
+      const matchesDone = !hideDone || !r.completed;
+      return matchesText && matchesDept && matchesDone;
+    });
+
+    function byDueDate(a,b){
+      const da = parseISO(a.dueDate), db_ = parseISO(b.dueDate);
+      if (!da && !db_) return 0;
+      if (!da) return 1;
+      if (!db_) return -1;
+      return da - db_;
+    }
+
+    visible.sort((a,b) => {
+      const rr = URGENCY_RANK[a.urgencyKey] - URGENCY_RANK[b.urgencyKey];
+      if (rr !== 0) return rr;
+      return byDueDate(a,b);
+    });
+
+    document.getElementById('statTotal').textContent = items.length;
+    document.getElementById('statShown').textContent = visible.length;
+    document.getElementById('statExcluded').textContent = excludedCount > 0 ? `· ${excludedCount} excluded (no graphic, marketing, or calendar work needed)` : '';
+
+    renderSections(visible, byDueDate);
+    renderGantt(visible);
+  }
+
+  function renderSections(items, byDueDate){
+    const el = document.getElementById('lanes');
+    let html = '';
+    SECTIONS.forEach(section => {
+      const sectionItems = items.filter(r => r.sections.includes(section.key)).sort(byDueDate);
+      if (sectionItems.length === 0 && section.key !== 'done') return;
+      const grid = `<div class="card-grid">${sectionItems.map(cardHtml).join('') || '<p class="empty-note">Nothing here right now.</p>'}</div>`;
+      if (section.key === 'done') {
+        html += `<details class="lane-completed"><summary>(${sectionItems.length}) ${section.label}</summary><div style="margin-top:10px">${grid}</div></details>`;
+      } else {
+        html += `<div class="lane">
+          <div class="lane-head">
+            <span class="lane-rail" style="background:${SECTION_COLOR[section.key]}"></span>
+            <h3>${section.label}</h3>
+            <span class="lane-count">${sectionItems.length}</span>
+            <span class="lane-desc">${section.desc}</span>
+          </div>
+          ${grid}
+        </div>`;
+      }
+    });
+    el.innerHTML = html || '<p class="empty-note">Nothing matches those filters.</p>';
+  }
+
+  function statusField(id, name, field, value, dueField, dueValue, canEdit, lockedHint){
+    const opts = [["","Not started"],["In Progress","In progress"],["Completed","Done"]];
+    const dis = canEdit ? '' : 'disabled';
+    const btns = opts.map(([v,label]) => `<button type="button" class="seg-btn ${v===(value||'')?'active':''}" data-value="${v}" data-action="status" data-id="${id}" data-field="${field}" ${dis}>${label}</button>`).join('');
+    const dueHtml = dueField ? `<input type="date" class="due-input" data-action="due" data-id="${id}" data-field="${dueField}" value="${dueValue||''}" ${dis}>` : '';
+    const hint = !canEdit && lockedHint ? `<span class="locked-hint">${lockedHint}</span>` : '';
+    return `<div class="status-field"><span class="field-label">${name}</span><div class="seg">${btns}</div>${dueHtml}${hint}</div>`;
+  }
+
+  function cardHtml(r){
+    const urgency = urgencyOf(r.urgencyKey);
+    const due = parseISO(r.dueDate);
+    const ev = parseISO(r.eventDate);
+    const title = escHtml(r.eventTitle || r.projectTitle || 'Untitled request');
+    const kindLabel = r.requestType === 'church_event' ? 'Calendar Event' : r.requestType === 'media_only' ? 'Graphic / Media Only' : 'Request';
+    const dept = (r.department||[]).join(', ') || '—';
+
+    let dueLine = `Due <strong>${fmtDate(due)}</strong>`;
+    if (ev && (!due || +ev !== +due)) dueLine += ` &nbsp;·&nbsp; Event ${fmtDate(ev)}`;
+    if (r.dueApprox) dueLine += ` <span class="approx">(no due date set — showing event date)</span>`;
+    if (!due && !ev) dueLine = `<span class="approx">No due date or event date on file</span>`;
+
+    let miniBar = '';
+    if (due) {
+      const span = 60*DAY;
+      const a = Math.min(+TODAY, +due), b = Math.max(+TODAY, +due);
+      const left = Math.max(0, Math.min(100, ((a-(+TODAY-span/2))/span)*100));
+      const width = Math.max(2, Math.min(100-left, ((b-a)/span)*100));
+      const todayLeft = Math.max(0, Math.min(100, ((+TODAY-(+TODAY-span/2))/span)*100));
+      miniBar = `<div class="mini-track"><div class="mini-bar" style="left:${left}%; width:${width}%; background:${urgency.color}; opacity:${r.completed?0.4:0.85}"></div><div class="mini-today" style="left:${todayLeft}%"></div></div>`;
+    }
+
+    const canCalendar = myRoles.isAdmin;
+    const canGraphic = myRoles.isAdmin || myRoles.graphics;
+    const canMarketing = myRoles.isAdmin || myRoles.marketing;
+
+    let fields = '';
+    if (r.hasCalendar) {
+      const dis = canCalendar ? '' : 'disabled';
+      const hint = canCalendar ? '' : '<span class="locked-hint">admin only</span>';
+      fields += `<div class="status-field"><span class="field-label">Calendar</span><label class="cal-toggle"><input type="checkbox" data-action="calendar" data-id="${r.id}" ${r.calendarAdded?'checked':''} ${dis}> Added to church calendar</label>${hint}</div>`;
+    }
+    if (r.hasGraphic) fields += statusField(r.id, 'Graphic', 'graphicStatus', r.graphicStatus, 'graphicDueDate', r.graphicDueDate, canGraphic, 'graphics team');
+    if (r.hasMarketing) fields += statusField(r.id, 'Marketing', 'marketingStatus', r.marketingStatus, 'marketingDueDate', r.marketingDueDate, canMarketing, 'marketing team');
+
+    const chips = [...(r.mediaSizes||[]), ...(Array.isArray(r.vansNeeded) && r.vansNeeded.length ? ['Van needed'] : [])]
+      .map(c=>`<span class="tag">${escHtml(c)}</span>`).join('');
+
+    const descText = r.mediaDesc || r.eventDesc || '';
+
+    const pendingBadge = r.pending && !r.completed ? `<div class="desc-text" style="background:var(--blue-dim); color:var(--blue);">Status: ${escHtml(r.status || 'new')} — waiting on admin approval before creative work should start.</div>` : '';
+
+    const linkField = canGraphic
+      ? `<div class="link-field"><label>Graphic file link</label><input type="url" placeholder="Paste a Drive link once it's ready…" data-action="link" data-id="${r.id}" value="${escHtml(r.graphicLink||'')}"></div>`
+      : '';
+
+    const completableFields = [];
+    if (canCalendar && r.hasCalendar && !r.calendarAdded) completableFields.push('calendarAdded');
+    if (canGraphic && r.hasGraphic && r.graphicStatus !== 'Completed') completableFields.push('graphicStatus');
+    if (canMarketing && r.hasMarketing && r.marketingStatus !== 'Completed') completableFields.push('marketingStatus');
+    const completeLabel = completableFields.length > 1 ? 'Mark all complete'
+      : completableFields[0] === 'calendarAdded' ? 'Mark calendar added'
+      : completableFields[0] === 'graphicStatus' ? 'Mark graphic complete'
+      : completableFields[0] === 'marketingStatus' ? 'Mark marketing complete' : '';
+    const completeBtn = completableFields.length
+      ? `<button type="button" class="btn-complete-all" data-action="complete-all" data-id="${r.id}" data-fields="${completableFields.join(',')}">${completeLabel}</button>`
+      : '<span></span>';
+
+    return `<article class="card ${r.completed?'is-complete':''}" data-card-id="${r.id}">
+      <div class="card-top">
+        <span class="chip" style="background:${urgency.bg}; color:${urgency.color}">${escHtml(urgency.label)}</span>
+        <span class="chip dept">${escHtml(dept)}</span>
+      </div>
+      <h4>${title}</h4>
+      <div class="who">${escHtml(r.requesterName||'—')} · ${kindLabel}</div>
+      <div class="due-line">${dueLine}</div>
+      ${miniBar}
+      ${pendingBadge}
+      ${descText ? `<div class="desc-text">${escHtml(descText)}</div>` : ''}
+      ${chips ? `<div class="chips-row">${chips}</div>` : ''}
+      <div class="status-fields">${fields}</div>
+      ${linkField}
+      <div class="note-field">
+        <label>Staff note</label>
+        <textarea placeholder="Notes for the team…" data-action="note" data-id="${r.id}">${escHtml(r.internalNote||'')}</textarea>
+      </div>
+      <div class="card-actions">
+        ${completeBtn}
+        ${r.graphicLink ? `<a class="link-open" href="${escAttr(r.graphicLink)}" target="_blank" rel="noopener">Open file ↗</a>` : ''}
+      </div>
+    </article>`;
+  }
+
+  /* ---------- Gantt ---------- */
+  function renderGantt(items){
+    const el = document.getElementById('gantt');
+    const dates = [];
+    items.forEach(r => { const d=parseISO(r.dueDate), e=parseISO(r.eventDate); if(d) dates.push(d); if(e) dates.push(e); });
+    const minD = new Date(Math.min(+TODAY - 10*DAY, ...(dates.length ? dates.map(d=>+d-5*DAY) : [+TODAY])));
+    const maxD = new Date(Math.max(+TODAY + 30*DAY, ...(dates.length ? dates.map(d=>+d+10*DAY) : [+TODAY+30*DAY])));
+    const span = maxD - minD;
+    const pct = d => Math.min(100, Math.max(0, ((d-minD)/span)*100));
+
+    let axisHtml = '<div class="gantt-axis"><div></div><div class="months">';
+    let cursor = new Date(minD.getFullYear(), minD.getMonth(), 1);
+    while (cursor <= maxD) {
+      axisHtml += `<span style="left:${pct(cursor)}%">${cursor.toLocaleDateString("en-US",{month:"short", year:"2-digit"})}</span>`;
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth()+1, 1);
+    }
+    axisHtml += '</div></div>';
+
+    const todayPct = pct(TODAY);
+    let rows = '';
+    items.forEach(r => {
+      const urgency = urgencyOf(r.urgencyKey);
+      const due = parseISO(r.dueDate), ev = parseISO(r.eventDate);
+      let barHtml = '';
+      if (due) {
+        const a = Math.min(+TODAY, +due), b = Math.max(+TODAY, +due);
+        const left = pct(new Date(a)), right = pct(new Date(b));
+        barHtml += `<div class="gantt-bar" style="left:${left}%; width:${Math.max(right-left,0.6)}%; background:${urgency.color}; opacity:${r.completed?0.4:0.85}"></div>`;
+      }
+      if (ev && (!due || +ev !== +due)) barHtml += `<div class="gantt-marker" style="left:${pct(ev)}%; background:${urgency.color}"></div>`;
+      const title = escHtml(r.eventTitle || r.projectTitle || 'Untitled request');
+      rows += `<div class="gantt-row"><div class="label" title="${title}">${title}<span class="dept">${escHtml((r.department||[]).join(', '))}</span></div><div class="gantt-track">${barHtml}</div></div>`;
+    });
+
+    el.innerHTML = axisHtml + `<div style="position:relative">
+        <div class="gantt-today" style="left:${todayPct}%"></div>
+        <div class="gantt-today-label" style="left:${todayPct}%">TODAY</div>
+        ${rows || '<p class="empty-note">Nothing matches those filters.</p>'}
+      </div>`;
+  }
+
+  /* ---------- writes ---------- */
+  let noteTimers = {};
+  function debounce(id, fn, ms){ clearTimeout(noteTimers[id]); noteTimers[id] = setTimeout(fn, ms); }
+
+  document.getElementById('lanes').addEventListener('click', e => {
+    const btn = e.target.closest('[data-action="status"]');
+    if (btn) {
+      db.collection('eventRequests').doc(btn.dataset.id).update({ [btn.dataset.field]: btn.dataset.value });
+      return;
+    }
+    const complAll = e.target.closest('[data-action="complete-all"]');
+    if (complAll) {
+      // Only ever set the fields this viewer's role is allowed to write —
+      // data-fields was already computed against myRoles when the card was
+      // rendered, so this can't attempt a write the security rules would
+      // reject as a whole (Firestore update() is all-or-nothing per call).
+      const fieldList = (complAll.dataset.fields || '').split(',').filter(Boolean);
+      const update = {};
+      fieldList.forEach(f => { update[f] = f === 'calendarAdded' ? true : 'Completed'; });
+      if (Object.keys(update).length) db.collection('eventRequests').doc(complAll.dataset.id).update(update);
+    }
+  });
+
+  document.getElementById('lanes').addEventListener('change', e => {
+    const cal = e.target.closest('[data-action="calendar"]');
+    if (cal) { db.collection('eventRequests').doc(cal.dataset.id).update({ calendarAdded: cal.checked }); return; }
+    const due = e.target.closest('[data-action="due"]');
+    if (due) { db.collection('eventRequests').doc(due.dataset.id).update({ [due.dataset.field]: due.value }); return; }
+    const link = e.target.closest('[data-action="link"]');
+    if (link) { db.collection('eventRequests').doc(link.dataset.id).update({ graphicLink: link.value.trim() }); return; }
+  });
+
+  document.getElementById('lanes').addEventListener('input', e => {
+    const note = e.target.closest('[data-action="note"]');
+    if (note) {
+      const id = note.dataset.id, val = note.value;
+      debounce(id, () => db.collection('eventRequests').doc(id).update({ internalNote: val }), 900);
+    }
+  });
+
+  /* ---------- filters (re-render only, no writes) ---------- */
+  document.getElementById('search').addEventListener('input', render);
+  document.getElementById('deptFilter').addEventListener('change', render);
+  document.getElementById('hideDone').addEventListener('change', render);
+
+  function escHtml(str){ return (str==null?'':String(str)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function escAttr(str){ return escHtml(str).replace(/'/g,'&#39;'); }
+</script>
+</body>
+</html>

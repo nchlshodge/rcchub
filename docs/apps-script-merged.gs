@@ -2,23 +2,29 @@
  * Apps Script — Event & Graphic Request Automation (Merged)
  * ============================================================
  *
- * This file combines two things that used to be separate:
+ * This file combines three things:
  *
  * 1. Your EXISTING automation (onFormSubmit, onStatusEdit,
  *    sendOverdueDigest) — unchanged in behavior, still triggered by
  *    the old Google Form and by manually editing the Status column.
  *
- * 2. The NEW app's webhook (doPost) — receives submissions from the
- *    RCC Hub's Event Request page and now runs through the SAME
+ * 2. The app's webhook (doPost) — receives submissions from the
+ *    RCC Hub's Event Request page and runs through the SAME
  *    notification logic as the Google Form, instead of just silently
- *    appending a row. This is the fix for the gap where app-submitted
- *    requests weren't triggering any staff emails.
+ *    appending a row.
  *
- * Both paths now call one shared function, notifyOnNewRequest(),
+ * 3. Firestore sync (new) — mirrors every row into the same
+ *    `eventRequests` Firestore collection the Creative Timeline and
+ *    Work Queue pages read from, so requests that still come in
+ *    through the OLD Google Form show up there too. App-submitted
+ *    requests already write to Firestore directly from
+ *    event-request-index.html before this script ever sees them —
+ *    doPost just records that row's Firestore doc id in column 33 so
+ *    the backfill function below never double-creates it.
+ *
+ * Both intake paths now call one shared function, notifyOnNewRequest(),
  * so there is exactly one place that decides who gets emailed and
- * what the starting status is. If you ever need to change who gets
- * notified for graphics vs. van requests, you only need to change it
- * in ONE place now.
+ * what the starting status is.
  *
  * SETUP: same as before — paste this into the Sheet's Apps Script
  * editor (Extensions → Apps Script), replacing what's there, and
@@ -27,6 +33,31 @@
  * The existing onFormSubmit/onStatusEdit triggers you already had set
  * up in the Triggers tab do NOT need to be recreated — they'll keep
  * calling the same function names.
+ *
+ * NEW SETUP for the Firestore sync piece:
+ *   The sync authenticates by signing in as a fresh anonymous Firebase
+ *   user (getAnonymousIdToken_) rather than using your own Google
+ *   account's permissions — eventRequests' security rule only checks
+ *   "is this a real Firebase Auth session," and this satisfies that
+ *   directly, so there's no OAuth scope, IAM role, or service account
+ *   to set up. (An earlier version of this file tried using
+ *   ScriptApp.getOAuthToken() instead — that's a Google Cloud user
+ *   token, a different kind of credential the security rule can never
+ *   recognize as signed in, and it always failed with a 403 no matter
+ *   what permissions the account had. If you already added a
+ *   "datastore" scope to appsscript.json chasing that, it's harmless
+ *   to leave in place or remove — it's simply unused now.)
+ *
+ *   1. In the Sheet itself, add a header in column AG (33), titled
+ *      exactly "Firestore Doc ID" — this is bookkeeping only (marks
+ *      which rows have already been mirrored into Firestore) and
+ *      isn't read by any other page.
+ *   2. Save this script, then run backfillEventRequestsToFirestore()
+ *      ONCE from the function dropdown at the top of the editor
+ *      (▷ Run) to mirror all existing rows. Check the execution log —
+ *      it now reports synced / failed / skipped counts separately.
+ *   3. From then on, every new Google Form submission mirrors itself
+ *      automatically via the same onFormSubmit trigger you already have.
  */
 
 var NICK = "nick@rochesterchristian.church";
@@ -116,6 +147,14 @@ function onFormSubmit(e) {
   };
 
   notifyOnNewRequest(fields);
+
+  // Mirror this brand-new row into Firestore so it shows up in the
+  // Creative Timeline / Work Queue immediately, same as an app submission.
+  try {
+    syncRowToFirestoreByRowNumber_(sheet, row, getAnonymousIdToken_());
+  } catch (err) {
+    Logger.log("Firestore sync setup failed for row " + row + ": " + err.message);
+  }
 }
 
 // ============================================================
@@ -177,6 +216,10 @@ function doPost(e) {
       '',                                                  // 30. Van Confirmed? (blank until admin confirms, matches real data pattern)
       '',                                                  // 31. Overdue?
       '',                                                  // 32. Graphic Upload or Link
+      sanitizeForSheet(data.id || ''),                  // 33. Firestore Doc ID — this row's doc already
+                                                             // exists (created client-side before this webhook
+                                                             // ran); recording it here stops the backfill
+                                                             // function from ever creating a duplicate.
     ];
 
     sheet.appendRow(row);
@@ -215,6 +258,269 @@ function joinWithOther(arr, otherText) {
     if (idx > -1) items[idx] = 'Other: ' + otherText;
   }
   return items.join(', ');
+}
+
+// ============================================================
+// Firestore sync — mirrors Sheet rows into the same `eventRequests`
+// collection the Creative Timeline / Work Queue pages read from. See
+// the NEW SETUP block in the file header comment before running any
+// of this for the first time.
+// ============================================================
+var FIRESTORE_PROJECT_ID = "bedsidercc";
+var FIRESTORE_DOC_ID_COL = 33; // column AG — add a "Firestore Doc ID" header here
+
+// Same public Web API key already embedded in event-request-index.html
+// and work-queue.html's firebaseConfig — this is not a secret, it just
+// identifies which Firebase project to talk to.
+var FIREBASE_WEB_API_KEY = "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE";
+
+// Signs in as a fresh anonymous Firebase Auth user and returns its ID
+// token. This is the piece that was missing: eventRequests' security
+// rule is `allow create: if isSignedIn()`, which checks for a real
+// Firebase Auth session — a Google Cloud OAuth token from
+// ScriptApp.getOAuthToken() is a different kind of credential and can
+// never satisfy that, no matter what IAM role the account running the
+// script has. Signing in anonymously first gets a token the rule
+// actually recognizes, without needing a service account or any new
+// permission grant.
+function getAnonymousIdToken_() {
+  var url = "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=" + FIREBASE_WEB_API_KEY;
+  var res = UrlFetchApp.fetch(url, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify({ returnSecureToken: true }),
+    muteHttpExceptions: true,
+  });
+  var code = res.getResponseCode();
+  if (code < 200 || code >= 300) {
+    throw new Error("Anonymous Firebase sign-in failed (" + code + "): " + res.getContentText());
+  }
+  return JSON.parse(res.getContentText()).idToken;
+}
+
+function firestoreValue_(v) {
+  if (v === null || v === undefined || v === '') return { nullValue: null };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (typeof v === 'number') return { doubleValue: v };
+  if (Object.prototype.toString.call(v) === '[object Date]') return { timestampValue: v.toISOString() };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(firestoreValue_) } };
+  return { stringValue: String(v) };
+}
+
+function firestoreFields_(obj) {
+  var fields = {};
+  Object.keys(obj).forEach(function (k) { fields[k] = firestoreValue_(obj[k]); });
+  return fields;
+}
+
+// Creates one eventRequests document via the Firestore REST API,
+// authenticated as the anonymous Firebase user idToken belongs to
+// (see getAnonymousIdToken_ above).
+function createEventRequestDoc_(obj, idToken) {
+  var url = "https://firestore.googleapis.com/v1/projects/" + FIRESTORE_PROJECT_ID + "/databases/(default)/documents/eventRequests";
+  var res = UrlFetchApp.fetch(url, {
+    method: "post",
+    contentType: "application/json",
+    headers: { Authorization: "Bearer " + idToken },
+    payload: JSON.stringify({ fields: firestoreFields_(obj) }),
+    muteHttpExceptions: true,
+  });
+  var code = res.getResponseCode();
+  if (code < 200 || code >= 300) {
+    throw new Error("Firestore write failed (" + code + "): " + res.getContentText());
+  }
+  var body = JSON.parse(res.getContentText());
+  var parts = body.name.split("/"); // ".../documents/eventRequests/<id>"
+  return parts[parts.length - 1];
+}
+
+// The old form's four historical "Request Type" labels, mapped to the
+// same enum the Hub's own Event Request page writes.
+function parseRequestTypeFromLabel_(label) {
+  label = (label || '').toString();
+  if (label.indexOf('Church Event') === 0) return 'church_event';
+  if (label.indexOf('Facilities Rental') === 0) return 'facilities';
+  return 'media_only'; // covers both "Graphic Only..." and "Media/Graphic Only..."
+}
+
+function splitList_(str) {
+  str = (str || '').toString().trim();
+  if (!str || str === 'None') return [];
+  return str.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+}
+
+// The Hub's own schema uses '' for not-started; the Sheet has used
+// "Not Started" and "Not Yet Started" interchangeably over time.
+function normalizeStatus_(status) {
+  if (status === 'Completed') return 'Completed';
+  if (status === 'In Progress') return 'In Progress';
+  return '';
+}
+
+function toDateString_(val) {
+  if (!val) return '';
+  if (Object.prototype.toString.call(val) === '[object Date]') {
+    return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(val);
+}
+
+function toTimeString_(val) {
+  if (!val) return '';
+  if (Object.prototype.toString.call(val) === '[object Date]') {
+    return Utilities.formatDate(val, Session.getScriptTimeZone(), 'HH:mm');
+  }
+  return String(val);
+}
+
+// Subtracts `days` from a "YYYY-MM-DD" string, returning the same
+// format — same logic as event-request-index.html's subtractDays_, kept
+// in sync so both intake paths compute the same default the same way.
+function subtractDays_(dateStr, days) {
+  if (!dateStr) return '';
+  var parts = dateStr.split('-').map(Number);
+  var d = new Date(parts[0], parts[1] - 1, parts[2]);
+  d.setDate(d.getDate() - days);
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+// Maps one 32-column Sheet row (see the column map in doPost above)
+// into the exact document shape event-request-index.html writes, so
+// both intake paths produce identical Firestore documents.
+function mapRowToEventRequest_(row) {
+  var overallStatus = row[20]; // col 21
+  var eventDate = toDateString_(row[6]);
+  var mediaSizes = splitList_(row[9]);
+  var graphicDueDate = toDateString_(row[25]);
+  // Same default lead time as the app's own form: 6 weeks before the
+  // event, only filled in when the Sheet didn't already have one.
+  if (!graphicDueDate && mediaSizes.length && eventDate) {
+    graphicDueDate = subtractDays_(eventDate, 42);
+  }
+  return {
+    email: row[1] || '',
+    requesterName: row[3] || '',
+    requestType: parseRequestTypeFromLabel_(row[2]),
+    department: splitList_(row[4]),
+    eventTitle: row[5] || '',
+    eventDesc: row[7] || '',
+    eventDate: eventDate,
+    startTime: toTimeString_(row[18]),
+    endTime: toTimeString_(row[19]),
+    location: row[16] || '',
+    onsiteRoom: splitList_(row[17]),
+    projectTitle: row[8] || '',
+    mediaSizes: mediaSizes,
+    mediaDesc: row[10] || '',
+    vansNeeded: splitList_(row[11]),
+    ticketsNeeded: row[12] === 'Yes' ? 'yes' : (row[12] === 'No' ? 'no' : ''),
+    ticketPrice: row[13] || '',
+    marketing: splitList_(row[14]),
+    status: overallStatus === 'Approved' ? 'approved' : (overallStatus === 'Denied' ? 'denied' : 'new'),
+    calendarAdded: /Google Cal|PC Cal/.test(row[22] || ''),
+    graphicStatus: normalizeStatus_(row[24]),
+    graphicDueDate: graphicDueDate,
+    marketingStatus: normalizeStatus_(row[27]),
+    marketingDueDate: toDateString_(row[28]),
+    vanConfirmed: row[29] === 'Yes',
+    graphicLink: row[31] || '',
+    submittedAt: (Object.prototype.toString.call(row[0]) === '[object Date]') ? row[0] : new Date(),
+  };
+}
+
+// Syncs one row by number, skipping it if it already has a Firestore
+// doc id recorded (so re-running the backfill is always safe). Wrapped
+// in try/catch so a Firestore hiccup never breaks onFormSubmit's emails.
+// Returns true on an actual successful write, false otherwise — callers
+// should count THIS, not just "did we attempt it."
+function syncRowToFirestoreByRowNumber_(sheet, rowNum, idToken) {
+  try {
+    var lastCol = Math.max(sheet.getLastColumn(), FIRESTORE_DOC_ID_COL);
+    var row = sheet.getRange(rowNum, 1, 1, lastCol).getValues()[0];
+    if (row[FIRESTORE_DOC_ID_COL - 1]) return false; // already synced
+    var docId = createEventRequestDoc_(mapRowToEventRequest_(row), idToken);
+    sheet.getRange(rowNum, FIRESTORE_DOC_ID_COL).setValue(docId);
+    return true;
+  } catch (err) {
+    Logger.log("Firestore sync failed for row " + rowNum + ": " + err.message);
+    return false;
+  }
+}
+
+// Run this ONCE by hand (▷ Run, in the Apps Script editor's function
+// dropdown) to mirror every existing row into Firestore. Safe to
+// re-run any time afterward — rows with a Firestore Doc ID already
+// filled in are skipped, so nothing gets duplicated.
+function backfillEventRequestsToFirestore() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  var lastRow = sheet.getLastRow();
+  var idToken = getAnonymousIdToken_();
+  var synced = 0, skipped = 0, failed = 0;
+  for (var r = 2; r <= lastRow; r++) {
+    if (sheet.getRange(r, FIRESTORE_DOC_ID_COL).getValue()) { skipped++; continue; }
+    if (!sheet.getRange(r, 4).getValue()) { skipped++; continue; } // blank Requester Name = blank row
+    if (syncRowToFirestoreByRowNumber_(sheet, r, idToken)) { synced++; } else { failed++; }
+  }
+  Logger.log("Backfill complete: " + synced + " synced, " + failed + " failed, " + skipped + " skipped.");
+}
+
+// Updates ONE field on an already-existing eventRequests document —
+// unlike createEventRequestDoc_, this never creates a new document, so
+// it's safe to use for fixing up rows that were synced before some
+// default (like the 6-week graphic due date) existed.
+function patchEventRequestField_(docId, fieldName, value, idToken) {
+  var url = "https://firestore.googleapis.com/v1/projects/" + FIRESTORE_PROJECT_ID +
+    "/databases/(default)/documents/eventRequests/" + docId +
+    "?updateMask.fieldPaths=" + encodeURIComponent(fieldName);
+  var patch = {};
+  patch[fieldName] = value;
+  var res = UrlFetchApp.fetch(url, {
+    method: "patch",
+    contentType: "application/json",
+    headers: { Authorization: "Bearer " + idToken },
+    payload: JSON.stringify({ fields: firestoreFields_(patch) }),
+    muteHttpExceptions: true,
+  });
+  var code = res.getResponseCode();
+  if (code < 200 || code >= 300) {
+    throw new Error("Firestore patch failed (" + code + "): " + res.getContentText());
+  }
+}
+
+// Run this ONCE to backfill the 6-week-before-event graphic due date
+// onto rows that were already synced to Firestore before that default
+// existed. Only touches rows that (a) already have a Firestore Doc ID
+// and (b) still have a blank Graphic Due Date in the Sheet — it will
+// never overwrite a due date someone already set, and never creates a
+// new document. Also fills in the Sheet's own Graphic Due Date column
+// (Z) so both sides stay consistent.
+function patchMissingGraphicDueDates() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  var lastRow = sheet.getLastRow();
+  var idToken = getAnonymousIdToken_();
+  var patched = 0, skipped = 0, failed = 0;
+  for (var r = 2; r <= lastRow; r++) {
+    var docId = sheet.getRange(r, FIRESTORE_DOC_ID_COL).getValue();
+    if (!docId) { skipped++; continue; } // never synced — run the backfill for these instead
+
+    var lastCol = Math.max(sheet.getLastColumn(), FIRESTORE_DOC_ID_COL);
+    var row = sheet.getRange(r, 1, 1, lastCol).getValues()[0];
+    var existingDue = toDateString_(row[25]);
+    var mediaSizes = splitList_(row[9]);
+    var eventDate = toDateString_(row[6]);
+    if (existingDue || !mediaSizes.length || !eventDate) { skipped++; continue; }
+
+    var newDue = subtractDays_(eventDate, 42);
+    try {
+      patchEventRequestField_(docId, 'graphicDueDate', newDue, idToken);
+      sheet.getRange(r, 26).setValue(newDue); // column Z — Graphic Due Date
+      patched++;
+    } catch (err) {
+      Logger.log("Patch failed for row " + r + " (doc " + docId + "): " + err.message);
+      failed++;
+    }
+  }
+  Logger.log("Patched " + patched + " rows, " + failed + " failed, " + skipped + " skipped.");
 }
 
 // ============================================================

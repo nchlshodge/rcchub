@@ -341,6 +341,18 @@
     return Array.from(document.querySelectorAll('#'+containerId+' input:checked')).map(function(c){ return c.value; });
   }
 
+  // Subtracts `days` from a "YYYY-MM-DD" date string, returning the same
+  // format. Builds the Date from explicit y/m/d components (not by
+  // parsing the string directly) so it's always interpreted in the
+  // browser's local time, never shifted by a UTC/local offset.
+  function subtractDays_(dateStr, days){
+    var parts = dateStr.split('-').map(Number);
+    var d = new Date(parts[0], parts[1] - 1, parts[2]);
+    d.setDate(d.getDate() - days);
+    var y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
   document.getElementById('ev-form').addEventListener('submit', function(e){
     e.preventDefault();
     var type = requestType();
@@ -350,6 +362,14 @@
     var locType = document.querySelector('input[name="loctype"]:checked')?.value || '';
     var location = locType==='other' ? document.getElementById('ev-location-other').value : (locType==='at_rcc' ? 'At Rochester Christian Church' : '');
 
+    var eventDateVal = document.getElementById('ev-date').value;
+    var mediaSizesVal = checkedValues('ev-media-size');
+    // Default lead time for graphics: 6 weeks before the event, when we
+    // have both a graphic request and an event date to count back from.
+    // Staff can always change this later from the Creative Timeline —
+    // this is just a sensible starting point, not a locked-in deadline.
+    var defaultGraphicDueDate = (mediaSizesVal.length && eventDateVal) ? subtractDays_(eventDateVal, 42) : '';
+
     var request = {
       email: document.getElementById('ev-email').value,
       requesterName: document.getElementById('ev-name').value,
@@ -357,14 +377,14 @@
       department: checkedValues('ev-dept'),
       eventTitle: document.getElementById('ev-title').value,
       eventDesc: document.getElementById('ev-desc').value,
-      eventDate: document.getElementById('ev-date').value,
+      eventDate: eventDateVal,
       startTime: document.getElementById('ev-start-time').value,
       endTime: document.getElementById('ev-end-time').value,
       location: location,
       onsiteRoom: checkedValues('ev-room'),
       onsiteRoomOther: document.getElementById('ev-room-other').value,
       projectTitle: document.getElementById('ev-project-title').value,
-      mediaSizes: checkedValues('ev-media-size'),
+      mediaSizes: mediaSizesVal,
       mediaSizeOther: document.getElementById('ev-media-size-other').value,
       mediaDesc: document.getElementById('ev-media-desc').value,
       vansNeeded: checkedValues('ev-vans'),
@@ -374,7 +394,7 @@
       marketingOther: document.getElementById('ev-marketing-other').value,
       status: 'new', // new | approved | denied
       calendarAdded: false,
-      graphicStatus: '', graphicDueDate: '',
+      graphicStatus: '', graphicDueDate: defaultGraphicDueDate,
       marketingStatus: '', marketingDueDate: '',
       vanConfirmed: false,
       submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
