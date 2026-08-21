@@ -100,12 +100,15 @@
   .lane-desc { font-size: 12px; color: var(--text-soft); margin-left: auto; text-align: right; max-width: 38ch; }
   .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 14px; }
 
-  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .card { position: relative; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
   .card.is-complete { opacity: 0.68; }
   .card.is-complete h4 { text-decoration: line-through; text-decoration-color: var(--green); }
   .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .card-top.has-delete { padding-right: 22px; }
   .chip { font-size: 11px; letter-spacing: 0.02em; font-weight: 700; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
   .chip.dept { background: var(--bg-raised); color: var(--text-soft); text-transform: none; font-weight: 600; letter-spacing: 0; font-size: 11.5px; }
+  .btn-delete { position: absolute; top: 10px; right: 10px; background: none; border: none; color: var(--text-soft); font-size: 13px; line-height: 1; cursor: pointer; padding: 3px 5px; border-radius: 4px; }
+  .btn-delete:hover { color: var(--red); background: var(--red-dim); }
   .card h4 { font-family: 'Playfair Display', serif; font-size: 16.5px; font-weight: 600; line-height: 1.28; }
   .card .who { font-size: 12.5px; color: var(--text-mid); margin-top: -4px; }
   .due-line { font-size: 12.5px; color: var(--text-mid); display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
@@ -523,10 +526,15 @@
       ? `<button type="button" class="btn-complete-all" data-action="complete-all" data-id="${r.id}" data-fields="${completableFields.join(',')}">${completeLabel}</button>`
       : '<span></span>';
 
+    const deleteBtn = myRoles.isAdmin
+      ? `<button type="button" class="btn-delete" data-action="delete" data-id="${r.id}" data-title="${title}" title="Delete this request">✕</button>`
+      : '';
+
     return `<article class="card ${r.completed?'is-complete':''}" data-card-id="${r.id}">
-      <div class="card-top">
+      <div class="card-top${myRoles.isAdmin ? ' has-delete' : ''}">
         <span class="chip" style="background:${urgency.bg}; color:${urgency.color}">${escHtml(urgency.label)}</span>
         <span class="chip dept">${escHtml(dept)}</span>
+        ${deleteBtn}
       </div>
       <h4>${title}</h4>
       <div class="who">${escHtml(r.requesterName||'—')} · ${kindLabel}</div>
@@ -610,6 +618,12 @@
     if (deny) {
       if (!confirm('Deny this request?')) return;
       db.collection('eventRequests').doc(deny.dataset.id).update({ status: 'denied', statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid });
+      return;
+    }
+    const del = e.target.closest('[data-action="delete"]');
+    if (del) {
+      if (!confirm('Permanently delete "' + del.dataset.title + '"? This cannot be undone.')) return;
+      db.collection('eventRequests').doc(del.dataset.id).delete();
       return;
     }
     const complAll = e.target.closest('[data-action="complete-all"]');
