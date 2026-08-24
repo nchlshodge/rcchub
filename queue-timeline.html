@@ -213,6 +213,7 @@
       <div class="view-tabs" role="tablist">
         <button type="button" class="view-tab active" data-view="cards" role="tab" aria-selected="true">Cards</button>
         <button type="button" class="view-tab" data-view="timeline" role="tab" aria-selected="false">Timeline</button>
+        <button type="button" class="view-tab" data-view="duplicates" role="tab" aria-selected="false" id="duplicatesTab" style="display:none;">Duplicates <span id="dupCountBadge"></span></button>
       </div>
 
       <div id="cardsView">
@@ -225,6 +226,14 @@
           <span class="hint">bar runs from today to the due date · diamond marks the event date · blue line is today</span>
         </div>
         <div class="gantt-scroll"><div class="gantt" id="gantt"></div></div>
+      </div>
+
+      <div id="duplicatesView" style="display:none;">
+        <div class="section-heading">
+          <h2>Possible Duplicates</h2>
+          <span class="hint">same requester, title, date &amp; department — usually an accidental double-submit</span>
+        </div>
+        <div id="duplicatesList"></div>
       </div>
     </div>
 
@@ -421,6 +430,7 @@
 
     renderSections(visible, byDueDate);
     renderGantt(visible);
+    renderDuplicates();
   }
 
   function renderSections(items, byDueDate){
@@ -639,6 +649,13 @@
     }
   });
 
+  document.getElementById('duplicatesList').addEventListener('click', e => {
+    const del = e.target.closest('[data-action="delete"]');
+    if (!del) return;
+    if (!confirm('Permanently delete this duplicate copy of "' + del.dataset.title + '"? This cannot be undone.')) return;
+    db.collection('eventRequests').doc(del.dataset.id).delete();
+  });
+
   document.getElementById('lanes').addEventListener('change', e => {
     const cal = e.target.closest('[data-action="calendar"]');
     if (cal) { db.collection('eventRequests').doc(cal.dataset.id).update({ calendarAdded: cal.checked }); return; }
@@ -661,7 +678,7 @@
   document.getElementById('deptFilter').addEventListener('change', render);
   document.getElementById('hideDone').addEventListener('change', render);
 
-  /* ---------- Cards / Timeline view tabs ---------- */
+  /* ---------- Cards / Timeline / Duplicates view tabs ---------- */
   document.querySelectorAll('.view-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.view-tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
@@ -669,8 +686,72 @@
       tab.setAttribute('aria-selected', 'true');
       document.getElementById('cardsView').style.display = tab.dataset.view === 'cards' ? 'block' : 'none';
       document.getElementById('timelineView').style.display = tab.dataset.view === 'timeline' ? 'block' : 'none';
+      document.getElementById('duplicatesView').style.display = tab.dataset.view === 'duplicates' ? 'block' : 'none';
     });
   });
+
+  /* ---------- Duplicate detection (admin only) ----------
+     Same requester + title + date + department, submitted at the exact
+     same moment, is essentially never a coincidence — this catches
+     accidental double-submits (or, once, a one-time data-import that
+     ran twice) so an admin can clean them up with the existing per-card
+     delete button, grouped together instead of hunting for them one by
+     one via search. */
+  function findDuplicateGroups(){
+    const norm = s => String(s||'').trim().toLowerCase();
+    const groups = {};
+    allRequests.forEach(r => {
+      const key = [norm(r.requesterName), norm(r.eventTitle), norm(r.projectTitle), norm(r.eventDate), norm((r.department||[]).join(','))].join('|');
+      (groups[key] = groups[key] || []).push(r);
+    });
+    return Object.values(groups).filter(g => g.length > 1);
+  }
+
+  function progressScore(r){
+    // Rough "how much work is already recorded on this copy" score, so
+    // the more-complete copy of a diverged pair is easy to spot.
+    let n = 0;
+    if (r.status === 'approved') n++;
+    if (r.calendarAdded) n++;
+    if (r.graphicStatus === 'Completed') n += 2; else if (r.graphicStatus === 'In Progress') n++;
+    if (r.marketingStatus === 'Completed') n += 2; else if (r.marketingStatus === 'In Progress') n++;
+    if (r.internalNote) n++;
+    if (r.graphicLink) n++;
+    return n;
+  }
+
+  function duplicateGroupHtml(group){
+    const sorted = group.slice().sort((a,b)=>progressScore(b)-progressScore(a));
+    const title = escHtml(sorted[0].eventTitle || sorted[0].projectTitle || 'Untitled request');
+    const rows = sorted.map((r,i) => {
+      const isBest = i===0 && progressScore(sorted[0]) > progressScore(sorted[sorted.length-1]);
+      const fields = [
+        ['Status', r.status||'new'],
+        ['Calendar', r.calendarAdded ? 'Added' : 'Not added'],
+        ['Graphic', r.graphicStatus || 'Not started'],
+        ['Marketing', r.marketingStatus || 'Not started'],
+      ];
+      return `<div class="list-item" style="align-items:flex-start; ${isBest?'border-left:3px solid var(--green); padding-left:9px;':''}">
+        <div>
+          ${isBest ? '<div style="font-size:11px; color:var(--green); font-weight:700; text-transform:uppercase; margin-bottom:3px;">Most progress — probably keep this one</div>' : ''}
+          <div style="font-size:12px; color:var(--text-soft);">${fields.map(([k,v])=>`${k}: <b style="color:var(--text-mid); font-weight:600;">${escHtml(v)}</b>`).join(' &nbsp;·&nbsp; ')}</div>
+        </div>
+        <button type="button" class="btn-deny" data-action="delete" data-id="${r.id}" data-title="${title}" style="flex-shrink:0;">Delete this copy</button>
+      </div>`;
+    }).join('');
+    return `<div class="card" style="margin-bottom:14px;"><h4 style="margin-bottom:8px;">${title}</h4>${rows}</div>`;
+  }
+
+  function renderDuplicates(){
+    const tab = document.getElementById('duplicatesTab');
+    if (!myRoles.isAdmin) { tab.style.display = 'none'; return; }
+    const groups = findDuplicateGroups();
+    tab.style.display = 'inline-block';
+    document.getElementById('dupCountBadge').textContent = groups.length ? `(${groups.length})` : '';
+    document.getElementById('duplicatesList').innerHTML = groups.length
+      ? groups.map(duplicateGroupHtml).join('')
+      : '<p class="empty-note">No duplicates found — nice and clean.</p>';
+  }
 
   function escHtml(str){ return (str==null?'':String(str)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function escAttr(str){ return escHtml(str).replace(/'/g,'&#39;'); }
