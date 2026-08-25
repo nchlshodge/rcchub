@@ -261,6 +261,7 @@
   let allRequests = [];
   let excludedCount = 0;
   let myRoles = { graphics: false, marketing: false, isAdmin: false };
+  let editingId = null; // which card (if any) is showing the "Edit Details" form
 
   document.getElementById('googleSignInBtn').addEventListener('click', () => {
     const provider = new firebase.auth.GoogleAuthProvider();
@@ -466,6 +467,36 @@
     return `<div class="status-field"><span class="field-label">${name}</span><div class="seg">${btns}</div>${dueHtml}${hint}</div>`;
   }
 
+  // The requester's own submitted details (title, date, times, location,
+  // who submitted it) — separate from the staff-tracking fields above,
+  // which already have their own inline controls. Admin-only, since
+  // that's what the Firestore rules actually allow for these fields.
+  function editFieldsHtml(r){
+    const titleField = r.eventTitle ? 'eventTitle' : 'projectTitle';
+    const titleValue = r.eventTitle || r.projectTitle || '';
+    const row = (label, field, type, value) => `
+      <div style="flex:1 1 120px;">
+        <label style="font-size:11px; color:var(--text-soft); font-weight:600; display:block; margin-bottom:3px;">${label}</label>
+        <input type="${type}" class="due-input" style="width:100%;" data-edit-field="${field}" value="${escAttr(value||'')}">
+      </div>`;
+    return `<div style="display:flex; flex-direction:column; gap:8px; background:var(--bg-raised); border-radius:8px; padding:10px; margin-bottom:10px;" data-edit-card="${r.id}">
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${row('Title', titleField, 'text', titleValue)}
+        ${row('Requester Name', 'requesterName', 'text', r.requesterName)}
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${row('Event Date', 'eventDate', 'date', r.eventDate)}
+        ${row('Start Time', 'startTime', 'time', r.startTime)}
+        ${row('End Time', 'endTime', 'time', r.endTime)}
+      </div>
+      ${row('Location', 'location', 'text', r.location)}
+      <div style="display:flex; gap:8px; margin-top:2px;">
+        <button type="button" class="btn-complete-all" data-action="save-details" data-id="${r.id}">Save changes</button>
+        <button type="button" class="btn-deny" data-action="cancel-edit" data-id="${r.id}">Cancel</button>
+      </div>
+    </div>`;
+  }
+
   function cardHtml(r){
     const urgency = urgencyOf(r.urgencyKey);
     const due = parseISO(r.dueDate);
@@ -473,6 +504,7 @@
     const title = escHtml(r.eventTitle || r.projectTitle || 'Untitled request');
     const kindLabel = r.requestType === 'church_event' ? 'Calendar Event' : r.requestType === 'media_only' ? 'Graphic / Media Only' : 'Request';
     const dept = (r.department||[]).join(', ') || '—';
+    const isEditing = editingId === r.id;
 
     let dueLine = `Due <strong>${fmtDate(due)}</strong>`;
     if (ev && (!due || +ev !== +due)) dueLine += ` &nbsp;·&nbsp; Event ${fmtDate(ev)}`;
@@ -549,6 +581,7 @@
       <h4>${title}</h4>
       <div class="who">${escHtml(r.requesterName||'—')} · ${kindLabel}</div>
       <div class="due-line">${dueLine}</div>
+      ${isEditing ? editFieldsHtml(r) : ''}
       ${miniBar}
       ${pendingBadge}
       ${descText ? `<div class="desc-text">${escHtml(descText)}</div>` : ''}
@@ -560,7 +593,10 @@
         <textarea placeholder="Notes for the team…" data-action="note" data-id="${r.id}">${escHtml(r.internalNote||'')}</textarea>
       </div>
       <div class="card-actions">
-        ${completeBtn}
+        <div style="display:flex; gap:6px; align-items:center;">
+          ${completeBtn}
+          ${myRoles.isAdmin && !isEditing ? `<button type="button" class="btn-complete-all" style="color:var(--blue); background:var(--blue-dim);" data-action="edit" data-id="${r.id}">Edit Details</button>` : ''}
+        </div>
         ${r.graphicLink ? `<a class="link-open" href="${escAttr(r.graphicLink)}" target="_blank" rel="noopener">Open file ↗</a>` : ''}
       </div>
     </article>`;
@@ -646,6 +682,23 @@
       const update = {};
       fieldList.forEach(f => { update[f] = f === 'calendarAdded' ? true : 'Completed'; });
       if (Object.keys(update).length) db.collection('eventRequests').doc(complAll.dataset.id).update(update);
+      return;
+    }
+    const edit = e.target.closest('[data-action="edit"]');
+    if (edit) { editingId = edit.dataset.id; render(); return; }
+    const cancelEdit = e.target.closest('[data-action="cancel-edit"]');
+    if (cancelEdit) { editingId = null; render(); return; }
+    const saveDetails = e.target.closest('[data-action="save-details"]');
+    if (saveDetails) {
+      const block = saveDetails.closest('[data-edit-card]');
+      const update = {};
+      block.querySelectorAll('[data-edit-field]').forEach(input => {
+        update[input.dataset.editField] = input.value.trim();
+      });
+      db.collection('eventRequests').doc(saveDetails.dataset.id).update(update)
+        .catch(err => alert('Could not save: ' + err.message));
+      editingId = null;
+      render();
     }
   });
 
