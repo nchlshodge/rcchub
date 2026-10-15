@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCC — Event Requests</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+<!-- READ-ONLY VIEW. This page only ever reads the eventRequests collection
+     (one onSnapshot listener, no writes anywhere), so it cannot affect the
+     Event Request form, the Creative Timeline, the Admin approvals, or the
+     Google Sheet sync. Edit/approve things where you always have. -->
+
+<style>
+  :root {
+    --bg:         #f7f6f3;
+    --bg-card:    #ffffff;
+    --bg-raised:  #f0ece4;
+    --border:     #e8e4dc;
+    --text:       #1a1a1a;
+    --text-mid:   #5c5650;
+    --text-soft:  #9e9890;
+    --blue:       #2557b8;
+    --blue-dim:   rgba(37,87,184,0.08);
+    --gold:       #b5892a;
+    --gold-dim:   rgba(181,137,42,0.12);
+    --green:      #2e7a52;
+    --green-dim:  rgba(46,122,82,0.10);
+    --red:        #a03030;
+    --red-dim:    rgba(160,48,48,0.10);
+    --radius:     14px;
+    --radius-sm:  8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  a { color: var(--blue); }
+
+  .nav { background: #fff; border-bottom: 1px solid var(--border); padding: 0 2rem; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .nav-brand { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--blue); text-decoration: none; }
+  .nav-brand span { font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text-soft); margin-left: 6px; }
+  .nav-links { display: flex; align-items: center; gap: 18px; }
+  .nav-user { font-size: 13px; color: var(--text-mid); }
+  .nav-signout { background: none; border: none; font-size: 13px; color: var(--text-soft); cursor: pointer; }
+
+  .page { max-width: 1180px; margin: 0 auto; padding: 2.25rem 1.5rem 4rem; }
+  .page-title { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 600; margin-bottom: 6px; }
+  .page-sub { font-size: 14px; color: var(--text-mid); max-width: 66ch; line-height: 1.5; margin-bottom: 1.4rem; }
+
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 1.4rem; }
+  .controls input[type="search"], .controls select { border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: var(--radius-sm); padding: 8px 11px; font-family: 'Inter', sans-serif; font-size: 13.5px; }
+  .controls input[type="search"] { flex: 1 1 200px; min-width: 160px; }
+  .count-pill { font-size: 12.5px; color: var(--text-soft); margin-left: auto; white-space: nowrap; }
+  .count-pill b { color: var(--text); }
+
+  .view-switch { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+  .view-switch button { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: var(--text-mid); background: var(--bg); border: none; border-right: 1px solid var(--border); padding: 8px 14px; cursor: pointer; }
+  .view-switch button:last-child { border-right: none; }
+  .view-switch button.active { background: var(--blue); color: #fff; }
+
+  .month-head { font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 600; margin: 1.8rem 0 12px; display: flex; align-items: baseline; gap: 10px; }
+  .month-head:first-child { margin-top: 0; }
+  .month-head .n { font-family: 'Inter', sans-serif; font-size: 12px; color: var(--text-soft); font-weight: 500; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .card.is-denied { opacity: 0.6; }
+  .card-date { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--bg-raised); border-bottom: 1px solid var(--border); }
+  .date-tile { width: 46px; flex-shrink: 0; text-align: center; background: #fff; border: 1px solid var(--border); border-radius: 9px; padding: 4px 0 5px; line-height: 1; }
+  .date-tile .mo { display: block; font-size: 10px; font-weight: 700; color: var(--red); letter-spacing: 0.06em; text-transform: uppercase; padding-bottom: 2px; }
+  .date-tile .dy { display: block; font-family: 'Playfair Display', serif; font-size: 21px; font-weight: 600; }
+  .date-tile.nodate .dy { font-size: 16px; color: var(--text-soft); padding-top: 3px; }
+  .date-text { font-size: 13px; color: var(--text-mid); line-height: 1.35; min-width: 0; }
+  .date-text b { color: var(--text); font-weight: 600; display: block; }
+  .card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .card h3 { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 600; line-height: 1.28; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .chip.new { background: var(--gold-dim); color: var(--gold); }
+  .chip.approved { background: var(--green-dim); color: var(--green); }
+  .chip.denied { background: var(--red-dim); color: var(--red); }
+  .chip.type { background: var(--blue-dim); color: var(--blue); }
+  .chip.tag { text-transform: none; font-weight: 600; letter-spacing: 0; background: var(--bg-raised); color: var(--text-mid); font-size: 11.5px; }
+
+  .facts { display: grid; grid-template-columns: 92px 1fr; gap: 6px 10px; font-size: 13px; line-height: 1.45; }
+  .facts dt { color: var(--text-soft); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em; padding-top: 2px; }
+  .facts dd { color: var(--text); word-break: break-word; }
+  .facts dd.long { color: var(--text-mid); white-space: pre-wrap; }
+  .progress { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 10px; border-top: 1px solid var(--bg-raised); }
+  .progress .p { font-size: 11.5px; padding: 3px 9px; border-radius: 999px; background: var(--bg-raised); color: var(--text-soft); font-weight: 600; }
+  .progress .p.ok { background: var(--green-dim); color: var(--green); }
+  .progress .p.wip { background: var(--gold-dim); color: var(--gold); }
+  .card-foot { font-size: 11.5px; color: var(--text-soft); }
+  .btn-open { font-family: 'Inter', sans-serif; font-size: 12.5px; font-weight: 600; color: var(--blue); background: var(--blue-dim); border: none; border-radius: 8px; padding: 8px 12px; cursor: pointer; align-self: flex-start; }
+  .btn-open:hover { background: rgba(37,87,184,0.15); }
+
+  /* Detail drawer */
+  .overlay { position: fixed; inset: 0; background: rgba(26,26,26,0.45); z-index: 50; display: none; justify-content: flex-end; }
+  .overlay.show { display: flex; }
+  .drawer { background: var(--bg); width: min(620px, 100%); height: 100%; overflow-y: auto; box-shadow: -8px 0 30px rgba(0,0,0,0.18); display: flex; flex-direction: column; }
+  .drawer-head { position: sticky; top: 0; z-index: 2; background: #fff; border-bottom: 1px solid var(--border); padding: 16px 20px; display: flex; gap: 12px; align-items: flex-start; }
+  .drawer-head h2 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 600; line-height: 1.25; flex: 1; }
+  .drawer-close { background: var(--bg-raised); border: none; border-radius: 8px; width: 34px; height: 34px; font-size: 18px; cursor: pointer; color: var(--text-mid); flex-shrink: 0; }
+  .drawer-body { padding: 18px 20px 40px; display: flex; flex-direction: column; gap: 22px; }
+  .drawer-section h4 { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-soft); font-weight: 700; margin-bottom: 10px; }
+  .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+
+  .steps { list-style: none; display: flex; flex-direction: column; gap: 0; }
+  .step { display: grid; grid-template-columns: 26px 1fr; gap: 10px; position: relative; padding-bottom: 14px; }
+  .step:last-child { padding-bottom: 0; }
+  .step::before { content: ""; position: absolute; left: 12px; top: 24px; bottom: 0; width: 2px; background: var(--border); }
+  .step:last-child::before { display: none; }
+  .step .dot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); background: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: var(--text-soft); z-index: 1; }
+  .step.done .dot { background: var(--green); border-color: var(--green); color: #fff; }
+  .step.active .dot { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
+  .step.bad .dot { background: var(--red); border-color: var(--red); color: #fff; }
+  .step.done::before { background: var(--green); }
+  .step .s-title { font-size: 14px; font-weight: 600; line-height: 26px; }
+  .step .s-sub { font-size: 12px; color: var(--text-soft); margin-top: -2px; }
+  .step.todo .s-title { color: var(--text-soft); font-weight: 500; }
+
+  .notes-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+  .note { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 13px; }
+  .note.legacy { background: var(--bg-raised); border-style: dashed; }
+  .note-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--text-soft); margin-bottom: 4px; }
+  .note-meta b { color: var(--text-mid); font-weight: 600; }
+  .note-text { font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+  .note-del { background: none; border: none; color: var(--text-soft); font-size: 11.5px; cursor: pointer; padding: 0; }
+  .note-del:hover { color: var(--red); }
+  .note-form textarea { width: 100%; font-family: 'Inter', sans-serif; font-size: 14px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; min-height: 80px; resize: vertical; background: #fff; color: var(--text); }
+  .note-form .row-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+  .note-form .hint { font-size: 11.5px; color: var(--text-soft); }
+  .btn-primary { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: #fff; background: var(--blue); border: none; border-radius: 9px; padding: 9px 16px; cursor: pointer; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* List view */
+  .list { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .row { border-top: 1px solid var(--bg-raised); }
+  .row:first-child { border-top: none; }
+  .row.is-denied .row-main { opacity: 0.6; }
+  .row-main { display: grid; grid-template-columns: 120px minmax(0, 1fr) 150px 190px 110px; gap: 12px; align-items: center; padding: 11px 16px; cursor: pointer; font-size: 13px; width: 100%; background: none; border: none; text-align: left; font-family: 'Inter', sans-serif; color: var(--text); }
+  .row-main:hover { background: #fbfaf7; }
+  .row-date { font-weight: 600; }
+  .row-date small { display: block; font-weight: 400; color: var(--text-soft); font-size: 11.5px; }
+  .row-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-title small { display: block; font-weight: 400; color: var(--text-soft); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+  .row-mid { color: var(--text-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-detail { display: none; padding: 4px 16px 18px 148px; }
+  .row.open .row-detail { display: block; }
+  .row.open .row-main { background: #fbfaf7; }
+  .row-detail .facts { max-width: 760px; }
+
+  .empty-note, .loading { color: var(--text-soft); font-size: 13.5px; font-style: italic; padding: 20px 0; }
+  details.past-group > summary { cursor: pointer; font-family: 'Playfair Display', serif; font-weight: 600; font-size: 19px; color: var(--text-mid); list-style: none; margin: 2rem 0 12px; }
+  details.past-group > summary::-webkit-details-marker { display: none; }
+  details.past-group > summary::before { content: "▸ "; }
+  details.past-group[open] > summary::before { content: "▾ "; }
+  details.past-group > summary .n { font-family: 'Inter', sans-serif; font-size: 12px; color: var(--text-soft); font-weight: 500; }
+
+  #loginScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px; text-align: center; }
+  #googleSignInBtn { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #d1cdc4; border-radius:12px; padding:14px 24px; font-size:15px; cursor:pointer; }
+  .access-denied { text-align: center; padding: 60px 24px; }
+  .access-denied .title { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--red); margin-bottom: 10px; }
+
+  @media (max-width: 860px) {
+    .nav { padding: 0 1rem; }
+    .page { padding: 1.5rem 1rem 3rem; }
+    .card-grid { grid-template-columns: 1fr; }
+    .row-main { grid-template-columns: 84px minmax(0, 1fr) 96px; }
+    .row-main .row-mid { display: none; }
+    .row-detail { padding: 4px 16px 18px 16px; }
+    .count-pill { margin-left: 0; }
+  }
+  @media print {
+    .nav, .controls { display: none; }
+    body { background: #fff; }
+    .card, .row { break-inside: avoid; }
+    .row-detail { display: block !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <h1 style="font-family:'Playfair Display',serif; font-size:28px; margin-bottom:20px;">RCC Event Requests</h1>
+  <button id="googleSignInBtn">
+    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+    Sign in with Google
+  </button>
+</div>
+
+<div id="appShell" style="display:none;">
+  <nav class="nav">
+    <a href="index.html" class="nav-brand">RCC <span>· Event Requests</span></a>
+    <div class="nav-links">
+      <span class="nav-user" id="navUser"></span>
+      <button class="nav-signout" id="signOutBtn">Sign out</button>
+    </div>
+  </nav>
+
+  <div class="page">
+    <div id="accessCheck" class="loading">Checking access…</div>
+
+    <div id="ui" style="display:none;">
+      <h1 class="page-title">Event Requests</h1>
+      <p class="page-sub">Everything submitted through the Event Request form, laid out by event date. Switch between cards and a compact list, and open any event to see where it is in the process and keep a running log of notes. Approvals and graphic status are still changed in Admin and the Creative Timeline.</p>
+
+      <div class="controls">
+        <div class="view-switch" role="tablist" aria-label="Layout">
+          <button type="button" data-view="cards" class="active" role="tab" aria-selected="true">Cards</button>
+          <button type="button" data-view="list" role="tab" aria-selected="false">List</button>
+        </div>
+        <input type="search" id="search" placeholder="Search title, name, location…" aria-label="Search requests">
+        <select id="statusFilter" aria-label="Filter by status">
+          <option value="active">New + Approved</option>
+          <option value="all">All statuses</option>
+          <option value="new">New only</option>
+          <option value="approved">Approved only</option>
+          <option value="denied">Denied only</option>
+        </select>
+        <select id="typeFilter" aria-label="Filter by request type">
+          <option value="">All request types</option>
+          <option value="church_event">Church Event</option>
+          <option value="media_only">Media/Graphic Only</option>
+          <option value="facilities">Facilities Rental</option>
+        </select>
+        <select id="deptFilter" aria-label="Filter by department"><option value="">All departments</option></select>
+        <span class="count-pill"><b id="statShown">–</b> shown</span>
+      </div>
+
+      <div id="content"><div class="loading">Loading requests…</div></div>
+    </div>
+
+    <div id="overlay" class="overlay" aria-hidden="true">
+      <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+        <div class="drawer-head">
+          <h2 id="drawerTitle"></h2>
+          <button type="button" class="drawer-close" id="drawerClose" aria-label="Close">×</button>
+        </div>
+        <div class="drawer-body" id="drawerBody"></div>
+      </aside>
+    </div>
+
+    <div id="accessDenied" class="access-denied" style="display:none;">
+      <div class="title">No Access</div>
+      <p style="color: var(--text-soft); font-size:14px;">Ask an admin to add you to the Graphics or Marketing team to see this page.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+    authDomain: "bedsidercc.firebaseapp.com",
+    projectId: "bedsidercc",
+    storageBucket: "bedsidercc.firebasestorage.app",
+    messagingSenderId: "950958384975",
+    appId: "1:950958384975:web:6f43dec5a7ba842c69c73a"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  let allRequests = [];
+  let view = 'cards';
+  try { view = localStorage.getItem('eventRequestsView') === 'list' ? 'list' : 'cards'; } catch (e) {}
+  let currentUser = null, isAdmin = false;
+
+  document.getElementById('googleSignInBtn').addEventListener('click', () => {
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => alert('Sign-in failed: ' + err.message));
+  });
+  document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+
+  // Same access rule as the Firestore rules on eventRequests:
+  // admins, or people with the Graphics / Marketing role.
+  auth.onAuthStateChanged(async user => {
+    currentUser = user || null;
+    if (!user) {
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('appShell').style.display = 'none';
+      return;
+    }
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appShell').style.display = 'block';
+    document.getElementById('navUser').textContent = user.displayName || user.email;
+    const doc = await db.collection('users').doc(user.uid).get();
+    const data = doc.exists ? doc.data() : {};
+    const roles = data.roles || {};
+    isAdmin = data.isAdmin === true;
+    document.getElementById('accessCheck').style.display = 'none';
+    if (data.isAdmin === true || roles.graphics === true || roles.marketing === true) {
+      document.getElementById('ui').style.display = 'block';
+      syncViewButtons();
+      db.collection('eventRequests').onSnapshot(snap => {
+        allRequests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        buildDeptFilter();
+        render();
+        if (openId) drawDrawer(); // keep the open event's progress live
+      }, err => {
+        document.getElementById('content').innerHTML = '<p class="empty-note">Could not load requests: ' + esc(err.message) + '</p>';
+      });
+    } else {
+      document.getElementById('accessDenied').style.display = 'block';
+    }
+  });
+
+  /* ---------- helpers ---------- */
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  const DAY = 86400000;
+  function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  const TODAY = startOfDay(new Date());
+  function parseISO(s) {
+    if (!s) return null;
+    const p = String(s).split('-').map(Number);
+    if (p.length !== 3 || p.some(isNaN)) return null;
+    return new Date(p[0], p[1] - 1, p[2]);
+  }
+  function fmtTime(t) {
+    if (!t) return '';
+    const m = String(t).match(/^(\d{1,2}):(\d{2})/);
+    if (!m) return t;
+    let h = +m[1]; const ap = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return h + ':' + m[2] + ' ' + ap;
+  }
+  function timeRange(r) {
+    const a = fmtTime(r.startTime), b = fmtTime(r.endTime);
+    return a && b ? a + ' – ' + b : (a || b || '');
+  }
+  function arr(v) { return Array.isArray(v) ? v.filter(Boolean) : (v ? [v] : []); }
+  function titleOf(r) { return r.eventTitle || r.projectTitle || 'Untitled request'; }
+  const TYPE_LABELS = { church_event: 'Church Event', media_only: 'Media/Graphic Only', facilities: 'Facilities Rental' };
+  function statusOf(r) { return r.status || 'new'; }
+  function submittedDate(r) {
+    const t = r.submittedAt;
+    if (t && typeof t.toDate === 'function') return t.toDate();
+    if (typeof t === 'string') { const d = new Date(t); return isNaN(d) ? null : d; }
+    return null;
+  }
+  function fmtLong(d) { return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); }
+  function fmtShort(d) { return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
+  function whenLabel(d) {
+    const n = Math.round((d - TODAY) / DAY);
+    if (n === 0) return 'Today';
+    if (n === 1) return 'Tomorrow';
+    if (n > 1 && n <= 14) return 'In ' + n + ' days';
+    if (n < 0 && n >= -14) return Math.abs(n) + (n === -1 ? ' day ago' : ' days ago');
+    return '';
+  }
+  function locationOf(r) {
+    const rooms = arr(r.onsiteRoom).concat(r.onsiteRoomOther ? [r.onsiteRoomOther] : []);
+    const parts = [];
+    if (r.location) parts.push(r.location);
+    if (rooms.length) parts.push(rooms.join(', '));
+    return parts.join(' — ');
+  }
+  function vansOf(r) {
+    const v = arr(r.vansNeeded).filter(x => x !== 'None');
+    return v.length ? v.join(', ') : '';
+  }
+
+  function buildDeptFilter() {
+    const sel = document.getElementById('deptFilter');
+    const cur = sel.value;
+    const set = new Set();
+    allRequests.forEach(r => arr(r.department).forEach(d => set.add(d)));
+    sel.innerHTML = '<option value="">All departments</option>' +
+      [...set].sort().map(d => '<option value="' + esc(d) + '">' + esc(d) + '</option>').join('');
+    sel.value = set.has(cur) ? cur : '';
+  }
+
+  /* ---------- filtering + grouping ---------- */
+  function visibleRequests() {
+    const q = document.getElementById('search').value.trim().toLowerCase();
+    const st = document.getElementById('statusFilter').value;
+    const ty = document.getElementById('typeFilter').value;
+    const dp = document.getElementById('deptFilter').value;
+    return allRequests.filter(r => {
+      const s = statusOf(r);
+      if (st === 'active' && s === 'denied') return false;
+      if (['new', 'approved', 'denied'].includes(st) && s !== st) return false;
+      if (ty && r.requestType !== ty) return false;
+      if (dp && !arr(r.department).includes(dp)) return false;
+      if (q) {
+        const hay = [titleOf(r), r.requesterName, r.email, r.eventDesc, r.mediaDesc, locationOf(r), arr(r.department).join(' ')].join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+  function byDate(a, b) {
+    const da = parseISO(a.eventDate), db_ = parseISO(b.eventDate);
+    if (da && db_ && da - db_ !== 0) return da - db_;
+    const ta = a.startTime || '', tb = b.startTime || '';
+    if (ta !== tb) return ta < tb ? -1 : 1;
+    return titleOf(a).localeCompare(titleOf(b));
+  }
+
+  // Mirrors the Creative Timeline's own rules for which tracks a request has,
+  // so this page and the queue always agree.
+  function hasCalendar(r) { return r.requestType === 'church_event'; }
+  function hasGraphic(r) { return Array.isArray(r.mediaSizes) && r.mediaSizes.length > 0; }
+  function hasMarketing(r) { const m = r.marketing; return Array.isArray(m) && m.length > 0 && !(m.length === 1 && m[0] === 'None'); }
+
+  /* ---------- rendering ---------- */
+  function progressPills(r) {
+    if (statusOf(r) !== 'approved') return '';
+    const pill = (label, v) => '<span class="p ' + (v === 'Completed' ? 'ok' : v === 'In Progress' ? 'wip' : '') + '">' + esc(label) + ': ' + esc(v || 'Not started') + '</span>';
+    let h = hasCalendar(r) ? '<span class="p ' + (r.calendarAdded ? 'ok' : '') + '">Calendar: ' + (r.calendarAdded ? 'Added' : 'Not yet') + '</span>' : '';
+    if (hasGraphic(r)) h += pill('Graphic', r.graphicStatus);
+    if (hasMarketing(r)) h += pill('Marketing', r.marketingStatus);
+    if (vansOf(r)) h += '<span class="p ' + (r.vanConfirmed ? 'ok' : '') + '">Van: ' + (r.vanConfirmed ? 'Confirmed' : 'Not confirmed') + '</span>';
+    return h;
+  }
+
+  // The full detail block — only shows the fields that were actually filled in.
+  function factsHtml(r) {
+    const rows = [];
+    const add = (label, val, long) => { if (val) rows.push('<dt>' + label + '</dt><dd' + (long ? ' class="long"' : '') + '>' + val + '</dd>'); };
+    const d = parseISO(r.eventDate);
+    add('Date', d ? esc(fmtLong(d)) : '');
+    add('Time', esc(timeRange(r)));
+    add('Where', esc(locationOf(r)));
+    add('About', esc(r.eventDesc), true);
+    add('Requested by', esc(r.requesterName || '') + (r.email ? ' · <a href="mailto:' + esc(r.email) + '">' + esc(r.email) + '</a>' : ''));
+    add('Departments', esc(arr(r.department).join(', ')));
+    const sizes = arr(r.mediaSizes).concat(r.mediaSizeOther ? [r.mediaSizeOther] : []);
+    add('Graphic sizes', esc(sizes.join(', ')));
+    add('Graphic notes', esc(r.mediaDesc), true);
+    const gd = parseISO(r.graphicDueDate);
+    add('Graphic due', gd ? esc(fmtShort(gd) + ', ' + gd.getFullYear()) : '');
+    add('Marketing', esc(arr(r.marketing).concat(r.marketingOther ? [r.marketingOther] : []).join(', ')));
+    add('Vans', esc(vansOf(r)));
+    if (r.ticketsNeeded && r.ticketsNeeded.toLowerCase() !== 'no') add('Tickets', esc(r.ticketsNeeded) + (r.ticketPrice ? ' · ' + esc(r.ticketPrice) : ''));
+    add('Staff note', esc(r.internalNote), true);
+    if (r.graphicLink && /^https?:\/\//i.test(r.graphicLink)) add('Graphic link', '<a href="' + esc(r.graphicLink) + '" target="_blank" rel="noopener">Open graphic</a>');
+    return rows.length ? '<dl class="facts">' + rows.join('') + '</dl>' : '';
+  }
+
+  function statusChip(r) { const s = statusOf(r); return '<span class="chip ' + esc(s) + '">' + (s === 'new' ? 'Needs approval' : esc(s)) + '</span>'; }
+  function typeChip(r) { return r.requestType ? '<span class="chip type">' + esc(TYPE_LABELS[r.requestType] || r.requestType) + '</span>' : ''; }
+
+  function cardHtml(r) {
+    const d = parseISO(r.eventDate);
+    const when = d ? whenLabel(d) : '';
+    const tile = d
+      ? '<div class="date-tile"><span class="mo">' + esc(d.toLocaleDateString('en-US', { month: 'short' })) + '</span><span class="dy">' + d.getDate() + '</span></div>'
+      : '<div class="date-tile nodate"><span class="dy">TBD</span></div>';
+    const sub = d ? '<b>' + esc(d.toLocaleDateString('en-US', { weekday: 'long' })) + (timeRange(r) ? ' · ' + esc(timeRange(r)) : '') + '</b>' + esc(when || String(d.getFullYear())) : '<b>No event date</b>' + (r.requestType === 'media_only' ? 'Graphic-only request' : '');
+    const sd = submittedDate(r);
+    return '<article class="card ' + (statusOf(r) === 'denied' ? 'is-denied' : '') + '">' +
+      '<div class="card-date">' + tile + '<div class="date-text">' + sub + '</div></div>' +
+      '<div class="card-body">' +
+        '<h3>' + esc(titleOf(r)) + '</h3>' +
+        '<div class="chips">' + statusChip(r) + typeChip(r) + arr(r.department).map(x => '<span class="chip tag">' + esc(x) + '</span>').join('') + '</div>' +
+        factsHtml(r) +
+        (progressPills(r) ? '<div class="progress">' + progressPills(r) + '</div>' : '') +
+        '<button type="button" class="btn-open" data-open="' + esc(r.id) + '">Progress &amp; notes →</button>' +
+        (sd ? '<div class="card-foot">Submitted ' + esc(sd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })) + '</div>' : '') +
+      '</div></article>';
+  }
+
+  function rowHtml(r) {
+    const d = parseISO(r.eventDate);
+    return '<div class="row ' + (statusOf(r) === 'denied' ? 'is-denied' : '') + '">' +
+      '<button type="button" class="row-main" data-open="' + esc(r.id) + '">' +
+        '<span class="row-date">' + (d ? esc(fmtShort(d)) : 'No date') + '<small>' + esc(timeRange(r) || (d ? whenLabel(d) : '')) + '</small></span>' +
+        '<span class="row-title">' + esc(titleOf(r)) + '<small>' + esc(locationOf(r)) + '</small></span>' +
+        '<span class="row-mid">' + esc(r.requesterName || '') + '</span>' +
+        '<span class="row-mid">' + esc(arr(r.department).join(', ')) + '</span>' +
+        '<span>' + statusChip(r) + '</span>' +
+      '</button>' +
+    '</div>';
+  }
+
+  function render() {
+    const list = visibleRequests();
+    document.getElementById('statShown').textContent = list.length;
+    const el = document.getElementById('content');
+    if (!list.length) { el.innerHTML = '<p class="empty-note">No requests match these filters.</p>'; return; }
+
+    const pastWasOpen = !!el.querySelector('details.past-group[open]');
+    const upcoming = [], past = [], undated = [];
+    list.forEach(r => {
+      const d = parseISO(r.eventDate);
+      if (!d) undated.push(r); else if (d < TODAY) past.push(r); else upcoming.push(r);
+    });
+    upcoming.sort(byDate);
+    past.sort((a, b) => byDate(b, a)); // most recent past event first
+    undated.sort((a, b) => (submittedDate(b) || 0) - (submittedDate(a) || 0));
+
+    const draw = items => view === 'cards'
+      ? '<div class="card-grid">' + items.map(cardHtml).join('') + '</div>'
+      : '<div class="list">' + items.map(rowHtml).join('') + '</div>';
+
+    // Upcoming grouped under month headings.
+    let html = '';
+    const months = new Map();
+    upcoming.forEach(r => {
+      const d = parseISO(r.eventDate);
+      const key = d.getFullYear() * 100 + d.getMonth();
+      if (!months.has(key)) months.set(key, { label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), items: [] });
+      months.get(key).items.push(r);
+    });
+    months.forEach(m => {
+      html += '<div class="month-head">' + esc(m.label) + '<span class="n">' + m.items.length + ' request' + (m.items.length === 1 ? '' : 's') + '</span></div>' + draw(m.items);
+    });
+    if (!upcoming.length) html += '<p class="empty-note">No upcoming dated events match.</p>';
+    if (undated.length) html += '<div class="month-head">No event date yet<span class="n">' + undated.length + '</span></div>' + draw(undated);
+    if (past.length) html += '<details class="past-group"' + (pastWasOpen ? ' open' : '') + '><summary>Past events <span class="n">' + past.length + '</span></summary>' + draw(past) + '</details>';
+    el.innerHTML = html;
+  }
+
+  /* ---------- wiring ---------- */
+  function syncViewButtons() {
+    document.querySelectorAll('.view-switch button').forEach(b => {
+      const on = b.dataset.view === view;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on);
+    });
+  }
+  document.querySelectorAll('.view-switch button').forEach(b => b.addEventListener('click', () => {
+    view = b.dataset.view;
+    try { localStorage.setItem('eventRequestsView', view); } catch (e) {}
+    syncViewButtons();
+    render();
+  }));
+  ['search', 'statusFilter', 'typeFilter', 'deptFilter'].forEach(id => {
+    document.getElementById(id).addEventListener(id === 'search' ? 'input' : 'change', render);
+  });
+  document.getElementById('content').addEventListener('click', e => {
+    const btn = e.target.closest('[data-open]');
+    if (btn) openDetail(btn.dataset.open);
+  });
+
+  /* ---------- detail drawer: progress + notes ---------- */
+  let openId = null, unsubNotes = null, noteDocs = [];
+
+  // Where the request is in its life, derived from fields the other pages
+  // already maintain (status, calendarAdded, graphicStatus, ...). Nothing
+  // here is stored or edited — it just reads them.
+  function stepsFor(r) {
+    const s = statusOf(r);
+    const d = parseISO(r.eventDate);
+    const approved = s === 'approved';
+    const sd = submittedDate(r);
+    const steps = [{ state: 'done', title: 'Request submitted', sub: sd ? sd.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + (r.requesterName ? ' by ' + r.requesterName : '') : (r.requesterName ? 'by ' + r.requesterName : '') }];
+    if (s === 'denied') {
+      steps.push({ state: 'bad', title: 'Denied', sub: 'This request was not approved.' });
+      return steps;
+    }
+    steps.push({ state: approved ? 'done' : 'active', title: approved ? 'Approved' : 'Waiting for approval', sub: approved ? '' : 'An admin needs to approve or deny this.' });
+    const later = (label, done, wipSub, todoSub, wip) => {
+      if (!approved) return { state: 'todo', title: label, sub: '' };
+      return { state: done ? 'done' : (wip ? 'active' : 'todo'), title: label, sub: done ? '' : (wip ? wipSub : todoSub) };
+    };
+    if (hasCalendar(r)) steps.push(later('On the calendar', !!r.calendarAdded, '', 'Not added yet', false));
+    if (hasGraphic(r)) steps.push(later('Graphic', r.graphicStatus === 'Completed', 'In progress', 'Not started', r.graphicStatus === 'In Progress'));
+    if (hasMarketing(r)) steps.push(later('Marketing', r.marketingStatus === 'Completed', 'In progress', 'Not started', r.marketingStatus === 'In Progress'));
+    if (vansOf(r)) steps.push(later('Van confirmed (' + vansOf(r) + ')', !!r.vanConfirmed, '', 'Not confirmed yet', false));
+    if (d) {
+      const over = d < TODAY;
+      steps.push({ state: over ? 'done' : 'todo', title: over ? 'Event has happened' : 'Event day', sub: fmtLong(d) + (whenLabel(d) ? ' · ' + whenLabel(d) : '') });
+    }
+    return steps;
+  }
+
+  function stepsHtml(r) {
+    return '<ol class="steps">' + stepsFor(r).map(st =>
+      '<li class="step ' + st.state + '"><span class="dot">' + (st.state === 'done' ? '✓' : st.state === 'bad' ? '✕' : st.state === 'active' ? '•' : '') + '</span><div><div class="s-title">' + esc(st.title) + '</div>' + (st.sub ? '<div class="s-sub">' + esc(st.sub) + '</div>' : '') + '</div></li>'
+    ).join('') + '</ol>';
+  }
+
+  function fmtStamp(ts) {
+    const d = ts && typeof ts.toDate === 'function' ? ts.toDate() : null;
+    return d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'just now';
+  }
+
+  function notesHtml() {
+    const r = allRequests.find(x => x.id === openId);
+    let h = '';
+    if (r && r.internalNote) {
+      h += '<div class="note legacy"><div class="note-meta"><b>Earlier staff note</b><span>from Creative Timeline</span></div><div class="note-text">' + esc(r.internalNote) + '</div></div>';
+    }
+    noteDocs.forEach(n => {
+      const mine = currentUser && n.authorUid === currentUser.uid;
+      h += '<div class="note"><div class="note-meta"><span><b>' + esc(n.authorName || 'Someone') + '</b> · ' + esc(fmtStamp(n.createdAt)) + '</span>' +
+        (mine || isAdmin ? '<button type="button" class="note-del" data-del-note="' + esc(n.id) + '">Delete</button>' : '') + '</div>' +
+        '<div class="note-text">' + esc(n.text) + '</div></div>';
+    });
+    return h || '<p class="empty-note" style="padding:4px 0;">No notes yet. Add the first one below.</p>';
+  }
+
+  function drawDrawer() {
+    const r = allRequests.find(x => x.id === openId);
+    if (!r) { closeDetail(); return; }
+    document.getElementById('drawerTitle').textContent = titleOf(r);
+    const body = document.getElementById('drawerBody');
+    // Keep whatever the person is typing if the data refreshes underneath them.
+    const prev = document.getElementById('noteInput');
+    const draft = prev ? prev.value : '';
+    const hadFocus = prev && document.activeElement === prev;
+    body.innerHTML =
+      '<div class="drawer-section"><div class="chips">' + statusChip(r) + typeChip(r) + arr(r.department).map(x => '<span class="chip tag">' + esc(x) + '</span>').join('') + '</div></div>' +
+      '<div class="drawer-section"><h4>Progress</h4><div class="panel">' + stepsHtml(r) + '</div></div>' +
+      '<div class="drawer-section"><h4>Notes &amp; updates</h4><div class="notes-list" id="notesList">' + notesHtml() + '</div>' +
+        '<div class="note-form"><textarea id="noteInput" maxlength="2000" placeholder="Add a note — new details, a change of plans, something to remember…"></textarea>' +
+        '<div class="row-actions"><span class="hint">Everyone with access to this page sees notes.</span><button type="button" class="btn-primary" id="noteSave">Add note</button></div></div></div>' +
+      '<div class="drawer-section"><h4>Details</h4><div class="panel">' + (factsHtml(r) || '<span class="hint">No details.</span>') + '</div></div>';
+    const input = document.getElementById('noteInput');
+    input.value = draft;
+    if (hadFocus) input.focus();
+  }
+
+  function openDetail(id) {
+    if (unsubNotes) { unsubNotes(); unsubNotes = null; }
+    openId = id; noteDocs = [];
+    document.getElementById('overlay').classList.add('show');
+    document.getElementById('overlay').setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    drawDrawer();
+    unsubNotes = db.collection('eventRequests').doc(id).collection('notes').orderBy('createdAt', 'asc').onSnapshot(snap => {
+      noteDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const list = document.getElementById('notesList');
+      if (list && openId === id) { list.innerHTML = notesHtml(); list.scrollTop = list.scrollHeight; }
+    }, err => {
+      const list = document.getElementById('notesList');
+      if (list) list.innerHTML = '<p class="empty-note">Could not load notes: ' + esc(err.message) + '</p>';
+    });
+  }
+  function closeDetail() {
+    if (unsubNotes) { unsubNotes(); unsubNotes = null; }
+    openId = null; noteDocs = [];
+    document.getElementById('overlay').classList.remove('show');
+    document.getElementById('overlay').setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+  document.getElementById('drawerClose').addEventListener('click', closeDetail);
+  document.getElementById('overlay').addEventListener('click', e => { if (e.target.id === 'overlay') closeDetail(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && openId) closeDetail(); });
+
+  document.getElementById('drawerBody').addEventListener('click', async e => {
+    if (e.target.id === 'noteSave') {
+      const input = document.getElementById('noteInput');
+      const text = input.value.trim();
+      if (!text || !openId || !currentUser) return;
+      const btn = e.target; btn.disabled = true;
+      try {
+        await db.collection('eventRequests').doc(openId).collection('notes').add({
+          text, authorUid: currentUser.uid,
+          authorName: currentUser.displayName || currentUser.email || 'Staff',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        input.value = '';
+      } catch (err) { alert('Could not save the note: ' + err.message); }
+      btn.disabled = false;
+      return;
+    }
+    const del = e.target.closest('[data-del-note]');
+    if (del && openId && confirm('Delete this note?')) {
+      db.collection('eventRequests').doc(openId).collection('notes').doc(del.dataset.delNote).delete()
+        .catch(err => alert('Could not delete: ' + err.message));
+    }
+  });
+</script>
+</body>
+</html>

@@ -612,6 +612,18 @@
       </button>`;
     }).join('');
 
+    if (hasWorkQueueAccess || isAdmin) {
+      html += `
+      <a class="module-card" href="event-requests.html">
+        <div class="module-icon" style="background: var(--gold-dim);">📅</div>
+        <div class="module-info">
+          <div class="module-name">Event Requests</div>
+          <div class="module-desc">Every request by event date — see progress and add notes</div>
+        </div>
+        <div class="module-arrow">→</div>
+      </a>`;
+    }
+
     if (hasWorkQueueAccess) {
       html += `
       <a class="module-card" href="queue-timeline.html">
