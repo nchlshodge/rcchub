@@ -1143,7 +1143,7 @@ function App(){
         title="Van Usage"
         hubLink
         right={<>
-          {canAccessAdmin && <a className="plain" href="admin.html" style={{textDecoration:'none', display:'inline-block', textAlign:'center'}}>Admin</a>}
+          {canAccessAdmin && <a className="plain" href="../admin.html?section=vans" style={{textDecoration:'none', display:'inline-block', textAlign:'center'}}>Admin</a>}
           <button className="plain" onClick={()=>auth.signOut()}>Sign out</button>
         </>}
       />

@@ -170,6 +170,8 @@
   .access-denied { text-align: center; padding: 60px 24px; }
   .access-denied .title { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--red); margin-bottom: 10px; }
 </style>
+<script>if(/[?&]embed=1(&|$)/.test(location.search))document.documentElement.classList.add('embedded');</script>
+<style>.embedded #appShell>header,.embedded #appShell>nav.nav,.embedded .topbar{display:none!important}</style>
 </head>
 <body>
 
@@ -185,6 +187,7 @@
   <nav class="nav">
     <a href="index.html" class="nav-brand">RCC <span>· Creative Timeline</span></a>
     <div class="nav-links">
+      <a href="admin.html?section=events" id="adminLink" style="display:none;">Admin</a>
       <span class="nav-user" id="navUser"></span>
       <button class="nav-signout" id="signOutBtn">Sign out</button>
     </div>
@@ -281,6 +284,7 @@
       const roles = data.roles || {};
       myRoles = { graphics: roles.graphics === true, marketing: roles.marketing === true, isAdmin: data.isAdmin === true };
       document.getElementById('accessCheck').style.display = 'none';
+      document.getElementById('adminLink').style.display = myRoles.isAdmin ? '' : 'none';
 
       if (myRoles.graphics || myRoles.marketing || myRoles.isAdmin) {
         document.getElementById('timelineUI').style.display = 'block';

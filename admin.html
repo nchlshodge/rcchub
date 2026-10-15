@@ -87,6 +87,9 @@
       gap: 4px;
       overflow-x: auto;
     }
+    .embed-bar { display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:12.5px; color:var(--text-soft); margin-bottom:10px; }
+    .embed-bar a { color:var(--blue); text-decoration:none; font-weight:500; }
+    .embed-frame { display:block; width:100%; height:calc(100vh - 210px); min-height:560px; border:1px solid var(--border); border-radius:12px; background:#fff; }
     .section-tab {
       padding: 14px 16px;
       font-size: 14px;
@@ -203,9 +206,12 @@
     <nav>
       <div class="section-tab active" data-section="overview">Overview</div>
       <div class="section-tab" data-section="bedside">Bedside</div>
-      <a class="section-tab" href="incident/admin.html" style="text-decoration:none;">Incident Reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></a>
+      <div class="section-tab" data-section="incidents">Incident Reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="vans">Van Usage</div>
+      <div class="section-tab" data-section="intramural" style="display:none;">Intramural</div>
+      <div class="section-tab" data-section="benevolence" style="display:none;">Benevolence</div>
       <div class="section-tab" data-section="events">Event Requests <span class="badge-count" id="eventsCount" style="display:none;"></span></div>
+      <div class="section-tab" data-section="timeline">Creative Timeline</div>
       <div class="section-tab" data-section="timeoff">Time Off <span class="badge-count" id="timeOffCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="access">App Access</div>
       <div class="section-tab" data-section="requests">Access Requests <span class="badge-count" id="requestsCount" style="display:none;"></span></div>
@@ -219,20 +225,17 @@
         <div id="overviewCards"><div class="loading">Loading...</div></div>
       </div>
 
-      <!-- BEDSIDE -->
+      <!-- BEDSIDE (full Bedside admin, embedded) -->
       <div class="section" id="section-bedside">
-        <h2 class="section-title">Bedside</h2>
-        <div class="subnav">
-          <div class="subtab active" data-btab="pending">Pending Prayer Requests</div>
-          <div class="subtab" data-btab="visits">Active Visits</div>
-          <div class="subtab" data-btab="wall">Prayer Wall</div>
-        </div>
-        <div id="bedside-pending"><div class="loading">Loading...</div></div>
-        <div id="bedside-visits" style="display:none;"><div class="loading">Loading...</div></div>
-        <div id="bedside-wall" style="display:none;"><div class="loading">Loading...</div></div>
-        <p class="card-text" style="margin-top:16px;">For discharge, add-visit, and full detail, use <a href="bedside/admin.html" style="color:var(--blue);">Bedside's own admin page →</a></p>
+        <div class="embed-bar"><span>Bedside admin</span><a id="open-bedside" href="bedside/admin.html?embed=1" target="_blank" rel="noopener">Open on its own page ↗</a></div>
+        <iframe class="embed-frame" id="frame-bedside" title="Bedside admin" data-src="bedside/admin.html?embed=1"></iframe>
       </div>
 
+      <!-- INCIDENT REPORTS (full Incident admin, embedded) -->
+      <div class="section" id="section-incidents">
+        <div class="embed-bar"><span>Incident Reports admin</span><a id="open-incidents" href="incident/admin.html?embed=1" target="_blank" rel="noopener">Open on its own page ↗</a></div>
+        <iframe class="embed-frame" id="frame-incidents" title="Incident Reports admin" data-src="incident/admin.html?embed=1"></iframe>
+      </div>
 
       <!-- VAN USAGE -->
       <!-- EVENT REQUESTS -->
@@ -275,19 +278,27 @@
         <div id="timeOffList"><div class="loading">Loading...</div></div>
       </div>
 
+      <!-- VAN USAGE (full Van admin, embedded) -->
       <div class="section" id="section-vans">
-        <h2 class="section-title">Van Usage</h2>
-        <div class="subnav">
-          <div class="subtab active" data-vtab="approvals">Driver Approvals</div>
-          <div class="subtab" data-vtab="vans">Vans</div>
-          <div class="subtab" data-vtab="alerts">Safety Alerts</div>
-          <div class="subtab" data-vtab="history">History</div>
-        </div>
-        <div id="van-approvals"><div class="loading">Loading...</div></div>
-        <div id="van-vans" style="display:none;"><div class="loading">Loading...</div></div>
-        <div id="van-alerts" style="display:none;"><div class="loading">Loading...</div></div>
-        <div id="van-history" style="display:none;"><div class="loading">Loading...</div></div>
-        <p class="card-text" style="margin-top:16px;">For scheduling, repairs, warning lights, adding drivers, adding vans, and managing weekly recurring reservations, use the <a href="van/admin.html" style="color:var(--blue);">Van Usage admin view →</a></p>
+        <div class="embed-bar"><span>Van Usage admin</span><a id="open-vans" href="van/admin.html?embed=1" target="_blank" rel="noopener">Open on its own page ↗</a></div>
+        <iframe class="embed-frame" id="frame-vans" title="Van Usage admin" data-src="van/admin.html?embed=1"></iframe>
+      </div>
+
+      <!-- INTRAMURAL + BENEVOLENCE: embedded once those pages are published (probed at load) -->
+      <div class="section" id="section-intramural">
+        <div class="embed-bar"><span>Intramural Sports admin</span><a id="open-intramural" href="#" target="_blank" rel="noopener">Open on its own page ↗</a></div>
+        <iframe class="embed-frame" id="frame-intramural" title="Intramural Sports admin"></iframe>
+      </div>
+
+      <div class="section" id="section-benevolence">
+        <div class="embed-bar"><span>Benevolence Fund admin</span><a id="open-benevolence" href="#" target="_blank" rel="noopener">Open on its own page ↗</a></div>
+        <iframe class="embed-frame" id="frame-benevolence" title="Benevolence Fund admin"></iframe>
+      </div>
+
+      <!-- CREATIVE TIMELINE (graphics / marketing queue, embedded) -->
+      <div class="section" id="section-timeline">
+        <div class="embed-bar"><span>Creative Timeline</span><a id="open-timeline" href="queue-timeline.html?embed=1" target="_blank" rel="noopener">Open on its own page ↗</a></div>
+        <iframe class="embed-frame" id="frame-timeline" title="Creative Timeline" data-src="queue-timeline.html?embed=1"></iframe>
       </div>
 
       <!-- APP ACCESS -->
@@ -359,7 +370,9 @@
       const canGraphics = isFullAdmin || roles.graphics === true;
       const canMarketing = isFullAdmin || roles.marketing === true;
       const canOverview = isFullAdmin || roles.overview === true;
-      const hasAnyAccess = isFullAdmin || canVan || canBedside || canGraphics || canMarketing || canOverview;
+      const canIntramural = isFullAdmin || roles.commissioner === true;
+      const canBenevolence = isFullAdmin || roles.benevolence === true;
+      const hasAnyAccess = isFullAdmin || canVan || canBedside || canGraphics || canMarketing || canOverview || canIntramural || canBenevolence;
       window.currentUserIsFullAdmin = isFullAdmin;
       window.currentUserCanOverview = canOverview;
       window.currentUserIsOwner = userData.isOwner === true;
@@ -377,9 +390,19 @@
         // Incident Reports, Event Requests, Time Off, App Access,
         // Access Requests, and Manage Admins stay full-admin-only,
         // since they sit outside any single department's scope.
+        // Intramural and Benevolence only get a tab once their admin page
+        // is actually published on the site (probed here), so there's never
+        // a tab pointing at a missing page.
+        const [intramuralSrc, benevolenceSrc] = await Promise.all([
+          probePage(['intramural/admin.html']),
+          probePage(['benevolence/admin.html', 'Benevolence/admin.html']),
+        ]);
+        setEmbedSource('intramural', intramuralSrc);
+        setEmbedSource('benevolence', benevolenceSrc);
         const tabVisibility = {
           overview: canOverview, bedside: canBedside, incidents: isFullAdmin, vans: canVan,
-          events: isFullAdmin, timeoff: isFullAdmin, access: isFullAdmin,
+          intramural: canIntramural && !!intramuralSrc, benevolence: canBenevolence && !!benevolenceSrc,
+          events: isFullAdmin, timeline: canGraphics || canMarketing, timeoff: isFullAdmin, access: isFullAdmin,
           requests: isFullAdmin, admins: isFullAdmin,
         };
         document.querySelectorAll('.section-tab').forEach(tab => {
@@ -400,12 +423,10 @@
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         document.querySelector(`[data-section="${landingSection}"]`)?.classList.add('active');
         document.getElementById('section-' + landingSection)?.classList.add('active');
+        loadEmbed(landingSection);
 
         if (canOverview) { loadOverview({canBedside, canVan, isFullAdmin, canOverview}); }
         if (isFullAdmin) { loadIncidentsBadgeOnly(); }
-        if (canBedside) { loadBedsidePending(); loadBedsideVisits(); loadBedsideWall(); }
-        if (isFullAdmin) { /* Incident Reports now lives in its own incident/admin.html page */ }
-        if (canVan) { loadVanApprovals(); loadVans(); loadVanAlerts(); loadVanHistory(); }
         if (isFullAdmin) { loadEventRequests(); loadTimeOffRequests(); loadNotificationEmails(); }
         if (isFullAdmin) { loadModuleManagement(); loadAccessRequests(); loadAdminManagement(); }
       } else {
@@ -425,19 +446,33 @@
       document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
       tab.classList.add('active');
       document.getElementById('section-' + tab.dataset.section).classList.add('active');
+      loadEmbed(tab.dataset.section);
     });
   });
 
-  // ── Bedside sub-tabs ──
-  document.querySelectorAll('[data-btab]').forEach(t => {
-    t.addEventListener('click', () => {
-      document.querySelectorAll('[data-btab]').forEach(x => x.classList.remove('active'));
-      t.classList.add('active');
-      ['pending','visits','wall'].forEach(k => {
-        document.getElementById('bedside-' + k).style.display = (k === t.dataset.btab) ? 'block' : 'none';
-      });
-    });
-  });
+  // ── Embedded module admin pages ──
+  // Each module's full admin page is shown inside its tab (same page the
+  // module's own Admin button used to open), so the portal always has the
+  // complete set of tools. Frames load the first time their tab is opened.
+  async function probePage(candidates) {
+    for (const path of candidates) {
+      try {
+        const r = await fetch(path, { method: 'HEAD', cache: 'no-store' });
+        if (r.ok) return path;
+      } catch (e) { /* try next */ }
+    }
+    return null;
+  }
+  function setEmbedSource(key, path) {
+    const frame = document.getElementById('frame-' + key);
+    if (!frame || !path) return;
+    frame.dataset.src = path + '?embed=1';
+    document.getElementById('open-' + key).href = path;
+  }
+  function loadEmbed(key) {
+    const frame = document.getElementById('frame-' + key);
+    if (frame && !frame.getAttribute('src') && frame.dataset.src) frame.src = frame.dataset.src;
+  }
 
   // ── OVERVIEW ──
   // Pulls a handful of lightweight counts from across all apps and
@@ -463,19 +498,19 @@
 
     if (showBedsideCard) {
       db.collection('prayerRequests').where('status','==','pending').onSnapshot(snap => {
-        updateOverviewCard('bedside', 'Bedside', `${snap.size} prayer request${snap.size===1?'':'s'} awaiting review`, {externalUrl: 'bedside/admin.html'});
+        updateOverviewCard('bedside', 'Bedside', `${snap.size} prayer request${snap.size===1?'':'s'} awaiting review`, {targetSection: 'bedside'});
       });
     }
     if (showVanCard) {
       db.collection('users').onSnapshot(snap => {
         const pendingDrivers = snap.docs.filter(d => d.data().vanRentalProfile?.status === 'pending').length;
-        updateOverviewCard('vans', 'Van Usage', `${pendingDrivers} driver application${pendingDrivers===1?'':'s'} awaiting approval`, {externalUrl: 'van/admin.html'});
+        updateOverviewCard('vans', 'Van Usage', `${pendingDrivers} driver application${pendingDrivers===1?'':'s'} awaiting approval`, {targetSection: 'vans'});
       });
     }
     if (showFullAdminCards) {
       db.collection('incidentReports').onSnapshot(snap => {
         const newCount = snap.docs.filter(d => !d.data().reviewStatus || d.data().reviewStatus==='new').length;
-        updateOverviewCard('incidents', 'Incident Reports', `${newCount} new report${newCount===1?'':'s'}`, {externalUrl: 'incident/admin.html'});
+        updateOverviewCard('incidents', 'Incident Reports', `${newCount} new report${newCount===1?'':'s'}`, {targetSection: 'incidents'});
       });
       db.collection('eventRequests').onSnapshot(snap => {
         const newCount = snap.docs.filter(d => (d.data().status||'new')==='new').length;
@@ -520,59 +555,8 @@
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelector(`[data-section="${section}"]`)?.classList.add('active');
     document.getElementById('section-' + section)?.classList.add('active');
+    loadEmbed(section);
   };
-
-  function loadBedsidePending() {
-    db.collection('prayerRequests').where('status','==','pending').orderBy('createdAt','desc').onSnapshot(snap => {
-      const items = snap.docs.map(d => ({id:d.id, ...d.data()}));
-      const c = document.getElementById('bedside-pending');
-      if (!items.length) { c.innerHTML = '<div class="empty-state">Nothing waiting for review. 🎉</div>'; return; }
-      c.innerHTML = items.map(r => `
-        <div class="card">
-          <div class="card-title">${escHtml(r.patientName)}</div>
-          <div class="card-text">${escHtml(r.text)}</div>
-          <div class="card-meta"><span class="tag ${r.type==='hospital_visit'?'tag-hospital':'tag-general'}">${r.type==='hospital_visit'?'Care Visit':'General Request'}</span><span>${escHtml(r.anonymous ? 'Anonymous' : (r.submittedBy?.name||''))}</span></div>
-          <div class="actions">
-            <button class="btn btn-approve" onclick="bedsideApprove('${r.id}')">Approve &amp; post publicly</button>
-            <button class="btn btn-hide" onclick="bedsideHide('${r.id}')">Keep private</button>
-          </div>
-        </div>`).join('');
-    });
-  }
-  function loadBedsideVisits() {
-    db.collection('visits').where('active','==',true).orderBy('createdAt','desc').onSnapshot(snap => {
-      const items = snap.docs.map(d => ({id:d.id, ...d.data()}));
-      const c = document.getElementById('bedside-visits');
-      if (!items.length) { c.innerHTML = '<div class="empty-state">No active visits.</div>'; return; }
-      c.innerHTML = items.map(v => `
-        <div class="card">
-          <div class="card-title">${escHtml(v.patientName)}</div>
-          <div class="card-text">${escHtml(v.hospital)} — ${escHtml(v.reason)}</div>
-          <div class="card-meta"><span>Claimed by: ${escHtml((v.claimedBy||[]).map(c=>c.name).join(', ')||'No one yet')}</span></div>
-        </div>`).join('');
-    });
-  }
-  function loadBedsideWall() {
-    db.collection('prayerRequests').where('status','in',['public','hidden']).orderBy('createdAt','desc').onSnapshot(snap => {
-      const items = snap.docs.map(d => ({id:d.id, ...d.data()}));
-      const c = document.getElementById('bedside-wall');
-      if (!items.length) { c.innerHTML = '<div class="empty-state">No prayer wall entries yet.</div>'; return; }
-      c.innerHTML = items.map(r => `
-        <div class="card">
-          <div class="card-title">${escHtml(r.patientName)}</div>
-          <div class="card-text">${escHtml(r.text)}</div>
-          <div class="card-meta"><span class="tag ${r.status==='public'?'tag-public':'tag-hidden'}">${r.status==='public'?'Public':'Hidden'}</span></div>
-          <div class="actions">
-            ${r.status==='public'
-              ? `<button class="btn btn-hide" onclick="bedsideHide('${r.id}')">Hide from wall</button>`
-              : `<button class="btn btn-unhide" onclick="bedsideUnhide('${r.id}')">Show on wall</button>`}
-          </div>
-        </div>`).join('');
-    });
-  }
-  window.bedsideApprove = async id => { await db.collection('prayerRequests').doc(id).update({status:'public', reviewedAt:new Date().toISOString()}); showBanner('Posted to the prayer wall.'); };
-  window.bedsideHide = async id => { await db.collection('prayerRequests').doc(id).update({status:'hidden', reviewedAt:new Date().toISOString()}); showBanner('Kept private.'); };
-  window.bedsideUnhide = async id => { await db.collection('prayerRequests').doc(id).update({status:'public'}); showBanner('Now visible on the prayer wall.'); };
 
   // Just the count for the nav link's badge — the full report list and
   // review actions now live entirely in incident/admin.html.
@@ -581,139 +565,6 @@
       const newCount = snap.docs.filter(d => !d.data().reviewStatus || d.data().reviewStatus==='new').length;
       const badge = document.getElementById('incidentsCount');
       if (newCount) { badge.textContent = newCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
-    });
-  }
-
-  // ── Van Usage ──
-  document.querySelectorAll('[data-vtab]').forEach(t => {
-    t.addEventListener('click', () => {
-      document.querySelectorAll('[data-vtab]').forEach(x => x.classList.remove('active'));
-      t.classList.add('active');
-      ['approvals','vans','alerts','history'].forEach(k => {
-        document.getElementById('van-' + k).style.display = (k === t.dataset.vtab) ? 'block' : 'none';
-      });
-    });
-  });
-  function loadVanApprovals() {
-    db.collection('users').onSnapshot(snap => {
-      const drivers = snap.docs.map(d => ({id:d.id, ...d.data()})).filter(u => u.vanRentalProfile);
-      const pending = drivers.filter(u => u.vanRentalProfile.status === 'pending');
-      const c = document.getElementById('van-approvals');
-      if (!pending.length) { c.innerHTML = '<div class="empty-state">No pending driver applications.</div>'; return; }
-      c.innerHTML = pending.map(u => {
-        const vr = u.vanRentalProfile;
-        const needsVerify = !vr.licenseVerifiedInPerson;
-        return `
-        <div class="card">
-          <div class="card-title">${escHtml(u.name||'Unnamed')}</div>
-          <div class="card-text">${escHtml(u.phone||'')} · License expires: ${escHtml(vr.licenseExp||'(not set)')}
-            <button class="btn btn-unhide" style="padding:2px 8px;font-size:12px;" onclick="vanEditExp('${u.id}','${escJsAttr(vr.licenseExp||'')}')">Edit</button>
-          </div>
-          <div class="card-meta"><span>License check: <strong style="color:${vr.licenseVerifiedInPerson ? 'var(--green)' : 'var(--red)'}">${vr.licenseVerifiedInPerson ? 'Verified in person ✓' : 'Not yet verified in person'}</strong></span></div>
-          <div class="card-meta"><span>Insurance cancelled: ${vr.insuranceCancelled ? 'YES' : 'No'} · License revoked/suspended: ${vr.licenseRevokedSuspended ? 'YES' : 'No'}</span></div>
-          <div class="actions">
-            ${needsVerify ? `<button class="btn btn-unhide" onclick="vanVerifyInPerson('${u.id}')">Mark license verified in person</button>` : ''}
-            <button class="btn btn-approve" ${needsVerify ? 'disabled style="opacity:0.5;cursor:default;"' : ''} onclick="vanApprove('${u.id}')">Approve</button>
-            <button class="btn btn-hide" onclick="vanDeny('${u.id}')">Deny</button>
-          </div>
-        </div>`;
-      }).join('');
-    });
-  }
-  window.vanApprove = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.status':'approved'}); showBanner('Driver approved.'); };
-  window.vanDeny = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.status':'denied'}); showBanner('Application denied.'); };
-  window.vanEditExp = async (uid, currentExp) => {
-    const newExp = prompt('New license expiration date (YYYY-MM-DD):', currentExp || '');
-    if (newExp === null) return;
-    await db.collection('users').doc(uid).update({'vanRentalProfile.licenseExp': newExp});
-    showBanner('Expiration date updated.');
-  };
-  window.vanVerifyInPerson = async uid => { await db.collection('users').doc(uid).update({'vanRentalProfile.licenseVerifiedInPerson':true}); showBanner('License marked verified.'); };
-
-  function loadVans() {
-    db.collection('vans').onSnapshot(snap => {
-      const vans = snap.docs.map(d => ({id:d.id, ...d.data()}));
-      const c = document.getElementById('van-vans');
-      if (!vans.length) { c.innerHTML = '<div class="empty-state">No vans on file.</div>'; return; }
-      c.innerHTML = vans.map(v => `
-        <div class="card">
-          <div class="card-title">${escHtml(v.name)}</div>
-          <div class="card-meta"><span class="tag ${v.status==='available'?'tag-public':(v.status==='maintenance'?'tag-pending':'tag-hidden')}">${v.status}</span><span>${v.mileage} mi · ${v.gas}% gas</span></div>
-          <div class="actions">
-            ${v.status!=='maintenance'
-              ? `<button class="btn btn-hide" onclick="setVanStatus('${v.id}','maintenance')">Send to Maintenance</button>`
-              : `<button class="btn btn-approve" onclick="setVanStatus('${v.id}','available')">Mark Available</button>`}
-          </div>
-        </div>`).join('');
-    });
-  }
-  window.setVanStatus = async (vanId, status) => { await db.collection('vans').doc(vanId).update({status}); showBanner('Van updated.'); };
-
-  function loadVanAlerts() {
-    db.collection('vanAlerts').onSnapshot(alertsSnap => {
-      const alerts = alertsSnap.docs.map(d => ({id:d.id, ...d.data()})).filter(a => !a.resolved);
-      const c = document.getElementById('van-alerts');
-      if (!alerts.length) { c.innerHTML = '<div class="empty-state">No open alerts.</div>'; return; }
-
-      db.collection('vanRentals').get().then(rentalsSnap => {
-        const rentals = rentalsSnap.docs.map(d => ({id:d.id, ...d.data()}));
-        c.innerHTML = alerts.map(a => {
-          const rental = a.rentalId ? rentals.find(r => r.id === a.rentalId) : null;
-          const isBlock = a.type === 'safety_light_block' && rental && rental.checkoutBlocked && !rental.checkoutCleared;
-          const draft = rental?.checkoutDraft || {};
-          return `
-            <div class="card">
-              <div class="card-text">"${escHtml(a.description||'')}"</div>
-              ${isBlock ? `<div class="card-meta"><span>Recorded so far — Mileage: ${escHtml(draft.mileage||'—')} · Gas: ${draft.gas ?? '—'}%</span></div>` : ''}
-              <div class="actions">
-                ${isBlock ? `<button class="btn btn-approve" onclick="clearVanCheckout('${rental.id}','${a.id}')">Clear — let driver finish</button>
-                  <span class="card-text" style="align-self:center;">or use the <a href="van/admin.html" style="color:var(--blue);">Van Usage admin</a> to complete it yourself</span>` : ''}
-                <button class="btn btn-hide" onclick="resolveVanAlert('${a.id}')">Mark Resolved</button>
-              </div>
-            </div>`;
-        }).join('');
-      });
-    });
-  }
-  window.resolveVanAlert = async id => { await db.collection('vanAlerts').doc(id).update({resolved:true}); showBanner('Alert resolved.'); };
-  window.clearVanCheckout = async (rentalId, alertId) => {
-    await db.collection('vanRentals').doc(rentalId).update({
-      checkoutCleared: true, clearedBy: currentUser.uid, clearedAt: Date.now(),
-    });
-    await db.collection('vanAlerts').doc(alertId).update({resolved:true});
-    showBanner('Cleared — driver can finish checkout now.');
-  };
-
-  function loadVanHistory() {
-    Promise.all([
-      db.collection('vanRentals').where('status','==','completed').get(),
-      db.collection('vans').get(),
-      db.collection('users').get(),
-    ]).then(([rentalsSnap, vansSnap, usersSnap]) => {
-      const rentals = rentalsSnap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(b.return?.at||0)-(a.return?.at||0));
-      const vansById = {}; vansSnap.docs.forEach(d => vansById[d.id] = d.data());
-      const usersById = {}; usersSnap.docs.forEach(d => usersById[d.id] = d.data());
-      const nameFor = uid_ => uid_ ? (usersById[uid_]?.name || usersById[uid_]?.email || 'Unknown') : 'Unknown';
-
-      const c = document.getElementById('van-history');
-      if (!rentals.length) { c.innerHTML = '<div class="empty-state">No completed rentals yet.</div>'; return; }
-
-      c.innerHTML = rentals.map(r => {
-        const van = vansById[r.vanId];
-        const checkoutBy = nameFor(r.driverId);
-        const checkinBy = nameFor(r.return?.completedBy);
-        const differentPerson = r.return?.completedBy && r.return.completedBy !== r.driverId;
-        return `
-          <div class="card">
-            <div class="card-title">${escHtml(van?.name||'Unknown van')}</div>
-            <div class="card-meta"><span>${r.date||''} ${r.time||''} → ${r.endDate||''} ${r.endTime||''}</span></div>
-            <div class="card-text">Checked out by: ${escHtml(checkoutBy)}</div>
-            <div class="card-text">Checked in by: ${escHtml(checkinBy)}${differentPerson ? ' <strong style="color:var(--blue);">— different from who checked it out</strong>' : ''}</div>
-          </div>`;
-      }).join('');
-    }).catch(err => {
-      document.getElementById('van-history').innerHTML = '<div class="empty-state">Could not load rental history.</div>';
-      console.error(err);
     });
   }
 

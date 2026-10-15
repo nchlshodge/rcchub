@@ -67,6 +67,7 @@
 
 <nav class="nav">
   <a href="../index.html" class="nav-brand">RCC <span>· All apps</span></a>
+  <a href="../admin.html?section=events" id="adminLink" style="display:none; font-size:13px; color:#2557b8; text-decoration:none; font-weight:500;">Admin</a>
 </nav>
 
 <div class="page">
@@ -265,6 +266,12 @@
   var SHEET_SYNC_TOKEN = "9PGTdz8dCn_9DV0brhR67k0-DoodYyyviwimrC-0R3g";
 
   auth.onAuthStateChanged(function(user){
+    // Admins get a shortcut to the full Event Request admin in the portal.
+    if(user){
+      db.collection('users').doc(user.uid).get().then(function(doc){
+        if(doc.exists && doc.data().isAdmin === true) document.getElementById('adminLink').style.display = '';
+      }).catch(function(){});
+    }
     if(user && user.email){
       var emailEl = document.getElementById('ev-email');
       if(!emailEl.value) emailEl.value = user.email;

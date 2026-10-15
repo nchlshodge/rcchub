@@ -75,6 +75,7 @@
   <nav class="nav">
     <a href="index.html" class="nav-brand">RCC <span>· All apps</span></a>
     <div style="display:flex; align-items:center; gap:12px;">
+      <a href="admin.html?section=timeoff" id="adminLink" style="display:none; font-size:13px; color:#2557b8; text-decoration:none; font-weight:500;">Admin</a>
       <span class="nav-user" id="navUser"></span>
       <button class="nav-signout" id="signOutBtn">Sign out</button>
     </div>
@@ -193,6 +194,7 @@
         var data = doc.exists ? doc.data() : {};
         var hasAccess = data.isAdmin === true || (data.modules && data.modules.timeOff === true);
         document.getElementById('accessCheck').style.display = 'none';
+        document.getElementById('adminLink').style.display = data.isAdmin === true ? '' : 'none';
         if(hasAccess){
           document.getElementById('formUI').style.display = 'block';
           if(!document.getElementById('lv-name').value) document.getElementById('lv-name').value = user.displayName || '';
