@@ -238,6 +238,13 @@
       <!-- EVENT REQUESTS -->
       <div class="section" id="section-events">
         <h2 class="section-title">Event Requests</h2>
+        <a href="event-requests.html" class="card" style="display:flex; align-items:center; justify-content:space-between; gap:12px; text-decoration:none; margin-bottom:16px;">
+          <span>
+            <span class="card-title" style="font-size:15px; display:block;">📅 Open the Event Requests page</span>
+            <span class="card-text">See every request by event date as cards or a list, check how each one is progressing, and add notes.</span>
+          </span>
+          <span style="color:var(--blue); font-size:18px;">→</span>
+        </a>
         <div class="subnav">
           <div class="subtab active" data-etab="new">New</div>
           <div class="subtab" data-etab="approved">Approved</div>
@@ -915,6 +922,7 @@
           ${r.mediaDesc ? `<div class="card-text"><strong>Media needed:</strong> ${escHtml(r.mediaDesc)}</div>` : ''}
           ${(r.vansNeeded||[]).length && !r.vansNeeded.includes('None') ? `<div class="card-meta"><span>Van requested: ${escHtml(r.vansNeeded.join(', '))} ${r.vanConfirmed ? '✓ confirmed' : '— not yet confirmed'}</span></div>` : ''}
 
+          <div class="card-meta" style="margin-top:8px;"><a href="event-requests.html#open=${encodeURIComponent(r.id)}" style="color:var(--blue); font-size:13px; font-weight:500;">Progress &amp; notes →</a></div>
           <div class="actions" style="margin-top:10px;">
             ${eventFilter==='new' ? `
               <button class="btn btn-approve" onclick="setEventStatus('${r.id}','approved')">Approve</button>

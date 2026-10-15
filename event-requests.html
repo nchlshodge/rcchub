@@ -268,7 +268,7 @@
   let allRequests = [];
   let view = 'cards';
   try { view = localStorage.getItem('eventRequestsView') === 'list' ? 'list' : 'cards'; } catch (e) {}
-  let currentUser = null, isAdmin = false;
+  let currentUser = null, isAdmin = false, deepLinkHandled = false;
 
   document.getElementById('googleSignInBtn').addEventListener('click', () => {
     auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => alert('Sign-in failed: ' + err.message));
@@ -300,6 +300,12 @@
         buildDeptFilter();
         render();
         if (openId) drawDrawer(); // keep the open event's progress live
+        // Deep link from Admin: event-requests.html#open=<requestId>
+        if (!deepLinkHandled) {
+          deepLinkHandled = true;
+          const m = location.hash.match(/^#open=(.+)$/);
+          if (m && allRequests.some(x => x.id === m[1])) openDetail(m[1]);
+        }
       }, err => {
         document.getElementById('content').innerHTML = '<p class="empty-note">Could not load requests: ' + esc(err.message) + '</p>';
       });
