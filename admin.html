@@ -934,8 +934,23 @@
     }).join('');
   }
 
+  // Same Apps Script web app + token the Event Request form already uses
+  // to add new rows. After an approve/deny is saved here, this tells that
+  // script so the Google Sheet's Status updates and the requester gets
+  // their approved/denied email. Best-effort: a failure here never blocks
+  // or undoes the approval itself.
+  const EVENT_SHEET_URL = "https://script.google.com/a/macros/rochesterchristian.church/s/AKfycbzwXpIevD_atUcIZbGd5ywvMRXClT0Ca9HDynFL1X0K1LNPnK2KhwnbJOUXEwsngQk/exec";
+  const EVENT_SHEET_TOKEN = "9PGTdz8dCn_9DV0brhR67k0-DoodYyyviwimrC-0R3g";
+  function syncEventDecisionToSheet(id, status) {
+    fetch(EVENT_SHEET_URL, {
+      method: 'POST', mode: 'no-cors', headers: {'Content-Type':'text/plain'},
+      body: JSON.stringify({ action: 'statusChanged', id, status, token: EVENT_SHEET_TOKEN })
+    }).catch(() => {});
+  }
+
   window.setEventStatus = async (id, status) => {
     await db.collection('eventRequests').doc(id).update({status, statusChangedAt:new Date().toISOString(), statusChangedBy: currentUser.uid});
+    syncEventDecisionToSheet(id, status);
     showBanner('Request updated.');
   };
   window.toggleEventField = async (id, field, val) => {
