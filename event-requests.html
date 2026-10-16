@@ -9,6 +9,8 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-functions-compat.js"></script>
+<script src="room-logic.js"></script>
 <script src="rcc-shell.js"></script>
 <script>if(/[?&]embed=1(&|$)/.test(location.search))document.documentElement.classList.add('embedded');</script>
 <link rel="stylesheet" href="rcc-ui.css">
@@ -106,6 +108,32 @@
   dl.facts dt { color: var(--ink-3); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding-top: 2px; }
   dl.facts dd { color: var(--ink); }
   dl.facts dd.long { white-space: pre-wrap; }
+
+  /* ---------- edit form (admins) ---------- */
+  .p-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .p-head .p-title { margin: 0; }
+  .ef label.lbl, .ef .lbl { display: block; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 5px; }
+  .ef .fld { margin-bottom: 14px; }
+  .ef input[type=text], .ef input[type=date], .ef input[type=time], .ef textarea { width: 100%; font-family: inherit; font-size: 15px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 10px 12px; }
+  .ef input:focus, .ef textarea:focus { outline: none; border-color: var(--blue); background: #fff; box-shadow: 0 0 0 4px rgba(37,87,184,.12); }
+  .ef textarea { min-height: 70px; resize: vertical; }
+  .ef .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ef .opts { display: flex; flex-wrap: wrap; gap: 7px; }
+  .ef .opts label { cursor: pointer; }
+  .ef .opts input { position: absolute; opacity: 0; pointer-events: none; }
+  .ef .opts span { display: inline-flex; padding: 7px 13px; border: 1px solid var(--line-2); border-radius: 999px; background: #fff; font-size: 13.5px; font-weight: 500; color: var(--ink-2); transition: all .2s var(--ease); user-select: none; }
+  .ef .opts label:hover span { border-color: var(--blue); }
+  .ef .opts input:checked + span { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .ef .opts input:focus-visible + span { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; }
+  .ef .grp { font-size: 12px; font-weight: 600; color: var(--ink-3); margin: 10px 0 6px; }
+  .ef .chk { display: flex; align-items: flex-start; gap: 9px; font-size: 14px; color: var(--ink-2); cursor: pointer; margin-bottom: 10px; line-height: 1.4; }
+  .ef .chk input { width: 17px; height: 17px; accent-color: var(--blue); margin-top: 2px; flex-shrink: 0; }
+  .ef .summary { background: var(--blue-soft); color: var(--blue-ink); border-radius: var(--radius-md); padding: 12px 14px; font-size: 13.5px; margin-bottom: 14px; line-height: 1.55; }
+  .ef .summary.none { background: var(--bg-soft); color: var(--ink-3); }
+  .ef .errbox { display: none; background: var(--red-soft); color: var(--red-ink); border-radius: var(--radius-md); padding: 11px 14px; font-size: 13.5px; margin-bottom: 12px; white-space: pre-wrap; }
+  .ef .errbox.show { display: block; }
+  .ef .actions { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
+  .ef .emailbox { background: var(--bg); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 14px; }
 
   @media (max-width: 860px) {
     .lrow { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px; }
@@ -227,7 +255,7 @@
         allRequests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         buildDeptFilter();
         render();
-        if (openId) drawDrawer(); // keep the open event's progress live
+        if (openId && !editing) drawDrawer(); // keep the open event's progress live (never while someone is editing it)
         // Deep link from Admin: event-requests.html#open=<requestId>
         if (!deepLinkHandled) {
           deepLinkHandled = true;
@@ -480,7 +508,7 @@
   });
 
   /* ---------- detail panel: progress + notes ---------- */
-  let openId = null, unsubNotes = null, noteDocs = [];
+  let openId = null, unsubNotes = null, noteDocs = [], editing = false;
 
   // Where the request is in its life, derived from fields the other pages
   // already maintain (status, calendarAdded, graphicStatus, ...). Nothing
@@ -541,12 +569,13 @@
     const r = allRequests.find(x => x.id === openId);
     if (!r) { closeDetail(); return; }
     const body = document.getElementById('drawerBody');
+    if (editing) { drawEditForm(r); return; }
     // Keep whatever the person is typing if the data refreshes underneath them.
     const prev = document.getElementById('noteInput');
     const draft = prev ? prev.value : '';
     const hadFocus = prev && document.activeElement === prev;
     body.innerHTML =
-      '<h2 class="p-title">' + esc(titleOf(r)) + '</h2>' +
+      '<div class="p-head"><h2 class="p-title">' + esc(titleOf(r)) + '</h2>' + (isAdmin ? '<button type="button" class="btn small soft" id="editStart">Edit request</button>' : '') + '</div>' +
       '<div class="p-sec"><div class="er-chips">' + statusChip(r) + typeChip(r) + arr(r.department).map(x => '<span class="pill gray">' + esc(x) + '</span>').join('') + '</div></div>' +
       '<div class="p-sec"><h4>Progress</h4><div class="box">' + stepsHtml(r) + '</div></div>' +
       '<div class="p-sec"><h4>Notes &amp; updates</h4><div class="notes-list" id="notesList">' + notesHtml() + '</div>' +
@@ -560,7 +589,7 @@
 
   function openDetail(id) {
     if (unsubNotes) { unsubNotes(); unsubNotes = null; }
-    openId = id; noteDocs = [];
+    openId = id; noteDocs = []; editing = false;
     document.getElementById('panel').classList.add('show');
     document.getElementById('scrim').classList.add('show');
     document.getElementById('panel').setAttribute('aria-hidden', 'false');
@@ -577,7 +606,7 @@
   }
   function closeDetail() {
     if (unsubNotes) { unsubNotes(); unsubNotes = null; }
-    openId = null; noteDocs = [];
+    openId = null; noteDocs = []; editing = false;
     document.getElementById('panel').classList.remove('show');
     document.getElementById('scrim').classList.remove('show');
     document.getElementById('panel').setAttribute('aria-hidden', 'true');
@@ -609,6 +638,179 @@
       db.collection('eventRequests').doc(openId).collection('notes').doc(del.dataset.delNote).delete()
         .catch(err => alert('Could not delete: ' + err.message));
     }
+  });
+
+  /* ---------- admin: edit a request after it was submitted ---------- */
+  const RCC_PLACE = 'At Rochester Christian Church';
+  const ROOM_GROUPS = [
+    ['Main building', ['Sanctuary', 'Fellowship Hall', 'Meeting Room', 'Living Room', 'Kitchen', 'Cafe', 'Prayer Room', "Nursing Mom's Room", 'Missions Room', 'Green Room / Worship Room']],
+    ['Kids wing', ['Kids Sanctuary', 'Kids Game Room', 'Preschool Room', 'Kindergarten Room', 'Nursery', 'Kids Work Room', 'Kids Classroom 214', 'Kids Classroom 215']],
+    ['Or', ['Entire Building', 'Other']],
+  ];
+  const $e = id => document.getElementById(id);
+  function titleField(r) { return r.requestType === 'media_only' ? 'projectTitle' : 'eventTitle'; }
+  function isAtChurch(r) { return !r.location || /rochester christian|\bRCC\b|on.?site|church/i.test(String(r.location)); }
+  function addDays(iso, n) {
+    const d = parseISO(iso); if (!d) return '';
+    d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function fmtDateLine(iso) { const d = parseISO(iso); return d ? fmtShort(d) + ', ' + d.getFullYear() : '(none)'; }
+  function sameSet(a, b) { const x = arr(a).slice().sort().join('|'), y = arr(b).slice().sort().join('|'); return x === y; }
+
+  function drawEditForm(r) {
+    const media = r.requestType === 'media_only';
+    const atChurch = isAtChurch(r);
+    const rooms = arr(r.onsiteRoom);
+    const roomsHtml = ROOM_GROUPS.map(g => '<div class="grp">' + g[0] + '</div><div class="opts">' + g[1].map(n =>
+      '<label><input type="checkbox" name="edRoom" value="' + esc(n) + '"' + (rooms.includes(n) ? ' checked' : '') + '><span>' + esc(n) + '</span></label>').join('') + '</div>').join('');
+    const canEmail = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(String(r.email || '').trim());
+    $e('drawerBody').innerHTML =
+      '<div class="p-head"><h2 class="p-title">Edit request</h2></div>' +
+      '<div class="ef" id="edForm">' +
+        '<div class="fld"><label class="lbl" for="edTitle">Title</label><input type="text" id="edTitle" value="' + esc(r[titleField(r)] || '') + '"></div>' +
+        '<div class="two"><div class="fld"><label class="lbl" for="edDate">Event date</label><input type="date" id="edDate" value="' + esc(r.eventDate || '') + '"></div><div></div></div>' +
+        (media ? '' :
+          '<div class="two"><div class="fld"><label class="lbl" for="edStart">Start time</label><input type="time" id="edStart" value="' + esc(r.startTime || '') + '"></div>' +
+          '<div class="fld"><label class="lbl" for="edEnd">End time</label><input type="time" id="edEnd" value="' + esc(r.endTime || '') + '"></div></div>' +
+          '<div class="fld"><span class="lbl">Where</span><div class="opts">' +
+            '<label><input type="radio" name="edLoc" value="at_rcc"' + (atChurch ? ' checked' : '') + '><span>At Rochester Christian Church</span></label>' +
+            '<label><input type="radio" name="edLoc" value="other"' + (!atChurch ? ' checked' : '') + '><span>Somewhere else</span></label></div>' +
+            '<input type="text" id="edLocOther" placeholder="Address" style="margin-top:8px;' + (atChurch ? 'display:none;' : '') + '" value="' + esc(atChurch ? '' : (r.location || '')) + '"></div>' +
+          '<div class="fld" id="edRoomsWrap"' + (atChurch ? '' : ' style="display:none"') + '><span class="lbl">Room(s)</span>' + roomsHtml +
+            '<input type="text" id="edRoomOther" placeholder="Other room" style="margin-top:8px;' + (rooms.includes('Other') ? '' : 'display:none;') + '" value="' + esc(r.onsiteRoomOther || '') + '"></div>') +
+        (r.graphicDueDate ? '<label class="chk"><input type="checkbox" id="edShift" checked><span id="edShiftText"></span></label>' : '') +
+        '<div class="summary none" id="edSummary">No changes yet.</div>' +
+        '<div class="emailbox">' +
+          '<label class="chk" style="margin-bottom:8px;"><input type="checkbox" id="edEmail"' + (canEmail ? '' : ' disabled') + '><span>' + (canEmail ? 'Email <b>' + esc(r.requesterName || 'the requester') + '</b> (' + esc(r.email) + ') about this change' : 'No valid email address on this request, so the requester can\'t be emailed') + '</span></label>' +
+          (canEmail ? '<label class="lbl" for="edMsg">Add a message (optional)</label><textarea id="edMsg" placeholder="e.g. The Sanctuary is booked that night, so we moved you to the Fellowship Hall."></textarea>' : '') +
+        '</div>' +
+        '<div class="errbox" id="edErr"></div>' +
+        '<div class="actions"><button type="button" class="btn primary" id="edSave">Save changes</button><button type="button" class="btn" id="edCancel">Cancel</button></div>' +
+      '</div>';
+    refreshEdit(r);
+  }
+
+  // Everything the admin has changed so far, as { changes: fields to write, lines: [{label, from, to}] }.
+  function collectEdits(r) {
+    const media = r.requestType === 'media_only';
+    const changes = {}, lines = [];
+    const set = (field, label, oldV, newV, fmt) => {
+      if (String(oldV == null ? '' : oldV) === String(newV == null ? '' : newV)) return;
+      changes[field] = newV; lines.push({ label, from: fmt ? fmt(oldV) : (oldV || '(none)'), to: fmt ? fmt(newV) : (newV || '(none)') });
+    };
+    set(titleField(r), 'Title', r[titleField(r)] || '', $e('edTitle').value.trim());
+    const newDate = $e('edDate').value;
+    set('eventDate', 'Date', r.eventDate || '', newDate, fmtDateLine);
+    if (!media) {
+      const t = v => v ? fmtTime(v) : '(none)';
+      set('startTime', 'Start time', r.startTime || '', $e('edStart').value, t);
+      set('endTime', 'End time', r.endTime || '', $e('edEnd').value, t);
+      const other = document.querySelector('input[name="edLoc"]:checked').value === 'other';
+      // "At Rochester Christian Church" only counts as a change when it was somewhere else before
+      if (other) set('location', 'Location', r.location || '', $e('edLocOther').value.trim());
+      else if (!isAtChurch(r)) set('location', 'Location', r.location || '', RCC_PLACE);
+      let newRooms = other ? [] : Array.from(document.querySelectorAll('input[name="edRoom"]:checked')).map(c => c.value);
+      const newRoomOther = (!other && newRooms.includes('Other')) ? $e('edRoomOther').value.trim() : '';
+      const roomsChanged = !sameSet(r.onsiteRoom, newRooms) || (r.onsiteRoomOther || '') !== newRoomOther;
+      if (roomsChanged) {
+        changes.onsiteRoom = newRooms; changes.onsiteRoomOther = newRoomOther;
+        const nm = (a, o) => arr(a).map(x => x === 'Other' && o ? 'Other: ' + o : x).join(', ') || '(none)';
+        lines.push({ label: 'Room(s)', from: nm(r.onsiteRoom, r.onsiteRoomOther), to: nm(newRooms, newRoomOther) });
+      }
+    }
+    // keep the graphic due date the same distance before the event
+    const shift = $e('edShift');
+    if (shift && shift.checked && changes.eventDate && r.eventDate && r.graphicDueDate && newDate) {
+      const diff = Math.round((parseISO(newDate) - parseISO(r.eventDate)) / DAY);
+      if (diff) { const nd = addDays(r.graphicDueDate, diff); changes.graphicDueDate = nd; lines.push({ label: 'Graphic due', from: fmtDateLine(r.graphicDueDate), to: fmtDateLine(nd) }); }
+    }
+    return { changes, lines };
+  }
+
+  function refreshEdit(r) {
+    if (!editing || !$e('edForm')) return;
+    const { changes, lines } = collectEdits(r);
+    const sum = $e('edSummary');
+    sum.className = 'summary' + (lines.length ? '' : ' none');
+    sum.textContent = lines.length ? 'Will change: ' + lines.map(l => l.label + ' — ' + l.from + ' → ' + l.to).join('; ') : 'No changes yet.';
+    const sh = $e('edShiftText');
+    if (sh) {
+      const nd = $e('edDate').value, diff = (nd && r.eventDate) ? Math.round((parseISO(nd) - parseISO(r.eventDate)) / DAY) : 0;
+      sh.textContent = diff ? 'Move the graphic due date by the same ' + Math.abs(diff) + ' day' + (Math.abs(diff) === 1 ? '' : 's') + ' (' + fmtDateLine(r.graphicDueDate) + ' → ' + fmtDateLine(addDays(r.graphicDueDate, diff)) + ')' : 'If the date moves, move the graphic due date (' + fmtDateLine(r.graphicDueDate) + ') with it';
+    }
+    // offer the requester email by default when something they would care about changed
+    const em = $e('edEmail');
+    if (em && !em.disabled && !em.dataset.touched) em.checked = !!(changes.eventDate || changes.startTime || changes.endTime || changes.location || changes.onsiteRoom);
+  }
+
+  function editedRequest() { return allRequests.find(x => x.id === openId); }
+  $e('drawerBody').addEventListener('input', e => { if (editing && e.target.closest('#edForm')) { const r = editedRequest(); if (r) refreshEdit(r); } });
+  $e('drawerBody').addEventListener('change', e => {
+    if (!editing || !e.target.closest('#edForm')) return;
+    if (e.target.id === 'edEmail') e.target.dataset.touched = '1';
+    const other = document.querySelector('input[name="edLoc"]:checked');
+    if (other && $e('edLocOther')) {
+      const isOther = other.value === 'other';
+      $e('edLocOther').style.display = isOther ? '' : 'none';
+      $e('edRoomsWrap').style.display = isOther ? 'none' : '';
+    }
+    const oc = document.querySelector('input[name="edRoom"][value="Other"]');
+    if (oc && $e('edRoomOther')) $e('edRoomOther').style.display = oc.checked ? '' : 'none';
+    const r = editedRequest(); if (r) refreshEdit(r);
+  });
+
+  $e('drawerBody').addEventListener('click', async e => {
+    if (e.target.id === 'editStart') { editing = true; drawDrawer(); return; }
+    if (e.target.id === 'edCancel') { editing = false; drawDrawer(); return; }
+    if (e.target.id !== 'edSave') return;
+    const r = editedRequest(); if (!r || !isAdmin) return;
+    const err = $e('edErr'); err.className = 'errbox';
+    const fail = msg => { err.textContent = msg; err.className = 'errbox show'; err.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+    const { changes, lines } = collectEdits(r);
+    if (!lines.length) return fail('Nothing has changed yet.');
+    if (changes.eventDate !== undefined && changes.eventDate && !parseISO(changes.eventDate)) return fail('That date doesn\'t look right.');
+    const media = r.requestType === 'media_only';
+    if (!media) {
+      if (document.querySelector('input[name="edLoc"]:checked').value === 'other' && !$e('edLocOther').value.trim()) return fail('Add the address, or choose "At Rochester Christian Church".');
+      const s = RoomLogic.toMinutes($e('edStart').value), en = RoomLogic.toMinutes($e('edEnd').value);
+      if (s != null && en != null && en <= s) return fail('The end time must be after the start time.');
+    }
+    const btn = $e('edSave'); btn.disabled = true; btn.textContent = 'Checking…';
+    const done = () => { btn.disabled = false; btn.textContent = 'Save changes'; };
+
+    // Same room check the request form and the Approve button use: a room that is firmly booked
+    // then can't be moved into; overlapping a TBD hold only asks first. Skipped when nothing about
+    // when/where changed.
+    const merged = Object.assign({}, r, changes);
+    const touchesRoom = ['eventDate', 'startTime', 'endTime', 'location', 'onsiteRoom', 'onsiteRoomOther'].some(k => k in changes);
+    if (touchesRoom && isAtChurch(merged)) {
+      const c = await RoomLogic.checkApprovalConflicts(db, merged, r.id);
+      if (c.hard.length) { done(); return fail('That room is already firmly booked then:\n\n' + c.hard.join('\n') + '\n\nPick a different room or time.'); }
+      if (c.soft.length && !confirm('Heads up — this overlaps with a TBD hold:\n\n' + c.soft.join('\n') + '\n\nSave the change anyway?')) { done(); return; }
+    }
+
+    btn.textContent = 'Saving…';
+    try { await db.collection('eventRequests').doc(r.id).update(changes); }
+    catch (ex) { done(); return fail('Could not save: ' + ex.message); }
+
+    // A running record, so everyone can see what was changed and by whom.
+    const who = currentUser.displayName || currentUser.email || 'An admin';
+    db.collection('eventRequests').doc(r.id).collection('notes').add({
+      text: ('Edited by ' + who + ' — ' + lines.map(l => l.label + ': ' + l.from + ' → ' + l.to).join('; ')).slice(0, 2000),
+      authorUid: currentUser.uid, authorName: who, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }).catch(() => {});
+
+    let emailMsg = '';
+    const em = $e('edEmail');
+    // the requester hears about what affects them — not our internal graphic deadline
+    const emailLines = lines.filter(l => l.label !== 'Graphic due');
+    if (em && em.checked && !em.disabled && emailLines.length) {
+      try { await firebase.functions().httpsCallable('emailRequesterOfChange')({ requestId: r.id, lines: emailLines, message: ($e('edMsg') || {}).value || '' }); emailMsg = 'The requester was emailed.'; }
+      catch (ex) { emailMsg = 'Saved — but the email to the requester could not be sent (' + (ex.message || 'please try again') + ').'; }
+    }
+    editing = false; done(); drawDrawer();
+    if (emailMsg) alert(emailMsg);
   });
 </script>
 </body>
