@@ -4,257 +4,309 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RCC — Event &amp; Graphic Request</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#2557b8">
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="../room-logic.js"></script>
+<link rel="stylesheet" href="../rcc-ui.css">
 
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter', sans-serif; background: #f7f6f3; min-height: 100vh; color: #1a1a1a; }
+  .top { display: flex; align-items: center; gap: 14px; padding: 0 clamp(14px, 3vw, 32px); height: 64px; border-bottom: 1px solid var(--line); background: rgba(246,242,234,.82); backdrop-filter: blur(14px); position: sticky; top: 0; z-index: 30; }
+  .top a.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--blue); font-family: 'Playfair Display', serif; font-size: 21px; }
+  .top a.brand img { width: 34px; height: 34px; border-radius: 50%; }
+  .top a.brand span { font-family: 'Inter', sans-serif; font-size: 13px; color: var(--ink-3); }
+  .top .right { margin-left: auto; font-size: 13px; }
+  .top .right a { text-decoration: none; font-weight: 600; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: clamp(20px, 4vw, 44px) clamp(14px, 3vw, 24px) 90px; }
 
-  .nav {
-    background: #fff; border-bottom: 1px solid #e8e4dc; padding: 0 2rem; height: 60px;
-    display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10;
+  .steps-wrap { counter-reset: s; }
+  .fstep { display: none; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px clamp(16px, 3vw, 26px); margin-bottom: 18px; box-shadow: var(--shadow-1); }
+  .fstep.show { display: block; animation: rise .45s var(--ease) both; }
+  .fstep h2 { font-size: 23px; margin-bottom: 4px; display: flex; align-items: center; gap: 12px; }
+  .fstep h2 i { font-style: normal; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; width: 28px; height: 28px; border-radius: 50%; background: var(--blue); color: #fff; display: inline-flex; align-items: center; justify-content: center; }
+  .fstep h2 i::before { counter-increment: s; content: counter(s); }
+  .fstep .hint { color: var(--ink-3); font-size: 13.5px; margin: 0 0 16px 40px; }
+
+  .f { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .f > label, .lbl { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+  .f > label em, .lbl em { color: var(--red); font-style: normal; }
+  .f input[type=text], .f input[type=email], .f input[type=date], .f input[type=time], .f textarea {
+    font-family: inherit; font-size: 16px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px 14px; width: 100%; transition: border-color .2s, box-shadow .2s, background .2s;
   }
-  .nav-brand { font-family: 'Playfair Display', serif; font-size: 22px; color: #2557b8; text-decoration: none; display:flex; align-items:center; gap:8px; }
-  .nav-brand span { font-family: 'Inter', sans-serif; font-size: 13px; color: #aaa; margin-left: 6px; }
+  .f textarea { min-height: 100px; resize: vertical; line-height: 1.5; }
+  .f input:focus, .f textarea:focus { outline: none; border-color: var(--blue); background: #fff; box-shadow: 0 0 0 4px rgba(37,87,184,.12); }
+  .f.err input, .f.err textarea { border-color: var(--red); background: #fff7f6; }
+  .msg, .grp-err { display: none; color: var(--red); font-size: 12.5px; }
+  .f.err > .msg, .grp-err.show { display: block; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .other-input { display: none; margin-top: 10px; }
+  .other-input.show { display: block; }
 
-  .page { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
-  .page-title { font-family: 'Playfair Display', serif; font-size: 28px; margin-bottom: 4px; }
-  .page-sub { font-size: 14px; color: #888; margin-bottom: 2rem; }
-  .page-sub span { color: #c0392b; }
+  /* chips (checkboxes / radios) */
+  .opts { display: flex; flex-wrap: wrap; gap: 9px; }
+  .opts label { cursor: pointer; }
+  .opts input { position: absolute; opacity: 0; pointer-events: none; }
+  .opts span { display: inline-flex; align-items: center; padding: 10px 17px; border: 1px solid var(--line-2); border-radius: 999px; background: #fff; font-size: 15px; font-weight: 500; color: var(--ink-2); transition: all .2s var(--ease); user-select: none; }
+  .opts label:hover span { border-color: var(--blue); }
+  .opts input:checked + span { background: var(--blue); border-color: var(--blue); color: #fff; box-shadow: 0 4px 14px rgba(37,87,184,.25); }
+  .opts input:focus-visible + span { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; }
+  .group-lbl { font-size: 12px; font-weight: 600; color: var(--ink-3); margin: 14px 0 8px; }
+  .group-lbl:first-child { margin-top: 0; }
 
-  .section { background: #fff; border: 1px solid #e8e4dc; border-radius: 10px; margin-bottom: 1.25rem; overflow: hidden; }
-  .section-head { background: #faf9f6; padding: 11px 18px; border-bottom: 1px solid #e8e4dc; font-size: 14px; font-weight: 500; }
-  .section-body { padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+  /* the three request types as big choices */
+  .types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .types label { cursor: pointer; display: block; }
+  .types input { position: absolute; opacity: 0; pointer-events: none; }
+  .types .tc { height: 100%; border: 1px solid var(--line-2); border-radius: var(--radius); background: #fff; padding: 16px 16px 15px; transition: all .25s var(--ease); display: flex; flex-direction: column; gap: 4px; }
+  .types .tc .ic { font-size: 26px; }
+  .types .tc b { font-family: 'Playfair Display', serif; font-weight: 500; font-size: 18px; }
+  .types .tc small { color: var(--ink-3); font-size: 13px; line-height: 1.4; }
+  .types label:hover .tc { border-color: var(--blue); transform: translateY(-2px); box-shadow: var(--shadow-1); }
+  .types input:checked + .tc { border-color: var(--blue); background: var(--blue-soft); box-shadow: 0 0 0 3px rgba(37,87,184,.18); }
+  .types input:focus-visible + .tc { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; }
 
-  label.lbl { font-size: 12px; font-weight: 500; color: #666; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; }
-  .req { color: #c0392b; margin-left: 2px; }
-  input[type=text], input[type=email], input[type=date], input[type=time], input[type=number], select, textarea {
-    width: 100%; background: #fff; border: 1px solid #d1cdc4; border-radius: 7px; padding: 9px 11px;
-    font-size: 14px; color: #1a1a1a; font-family: 'Inter', sans-serif;
-  }
-  input:focus, select:focus, textarea:focus { outline: none; border-color: #2557b8; box-shadow: 0 0 0 3px rgba(37,87,184,.1); }
-  textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
-  .row { display: grid; gap: 12px; }
-  .row-2 { grid-template-columns: 1fr 1fr; }
-  @media(max-width:560px) { .row-2 { grid-template-columns: 1fr; } }
+  .agree-box { background: var(--bg); border-radius: var(--radius-md); padding: 14px 16px; font-size: 14px; color: var(--ink-2); line-height: 1.55; margin-bottom: 14px; }
+  .agree { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 15px; }
+  .agree input { width: 20px; height: 20px; accent-color: var(--blue); margin-top: 2px; }
+  .submit-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+  .submit-row .note { color: var(--ink-3); font-size: 13px; flex: 1 1 220px; }
+  .btn-submit { background: var(--blue); color: #fff; border: none; border-radius: 999px; padding: 15px 38px; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 6px 20px rgba(37,87,184,.3); transition: transform .15s var(--ease), background .2s; }
+  .btn-submit:hover { background: var(--blue-ink); transform: translateY(-1px); }
+  .btn-submit:disabled { opacity: .6; cursor: wait; }
+  .formerr { display: none; background: var(--red-soft); color: var(--red-ink); border-radius: var(--radius-md); padding: 12px 16px; font-size: 14px; margin-bottom: 16px; }
+  .formerr.show { display: block; }
+  #ev-submit-wrap { display: none; }
+  #ev-submit-wrap.show { display: block; animation: rise .45s var(--ease) both; }
 
-  .radio-group, .check-group { display: flex; flex-direction: column; gap: 8px; }
-  .radio-opt, .check-opt {
-    display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 14px;
-    padding: 10px 12px; border: 1px solid #d1cdc4; border-radius: 7px;
-  }
-  .radio-opt:has(input:checked), .check-opt:has(input:checked) { border-color: #2557b8; background: #eef2fb; }
-  .radio-opt input, .check-opt input { margin-top: 2px; accent-color: #2557b8; }
-  .other-input { margin-top: 6px; }
+  .done { display: none; text-align: center; padding: 56px 20px; }
+  .done.show { display: block; animation: rise .5s var(--ease) both; }
+  .done .tick { width: 74px; height: 74px; border-radius: 50%; background: var(--green-soft); color: var(--green); display: inline-flex; align-items: center; justify-content: center; font-size: 36px; margin-bottom: 18px; }
+  .done h2 { font-size: 32px; margin-bottom: 10px; }
+  .done p { color: var(--ink-2); max-width: 46ch; margin: 0 auto 22px; }
 
-  .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem; }
-  .btn-primary { background: #2557b8; color: #fff; border: none; border-radius: 7px; padding: 12px 28px; font-size: 14px; font-weight: 500; cursor: pointer; }
-  .btn-primary:hover { background: #1e4694; }
-  .btn-primary:disabled { opacity: 0.5; cursor: default; }
-
-  .agree-box { background: #faf9f6; border: 1px solid #e8e4dc; border-radius: 10px; padding: 16px 18px; font-size: 13px; color: #666; line-height: 1.6; }
-
-  .success { background: #fff; border: 1px solid #e8e4dc; border-radius: 10px; padding: 3rem 2rem; text-align: center; display: none; }
-  .success h2 { font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 6px; }
-  .success p { font-size: 14px; color: #888; }
+  @media (max-width: 640px) { .types { grid-template-columns: 1fr; } .row { grid-template-columns: 1fr; gap: 0; } .top a.brand span { display: none; } }
 </style>
 </head>
 <body>
 
-<nav class="nav">
-  <a href="../index.html" class="nav-brand">RCC <span>· All apps</span></a>
-  <a href="../admin.html?section=events" id="adminLink" style="display:none; font-size:13px; color:#2557b8; text-decoration:none; font-weight:500;">Admin</a>
+<nav class="top">
+  <a class="brand" href="../index.html"><img src="../assets/rcc-logo-plain.png" alt="">RCC <span>· All apps</span></a>
+  <div class="right"><a href="../admin.html?section=events" id="adminLink" style="display:none;">Admin</a></div>
 </nav>
 
-<div class="page">
-  <h1 class="page-title">Event &amp; Graphic Request</h1>
-  <p class="page-sub">Fields marked <span>*</span> are required.</p>
+<div class="wrap">
+  <section class="hero">
+    <span class="eyebrow">Request</span>
+    <h1>Event &amp; graphic request</h1>
+    <p>Tell us what you need and we'll show only the questions that apply. Fields marked <b style="color:var(--red)">*</b> are required.</p>
+  </section>
 
   <form id="ev-form" novalidate>
+    <div class="steps-wrap">
 
     <!-- 1: Basics -->
-    <div class="section">
-      <div class="section-head">Request Basics</div>
-      <div class="section-body">
-        <div><label class="lbl" for="ev-email">Email <span class="req">*</span></label><input type="email" id="ev-email" required></div>
-        <div><label class="lbl" for="ev-name">Requester Name <span class="req">*</span></label><input type="text" id="ev-name" required></div>
+    <section class="fstep show">
+      <h2><i></i>What do you need?</h2>
+      <p class="hint">Choose one — the form adjusts to match.</p>
 
-        <div>
-          <label class="lbl">Request Type <span class="req">*</span></label>
-          <div class="radio-group" id="ev-request-type">
-            <label class="radio-opt"><input type="radio" name="reqtype" value="church_event"> Church Event (goes on church calendar and has a graphic)</label>
-            <label class="radio-opt"><input type="radio" name="reqtype" value="media_only"> Media/Graphic Only (no event, no church calendar)</label>
-            <label class="radio-opt"><input type="radio" name="reqtype" value="facilities"> Facilities Rental (no graphic needed, no church calendar)</label>
-          </div>
+      <div class="f" id="f-type" style="margin-bottom:6px">
+        <div class="types" id="ev-request-type">
+          <label><input type="radio" name="reqtype" value="church_event"><div class="tc"><span class="ic">🎉</span><b>Church event</b><small>Goes on the church calendar and gets a graphic</small></div></label>
+          <label><input type="radio" name="reqtype" value="media_only"><div class="tc"><span class="ic">🎨</span><b>Graphic or media only</b><small>No event, no church calendar</small></div></label>
+          <label><input type="radio" name="reqtype" value="facilities"><div class="tc"><span class="ic">🏛️</span><b>Facilities rental</b><small>Use of a room — no graphic, no calendar</small></div></label>
         </div>
-
-        <div>
-          <label class="lbl">Ministry Department <span class="req">*</span></label>
-          <div class="check-group" id="ev-dept">
-            <label class="check-opt"><input type="checkbox" value="Children's Ministry"> Children's Ministry</label>
-            <label class="check-opt"><input type="checkbox" value="Youth Ministry"> Youth Ministry</label>
-            <label class="check-opt"><input type="checkbox" value="Outreach/Missions"> Outreach/Missions</label>
-            <label class="check-opt"><input type="checkbox" value="Young Adults"> Young Adults</label>
-            <label class="check-opt"><input type="checkbox" value="Women's Ministry"> Women's Ministry</label>
-            <label class="check-opt"><input type="checkbox" value="Men's Ministry"> Men's Ministry</label>
-            <label class="check-opt"><input type="checkbox" value="Other"> Other</label>
-          </div>
-        </div>
+        <span class="grp-err" id="err-type">Please choose what you need.</span>
       </div>
-    </div>
+    </section>
+
+    <section class="fstep show" id="ev-section-you">
+      <h2><i></i>About you</h2>
+      <p class="hint">So we know who to contact.</p>
+      <div class="row">
+        <div class="f"><label for="ev-name">Your name <em>*</em></label><input type="text" id="ev-name" autocomplete="name"><span class="msg">Please add your name.</span></div>
+        <div class="f"><label for="ev-email">Email <em>*</em></label><input type="email" id="ev-email" autocomplete="email"><span class="msg">Please add a valid email.</span></div>
+      </div>
+      <div class="f" id="f-dept" style="margin-bottom:0">
+        <span class="lbl">Ministry department <em>*</em></span>
+        <div class="opts" id="ev-dept">
+          <label><input type="checkbox" value="Children's Ministry"><span>Children's Ministry</span></label>
+          <label><input type="checkbox" value="Youth Ministry"><span>Youth Ministry</span></label>
+          <label><input type="checkbox" value="Outreach/Missions"><span>Outreach/Missions</span></label>
+          <label><input type="checkbox" value="Young Adults"><span>Young Adults</span></label>
+          <label><input type="checkbox" value="Women's Ministry"><span>Women's Ministry</span></label>
+          <label><input type="checkbox" value="Men's Ministry"><span>Men's Ministry</span></label>
+          <label><input type="checkbox" value="Other"><span>Other</span></label>
+        </div>
+        <span class="grp-err" id="err-dept">Choose at least one department.</span>
+      </div>
+    </section>
 
     <!-- 2: Event Details (Church Event + Facilities Rental) -->
-    <div class="section" id="ev-section-eventdetails" style="display:none;">
-      <div class="section-head">Event Details</div>
-      <div class="section-body">
-        <div><label class="lbl" for="ev-title">Event Title</label><input type="text" id="ev-title"></div>
-        <div><label class="lbl" for="ev-desc">Event Details/Description</label><textarea id="ev-desc"></textarea></div>
-        <div class="row row-2">
-          <div><label class="lbl" for="ev-date">Event Date Requested</label><input type="date" id="ev-date"></div>
-          <div><label class="lbl" for="ev-start-time">Event Start Time <span class="req">*</span></label><input type="time" id="ev-start-time"></div>
-        </div>
-        <div><label class="lbl" for="ev-end-time">Event End Time</label><input type="time" id="ev-end-time"></div>
-
-        <div>
-          <label class="lbl">Event Location <span class="req">*</span></label>
-          <div class="radio-group" id="ev-location-type">
-            <label class="radio-opt"><input type="radio" name="loctype" value="at_rcc"> At Rochester Christian Church</label>
-            <label class="radio-opt"><input type="radio" name="loctype" value="other"> Other</label>
-          </div>
-          <input type="text" id="ev-location-other" class="other-input" placeholder="Address" style="display:none;">
-        </div>
-
-        <div id="ev-onsite-room-wrap" style="display:none;">
-          <label class="lbl">If OnSite, what room would you like to request?</label>
-          <div class="check-group" id="ev-room">
-            <label class="check-opt"><input type="checkbox" value="Sanctuary"> Sanctuary</label>
-            <label class="check-opt"><input type="checkbox" value="Fellowship Hall"> Fellowship Hall</label>
-            <label class="check-opt"><input type="checkbox" value="Meeting Room"> Meeting Room</label>
-            <label class="check-opt"><input type="checkbox" value="Living Room"> Living Room</label>
-            <label class="check-opt"><input type="checkbox" value="Kitchen"> Kitchen</label>
-            <label class="check-opt"><input type="checkbox" value="Cafe"> Cafe</label>
-            <label class="check-opt"><input type="checkbox" value="Prayer Room"> Prayer Room</label>
-            <label class="check-opt"><input type="checkbox" value="Nursing Mom's Room"> Nursing Mom's Room</label>
-            <label class="check-opt"><input type="checkbox" value="Missions Room"> Missions Room</label>
-            <label class="check-opt"><input type="checkbox" value="Green Room / Worship Room"> Green Room / Worship Room</label>
-            <label class="check-opt"><input type="checkbox" value="Kids Sanctuary"> Kids Sanctuary</label>
-            <label class="check-opt"><input type="checkbox" value="Kids Game Room"> Kids Game Room</label>
-            <label class="check-opt"><input type="checkbox" value="Preschool Room"> Preschool Room</label>
-            <label class="check-opt"><input type="checkbox" value="Kindergarten Room"> Kindergarten Room</label>
-            <label class="check-opt"><input type="checkbox" value="Nursery"> Nursery</label>
-            <label class="check-opt"><input type="checkbox" value="Kids Work Room"> Kids Work Room</label>
-            <label class="check-opt"><input type="checkbox" value="Kids Classroom 214"> Kids Classroom 214</label>
-            <label class="check-opt"><input type="checkbox" value="Kids Classroom 215"> Kids Classroom 215</label>
-            <label class="check-opt"><input type="checkbox" value="Entire Building"> Entire Building</label>
-            <label class="check-opt"><input type="checkbox" value="Other"> Other</label>
-          </div>
-          <input type="text" id="ev-room-other" class="other-input" placeholder="Other room" style="display:none;">
-        </div>
+    <section class="fstep" id="ev-section-eventdetails">
+      <h2><i></i>The event</h2>
+      <p class="hint">When, where, and what it is.</p>
+      <div class="f"><label for="ev-title">Event title</label><input type="text" id="ev-title"></div>
+      <div class="f"><label for="ev-desc">Details / description</label><textarea id="ev-desc"></textarea></div>
+      <div class="row">
+        <div class="f"><label for="ev-date">Event date requested</label><input type="date" id="ev-date"></div>
+        <div class="f"><label for="ev-start-time">Start time <em>*</em></label><input type="time" id="ev-start-time"><span class="msg">Please add a start time.</span></div>
       </div>
-    </div>
+      <div class="row">
+        <div class="f"><label for="ev-end-time">End time</label><input type="time" id="ev-end-time"></div>
+        <div></div>
+      </div>
+
+      <div class="f" id="f-loc" style="margin-bottom:0">
+        <span class="lbl">Where will it be? <em>*</em></span>
+        <div class="opts" id="ev-location-type">
+          <label><input type="radio" name="loctype" value="at_rcc"><span>At Rochester Christian Church</span></label>
+          <label><input type="radio" name="loctype" value="other"><span>Somewhere else</span></label>
+        </div>
+        <span class="grp-err" id="err-loc">Tell us where it will be.</span>
+        <div class="f other-input" id="f-loc-other"><input type="text" id="ev-location-other" placeholder="Address"><span class="msg">Please add the address.</span></div>
+      </div>
+
+      <div id="ev-onsite-room-wrap" style="display:none; margin-top:16px;">
+        <span class="lbl">Which room(s) would you like?</span>
+        <div id="ev-room" style="margin-top:6px;">
+          <div class="group-lbl">Main building</div>
+          <div class="opts">
+            <label><input type="checkbox" value="Sanctuary"><span>Sanctuary</span></label>
+            <label><input type="checkbox" value="Fellowship Hall"><span>Fellowship Hall</span></label>
+            <label><input type="checkbox" value="Meeting Room"><span>Meeting Room</span></label>
+            <label><input type="checkbox" value="Living Room"><span>Living Room</span></label>
+            <label><input type="checkbox" value="Kitchen"><span>Kitchen</span></label>
+            <label><input type="checkbox" value="Cafe"><span>Cafe</span></label>
+            <label><input type="checkbox" value="Prayer Room"><span>Prayer Room</span></label>
+            <label><input type="checkbox" value="Nursing Mom's Room"><span>Nursing Mom's Room</span></label>
+            <label><input type="checkbox" value="Missions Room"><span>Missions Room</span></label>
+            <label><input type="checkbox" value="Green Room / Worship Room"><span>Green Room / Worship Room</span></label>
+          </div>
+          <div class="group-lbl">Kids wing</div>
+          <div class="opts">
+            <label><input type="checkbox" value="Kids Sanctuary"><span>Kids Sanctuary</span></label>
+            <label><input type="checkbox" value="Kids Game Room"><span>Kids Game Room</span></label>
+            <label><input type="checkbox" value="Preschool Room"><span>Preschool Room</span></label>
+            <label><input type="checkbox" value="Kindergarten Room"><span>Kindergarten Room</span></label>
+            <label><input type="checkbox" value="Nursery"><span>Nursery</span></label>
+            <label><input type="checkbox" value="Kids Work Room"><span>Kids Work Room</span></label>
+            <label><input type="checkbox" value="Kids Classroom 214"><span>Kids Classroom 214</span></label>
+            <label><input type="checkbox" value="Kids Classroom 215"><span>Kids Classroom 215</span></label>
+          </div>
+          <div class="group-lbl">Or</div>
+          <div class="opts">
+            <label><input type="checkbox" value="Entire Building"><span>Entire Building</span></label>
+            <label><input type="checkbox" value="Other"><span>Other</span></label>
+          </div>
+        </div>
+        <input type="text" id="ev-room-other" class="other-input f-plain" placeholder="Other room" style="width:100%;font:inherit;font-size:16px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);">
+        <p class="hint" style="margin:12px 0 0;">Rooms are held as a "TBD" until the church office confirms them, so nobody else can double-book it by accident.</p>
+      </div>
+    </section>
 
     <!-- 3: Multimedia/Graphics (Church Event + Media Only) -->
-    <div class="section" id="ev-section-multimedia" style="display:none;">
-      <div class="section-head">Multimedia/Graphics</div>
-      <div class="section-body">
-        <div><label class="lbl" for="ev-project-title">Project/Graphic Title <span class="req">*</span></label><input type="text" id="ev-project-title"></div>
+    <section class="fstep" id="ev-section-multimedia">
+      <h2><i></i>Graphics</h2>
+      <p class="hint">What should the creative team make?</p>
+      <div class="f"><label for="ev-project-title">Project / graphic title <em>*</em></label><input type="text" id="ev-project-title"><span class="msg">Please name the project.</span></div>
 
-        <div>
-          <label class="lbl">Multimedia Size(s) Needed <span class="req">*</span></label>
-          <div class="check-group" id="ev-media-size">
-            <label class="check-opt"><input type="checkbox" value="16x9 (Projector Size)"> 16x9 (Projector Size)</label>
-            <label class="check-opt"><input type="checkbox" value="Social Media Graphic"> Social Media Graphic</label>
-            <label class="check-opt"><input type="checkbox" value="Print/Flyer"> Print/Flyer</label>
-            <label class="check-opt"><input type="checkbox" value="Large Poster"> Large Poster</label>
-            <label class="check-opt"><input type="checkbox" value="16x9 Video (Projector and Website)"> 16x9 Video (Projector and Website)</label>
-            <label class="check-opt"><input type="checkbox" value="Social Media Video"> Social Media Video</label>
-            <label class="check-opt"><input type="checkbox" value="Other"> Other</label>
-          </div>
-          <input type="text" id="ev-media-size-other" class="other-input" placeholder="Other size/format" style="display:none;">
+      <div class="f" id="f-size">
+        <span class="lbl">Size(s) needed <em>*</em></span>
+        <div class="opts" id="ev-media-size">
+          <label><input type="checkbox" value="16x9 (Projector Size)"><span>16x9 (Projector Size)</span></label>
+          <label><input type="checkbox" value="Social Media Graphic"><span>Social Media Graphic</span></label>
+          <label><input type="checkbox" value="Print/Flyer"><span>Print/Flyer</span></label>
+          <label><input type="checkbox" value="Large Poster"><span>Large Poster</span></label>
+          <label><input type="checkbox" value="16x9 Video (Projector and Website)"><span>16x9 Video (Projector and Website)</span></label>
+          <label><input type="checkbox" value="Social Media Video"><span>Social Media Video</span></label>
+          <label><input type="checkbox" value="Other"><span>Other</span></label>
         </div>
-
-        <div><label class="lbl" for="ev-media-desc">Details/Description of what's needed <span class="req">*</span></label><textarea id="ev-media-desc"></textarea></div>
+        <span class="grp-err" id="err-size">Choose at least one size.</span>
+        <input type="text" id="ev-media-size-other" class="other-input" placeholder="Other size/format" style="width:100%;font:inherit;font-size:16px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);">
       </div>
-    </div>
+
+      <div class="f" style="margin-bottom:0"><label for="ev-media-desc">What's needed? <em>*</em></label><textarea id="ev-media-desc"></textarea><span class="msg">Please describe what you need.</span></div>
+    </section>
 
     <!-- 4: Logistics (Church Event only) -->
-    <div class="section" id="ev-section-logistics" style="display:none;">
-      <div class="section-head">Logistics</div>
-      <div class="section-body">
-        <div>
-          <label class="lbl">Church Van Needed? (check all that apply)</label>
-          <div class="check-group" id="ev-vans">
-            <label class="check-opt"><input type="checkbox" value="Ford"> Ford</label>
-            <label class="check-opt"><input type="checkbox" value="GMC"> GMC</label>
-            <label class="check-opt"><input type="checkbox" value="Chevy"> Chevy</label>
-            <label class="check-opt"><input type="checkbox" value="None"> None</label>
-          </div>
-        </div>
-
-        <div>
-          <label class="lbl">Ticket Sales Needed?</label>
-          <div class="radio-group" id="ev-tickets">
-            <label class="radio-opt"><input type="radio" name="tickets" value="yes"> Yes</label>
-            <label class="radio-opt"><input type="radio" name="tickets" value="no"> No</label>
-          </div>
-        </div>
-        <div id="ev-ticket-price-wrap" style="display:none;">
-          <label class="lbl" for="ev-ticket-price">Ticket Price (if applicable)</label>
-          <input type="text" id="ev-ticket-price" placeholder="$">
+    <section class="fstep" id="ev-section-logistics">
+      <h2><i></i>Vans &amp; tickets</h2>
+      <p class="hint">Only if they apply.</p>
+      <div class="f">
+        <span class="lbl">Church van needed? (check all that apply)</span>
+        <div class="opts" id="ev-vans">
+          <label><input type="checkbox" value="Ford"><span>Ford</span></label>
+          <label><input type="checkbox" value="GMC"><span>GMC</span></label>
+          <label><input type="checkbox" value="Chevy"><span>Chevy</span></label>
+          <label><input type="checkbox" value="None"><span>None</span></label>
         </div>
       </div>
-    </div>
+      <div class="f" style="margin-bottom:0">
+        <span class="lbl">Ticket sales needed?</span>
+        <div class="opts" id="ev-tickets">
+          <label><input type="radio" name="tickets" value="yes"><span>Yes</span></label>
+          <label><input type="radio" name="tickets" value="no"><span>No</span></label>
+        </div>
+        <div id="ev-ticket-price-wrap" style="display:none; margin-top:10px;">
+          <label class="lbl" for="ev-ticket-price">Ticket price</label>
+          <input type="text" id="ev-ticket-price" placeholder="$" style="width:100%;font:inherit;font-size:16px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);margin-top:6px;">
+        </div>
+      </div>
+    </section>
 
     <!-- 5: Marketing Requests (Church Event + Media Only) -->
-    <div class="section" id="ev-section-marketing" style="display:none;">
-      <div class="section-head">Marketing Requests</div>
-      <div class="section-body">
-        <div class="check-group" id="ev-marketing">
-          <label class="check-opt"><input type="checkbox" value="Social Media Post"> Social Media Post</label>
-          <label class="check-opt"><input type="checkbox" value="Email Blast"> Email Blast</label>
-          <label class="check-opt"><input type="checkbox" value="Handout"> Handout</label>
-          <label class="check-opt"><input type="checkbox" value="PreService Announcements"> PreService Announcements</label>
-          <label class="check-opt"><input type="checkbox" value="Projector/Screens"> Projector/Screens</label>
-          <label class="check-opt"><input type="checkbox" value="Stage Announcement"> Stage Announcement</label>
-          <label class="check-opt"><input type="checkbox" value="Bathroom Signage"> Bathroom Signage</label>
-          <label class="check-opt"><input type="checkbox" value="Text Message"> Text Message</label>
-          <label class="check-opt"><input type="checkbox" value="Lobby Signage"> Lobby Signage</label>
-          <label class="check-opt"><input type="checkbox" value="None"> None</label>
-          <label class="check-opt"><input type="checkbox" value="Other"> Other</label>
-        </div>
-        <input type="text" id="ev-marketing-other" class="other-input" placeholder="Other marketing need" style="display:none;">
+    <section class="fstep" id="ev-section-marketing">
+      <h2><i></i>Getting the word out</h2>
+      <p class="hint">Pick any promotion you'd like (or None).</p>
+      <div class="opts" id="ev-marketing">
+        <label><input type="checkbox" value="Social Media Post"><span>Social Media Post</span></label>
+        <label><input type="checkbox" value="Email Blast"><span>Email Blast</span></label>
+        <label><input type="checkbox" value="Handout"><span>Handout</span></label>
+        <label><input type="checkbox" value="PreService Announcements"><span>PreService Announcements</span></label>
+        <label><input type="checkbox" value="Projector/Screens"><span>Projector/Screens</span></label>
+        <label><input type="checkbox" value="Stage Announcement"><span>Stage Announcement</span></label>
+        <label><input type="checkbox" value="Bathroom Signage"><span>Bathroom Signage</span></label>
+        <label><input type="checkbox" value="Text Message"><span>Text Message</span></label>
+        <label><input type="checkbox" value="Lobby Signage"><span>Lobby Signage</span></label>
+        <label><input type="checkbox" value="None"><span>None</span></label>
+        <label><input type="checkbox" value="Other"><span>Other</span></label>
       </div>
-    </div>
+      <input type="text" id="ev-marketing-other" class="other-input" placeholder="Other marketing need" style="width:100%;font:inherit;font-size:16px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);">
+    </section>
 
     <!-- 6: Wrap up -->
-    <div class="section">
-      <div class="section-head">Wrap Up</div>
-      <div class="section-body">
-        <div class="agree-box">
-          By submitting this form you understand that all requests are subject to approval by the Administrative Pastor. You will be informed via email if the date has been approved.
-          <br><br>
-          All marketing and graphics requests may be denied or subject to change at the discretion of the Creative Arts Pastor.
-        </div>
-        <label class="check-opt" style="margin-top:4px;">
-          <input type="checkbox" id="ev-understand" required> I understand <span class="req">*</span>
-        </label>
+    <section class="fstep" id="ev-section-wrap">
+      <h2><i></i>Almost done</h2>
+      <div class="agree-box">
+        By submitting this form you understand that all requests are subject to approval by the Administrative Pastor. You will be informed via email if the date has been approved.
+        <br><br>
+        All marketing and graphics requests may be denied or subject to change at the discretion of the Creative Arts Pastor.
       </div>
+      <div class="f" id="f-agree" style="margin-bottom:0">
+        <label class="agree"><input type="checkbox" id="ev-understand"><span>I understand <em style="color:var(--red);font-style:normal">*</em></span></label>
+        <span class="grp-err" id="err-agree">Please tick "I understand" to submit.</span>
+      </div>
+    </section>
+
     </div>
 
-    <div class="btn-row">
-      <button type="submit" class="btn-primary" id="ev-submit-btn">Submit Request</button>
+    <div id="ev-submit-wrap">
+      <div class="formerr" id="formErr">A few things need a look — they're highlighted above.</div>
+      <div class="submit-row">
+        <span class="note">You'll get an email once the team has reviewed it.</span>
+        <button type="submit" class="btn-submit" id="ev-submit-btn">Submit request</button>
+      </div>
     </div>
   </form>
 
-  <div class="success" id="ev-success">
+  <section class="done" id="ev-success">
+    <div class="tick">✓</div>
     <h2>Request submitted</h2>
-    <p>The team will review it and follow up by email.</p>
-  </div>
+    <p>Thank you! The team will review it and follow up by email.</p>
+    <button class="btn" id="againBtn" type="button">Submit another request</button>
+  </section>
 </div>
 
 <script>
@@ -270,18 +322,19 @@
   var fbApp; try { fbApp=firebase.app(); } catch(e) { fbApp=firebase.initializeApp(firebaseConfig); }
   var auth = firebase.auth();
   var db = firebase.firestore();
+  function $(id){ return document.getElementById(id); }
 
   auth.onAuthStateChanged(function(user){
     // Admins get a shortcut to the full Event Request admin in the portal.
     if(user){
       db.collection('users').doc(user.uid).get().then(function(doc){
-        if(doc.exists && doc.data().isAdmin === true) document.getElementById('adminLink').style.display = '';
+        if(doc.exists && doc.data().isAdmin === true) $('adminLink').style.display = '';
       }).catch(function(){});
     }
     if(user && user.email){
-      var emailEl = document.getElementById('ev-email');
+      var emailEl = $('ev-email');
       if(!emailEl.value) emailEl.value = user.email;
-      var nameEl = document.getElementById('ev-name');
+      var nameEl = $('ev-name');
       if(!nameEl.value && user.displayName) nameEl.value = user.displayName;
     }
   });
@@ -290,20 +343,19 @@
     var checked = document.querySelector('input[name="reqtype"]:checked');
     return checked ? checked.value : null;
   }
+  function show(id, on){ $(id).classList.toggle('show', !!on); }
 
   function updateVisibleSections(){
     var type = requestType();
-    var eventDetails = document.getElementById('ev-section-eventdetails');
-    var multimedia = document.getElementById('ev-section-multimedia');
-    var logistics = document.getElementById('ev-section-logistics');
-    var marketing = document.getElementById('ev-section-marketing');
-
     // Church Event: everything. Media Only: just multimedia + marketing.
     // Facilities Rental: just event details (no graphics/marketing/van).
-    eventDetails.style.display = (type==='church_event' || type==='facilities') ? 'block' : 'none';
-    multimedia.style.display   = (type==='church_event' || type==='media_only') ? 'block' : 'none';
-    logistics.style.display    = (type==='church_event') ? 'block' : 'none';
-    marketing.style.display    = (type==='church_event' || type==='media_only') ? 'block' : 'none';
+    show('ev-section-eventdetails', type==='church_event' || type==='facilities');
+    show('ev-section-multimedia',   type==='church_event' || type==='media_only');
+    show('ev-section-logistics',    type==='church_event');
+    show('ev-section-marketing',    type==='church_event' || type==='media_only');
+    show('ev-section-wrap', !!type);
+    show('ev-submit-wrap', !!type);
+    $('err-type').classList.remove('show');
   }
   document.querySelectorAll('input[name="reqtype"]').forEach(function(r){
     r.addEventListener('change', updateVisibleSections);
@@ -312,41 +364,31 @@
   // Location "Other" reveal
   document.querySelectorAll('input[name="loctype"]').forEach(function(r){
     r.addEventListener('change', function(){
-      var isOther = document.querySelector('input[name="loctype"]:checked')?.value === 'other';
-      document.getElementById('ev-location-other').style.display = isOther ? 'block' : 'none';
-      document.getElementById('ev-onsite-room-wrap').style.display = isOther ? 'none' : 'block';
+      var isOther = document.querySelector('input[name="loctype"]:checked').value === 'other';
+      $('f-loc-other').classList.toggle('show', isOther);
+      $('ev-onsite-room-wrap').style.display = isOther ? 'none' : 'block';
+      $('err-loc').classList.remove('show');
     });
   });
 
-  // Room "Other" reveal
-  document.querySelectorAll('#ev-room input').forEach(function(c){
-    c.addEventListener('change', function(){
-      var otherChecked = document.querySelector('#ev-room input[value="Other"]').checked;
-      document.getElementById('ev-room-other').style.display = otherChecked ? 'block' : 'none';
+  // "Other" reveals
+  function wireOther(groupSel, inputId){
+    document.querySelectorAll(groupSel + ' input').forEach(function(c){
+      c.addEventListener('change', function(){
+        var otherChecked = document.querySelector(groupSel + ' input[value="Other"]').checked;
+        $(inputId).classList.toggle('show', otherChecked);
+      });
     });
-  });
-
-  // Media size "Other" reveal
-  document.querySelectorAll('#ev-media-size input').forEach(function(c){
-    c.addEventListener('change', function(){
-      var otherChecked = document.querySelector('#ev-media-size input[value="Other"]').checked;
-      document.getElementById('ev-media-size-other').style.display = otherChecked ? 'block' : 'none';
-    });
-  });
-
-  // Marketing "Other" reveal
-  document.querySelectorAll('#ev-marketing input').forEach(function(c){
-    c.addEventListener('change', function(){
-      var otherChecked = document.querySelector('#ev-marketing input[value="Other"]').checked;
-      document.getElementById('ev-marketing-other').style.display = otherChecked ? 'block' : 'none';
-    });
-  });
+  }
+  wireOther('#ev-room', 'ev-room-other');
+  wireOther('#ev-media-size', 'ev-media-size-other');
+  wireOther('#ev-marketing', 'ev-marketing-other');
 
   // Ticket price reveal
   document.querySelectorAll('input[name="tickets"]').forEach(function(r){
     r.addEventListener('change', function(){
-      var isYes = document.querySelector('input[name="tickets"]:checked')?.value === 'yes';
-      document.getElementById('ev-ticket-price-wrap').style.display = isYes ? 'block' : 'none';
+      var isYes = document.querySelector('input[name="tickets"]:checked').value === 'yes';
+      $('ev-ticket-price-wrap').style.display = isYes ? 'block' : 'none';
     });
   });
 
@@ -366,16 +408,52 @@
     return y + '-' + m + '-' + day;
   }
 
-  document.getElementById('ev-form').addEventListener('submit', function(e){
+  /* ---------- checking the starred fields ---------- */
+  ['ev-name','ev-email','ev-start-time','ev-project-title','ev-media-desc','ev-location-other'].forEach(function(id){
+    $(id).addEventListener('input', function(){ var f = $(id).closest('.f'); if(f) f.classList.remove('err'); });
+  });
+  document.querySelectorAll('#ev-dept input').forEach(function(c){ c.addEventListener('change', function(){ $('err-dept').classList.remove('show'); }); });
+  document.querySelectorAll('#ev-media-size input').forEach(function(c){ c.addEventListener('change', function(){ $('err-size').classList.remove('show'); }); });
+  $('ev-understand').addEventListener('change', function(){ $('err-agree').classList.remove('show'); });
+
+  // Marks what is missing and returns the first thing that needs attention (or null).
+  function validate(type){
+    var first = null;
+    function bad(el, isBad){ if(isBad && !first) first = el; return isBad; }
+    function flagField(id, isBad){ $(id).closest('.f').classList.toggle('err', isBad); return bad($(id), isBad); }
+    function flagGroup(errId, isBad, anchor){ $(errId).classList.toggle('show', isBad); return bad($(anchor), isBad); }
+
+    flagField('ev-name', !$('ev-name').value.trim());
+    flagField('ev-email', !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('ev-email').value.trim()));
+    flagGroup('err-dept', checkedValues('ev-dept').length === 0, 'f-dept');
+
+    if(type==='church_event' || type==='facilities'){
+      flagField('ev-start-time', !$('ev-start-time').value);
+      var loc = document.querySelector('input[name="loctype"]:checked');
+      flagGroup('err-loc', !loc, 'f-loc');
+      if(loc && loc.value==='other') flagField('ev-location-other', !$('ev-location-other').value.trim());
+    }
+    if(type==='church_event' || type==='media_only'){
+      flagField('ev-project-title', !$('ev-project-title').value.trim());
+      flagGroup('err-size', checkedValues('ev-media-size').length === 0, 'f-size');
+      flagField('ev-media-desc', !$('ev-media-desc').value.trim());
+    }
+    flagGroup('err-agree', !$('ev-understand').checked, 'f-agree');
+    return first;
+  }
+
+  $('ev-form').addEventListener('submit', function(e){
     e.preventDefault();
     var type = requestType();
-    if(!type){ alert('Please select a request type.'); return; }
-    if(!document.getElementById('ev-understand').checked){ alert('Please check "I understand" to submit.'); return; }
+    if(!type){ $('err-type').classList.add('show'); $('f-type').scrollIntoView({behavior:'smooth', block:'center'}); return; }
+    var missing = validate(type);
+    $('formErr').classList.toggle('show', !!missing);
+    if(missing){ missing.scrollIntoView({behavior:'smooth', block:'center'}); return; }
 
-    var locType = document.querySelector('input[name="loctype"]:checked')?.value || '';
-    var location = locType==='other' ? document.getElementById('ev-location-other').value : (locType==='at_rcc' ? 'At Rochester Christian Church' : '');
+    var locType = document.querySelector('input[name="loctype"]:checked') ? document.querySelector('input[name="loctype"]:checked').value : '';
+    var location = locType==='other' ? $('ev-location-other').value : (locType==='at_rcc' ? 'At Rochester Christian Church' : '');
 
-    var eventDateVal = document.getElementById('ev-date').value;
+    var eventDateVal = $('ev-date').value;
     var mediaSizesVal = checkedValues('ev-media-size');
     // Default lead time for graphics: 6 weeks before the event, when we
     // have both a graphic request and an event date to count back from.
@@ -383,28 +461,29 @@
     // this is just a sensible starting point, not a locked-in deadline.
     var defaultGraphicDueDate = (mediaSizesVal.length && eventDateVal) ? subtractDays_(eventDateVal, 42) : '';
 
+    var ticketsChecked = document.querySelector('input[name="tickets"]:checked');
     var request = {
-      email: document.getElementById('ev-email').value,
-      requesterName: document.getElementById('ev-name').value,
+      email: $('ev-email').value.trim(),
+      requesterName: $('ev-name').value.trim(),
       requestType: type,
       department: checkedValues('ev-dept'),
-      eventTitle: document.getElementById('ev-title').value,
-      eventDesc: document.getElementById('ev-desc').value,
+      eventTitle: $('ev-title').value,
+      eventDesc: $('ev-desc').value,
       eventDate: eventDateVal,
-      startTime: document.getElementById('ev-start-time').value,
-      endTime: document.getElementById('ev-end-time').value,
+      startTime: $('ev-start-time').value,
+      endTime: $('ev-end-time').value,
       location: location,
       onsiteRoom: checkedValues('ev-room'),
-      onsiteRoomOther: document.getElementById('ev-room-other').value,
-      projectTitle: document.getElementById('ev-project-title').value,
+      onsiteRoomOther: $('ev-room-other').value,
+      projectTitle: $('ev-project-title').value,
       mediaSizes: mediaSizesVal,
-      mediaSizeOther: document.getElementById('ev-media-size-other').value,
-      mediaDesc: document.getElementById('ev-media-desc').value,
+      mediaSizeOther: $('ev-media-size-other').value,
+      mediaDesc: $('ev-media-desc').value,
       vansNeeded: checkedValues('ev-vans'),
-      ticketsNeeded: document.querySelector('input[name="tickets"]:checked')?.value || '',
-      ticketPrice: document.getElementById('ev-ticket-price').value,
+      ticketsNeeded: ticketsChecked ? ticketsChecked.value : '',
+      ticketPrice: $('ev-ticket-price').value,
       marketing: checkedValues('ev-marketing'),
-      marketingOther: document.getElementById('ev-marketing-other').value,
+      marketingOther: $('ev-marketing-other').value,
       status: 'new', // new | approved | denied
       calendarAdded: false,
       graphicStatus: '', graphicDueDate: defaultGraphicDueDate,
@@ -413,6 +492,9 @@
       submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
       uid: auth.currentUser ? auth.currentUser.uid : null,
     };
+
+    var btn = $('ev-submit-btn'); btn.disabled = true; btn.textContent = 'Sending…';
+    function reset(){ btn.disabled = false; btn.textContent = 'Submit request'; }
 
     // Rooms: every request holds its room as a TBD until staff confirm it. A room that is
     // already firmly booked at that time can't be requested; overlapping a TBD hold only asks first.
@@ -425,15 +507,30 @@
       }
       if(c.soft.length && !confirm('Heads up — this overlaps with a TBD hold:\n\n' + c.soft.join('\n') + '\n\nYour room will be held as a TBD until staff confirm it. Submit anyway?')) return null;
       return db.collection('eventRequests').add(request).then(function(){
-      // The Google Sheet row and the staff notification emails are sent
-      // from the server the moment this document is created (Cloud
-      // Function notifyEventRequestCreated) — nothing to call from here.
-      document.getElementById('ev-form').style.display = 'none';
-      document.getElementById('ev-success').style.display = 'block';
+        // The Google Sheet row and the staff notification emails are sent
+        // from the server the moment this document is created (Cloud
+        // Function notifyEventRequestCreated) — nothing to call from here.
+        $('ev-form').style.display = 'none';
+        $('ev-success').classList.add('show');
+        window.scrollTo({top: 0, behavior: 'smooth'});
       });
     }).catch(function(err){
       alert('Something went wrong submitting your request: ' + err.message);
-    });
+    }).then(reset);
+  });
+
+  $('againBtn').addEventListener('click', function(){
+    var keepName = $('ev-name').value, keepEmail = $('ev-email').value;
+    $('ev-form').reset();
+    $('ev-name').value = keepName; $('ev-email').value = keepEmail;
+    updateVisibleSections();
+    document.querySelectorAll('.other-input').forEach(function(el){ el.classList.remove('show'); });
+    $('ev-onsite-room-wrap').style.display = 'none'; $('ev-ticket-price-wrap').style.display = 'none';
+    document.querySelectorAll('.err').forEach(function(el){ el.classList.remove('err'); });
+    document.querySelectorAll('.grp-err.show').forEach(function(el){ el.classList.remove('show'); });
+    $('formErr').classList.remove('show');
+    $('ev-form').style.display = ''; $('ev-success').classList.remove('show');
+    window.scrollTo({top: 0});
   });
 })();
 </script>
