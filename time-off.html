@@ -4,155 +4,161 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RCC — Vacation / Leave of Absence Request</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#2557b8">
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="rcc-shell.js"></script>
+<link rel="stylesheet" href="rcc-ui.css">
 
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter', sans-serif; background: #f7f6f3; min-height: 100vh; color: #1a1a1a; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: clamp(20px, 4vw, 44px) clamp(14px, 3vw, 24px) 90px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px clamp(16px, 3vw, 26px); margin-bottom: 18px; box-shadow: var(--shadow-1); animation: rise .45s var(--ease) both; }
+  .card:nth-of-type(2) { animation-delay: .05s; } .card:nth-of-type(3) { animation-delay: .1s; }
+  .card h2 { font-size: 22px; margin-bottom: 4px; }
+  .card .hint { color: var(--ink-3); font-size: 13.5px; margin: 0 0 16px; }
+  .adminlink { display: inline-block; margin-top: 10px; font-size: 14px; font-weight: 600; text-decoration: none; }
 
-  .nav {
-    background: #fff; border-bottom: 1px solid #e8e4dc; padding: 0 2rem; height: 60px;
-    display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10;
-  }
-  .nav-brand { font-family: 'Playfair Display', serif; font-size: 22px; color: #2557b8; text-decoration: none; }
-  .nav-brand span { font-family: 'Inter', sans-serif; font-size: 13px; color: #aaa; margin-left: 6px; }
-  .nav-user { font-size: 13px; color: #666; }
-  .nav-signout { background:none; border:none; font-size:13px; color:#999; cursor:pointer; }
+  .f { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .f:last-child { margin-bottom: 0; }
+  .f > label, .lbl { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+  .f > label em, .lbl em { color: var(--red); font-style: normal; }
+  .f input[type=text], .f input[type=date] { font-family: inherit; font-size: 16px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px 14px; width: 100%; transition: border-color .2s, box-shadow .2s, background .2s; }
+  .f input:focus { outline: none; border-color: var(--blue); background: #fff; box-shadow: 0 0 0 4px rgba(37,87,184,.12); }
+  .f.err input[type=text], .f.err input[type=date] { border-color: var(--red); background: #fff7f6; }
+  .msg, .grp-err { display: none; color: var(--red); font-size: 12.5px; }
+  .f.err > .msg, .grp-err.show { display: block; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .suggest { display: none; font-size: 13px; color: var(--ink-2); }
+  .suggest.show { display: block; }
+  .suggest button { background: var(--blue-soft); color: var(--blue-ink); border: none; border-radius: 999px; padding: 4px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; margin-left: 6px; }
+  .suggest button:hover { background: var(--blue); color: #fff; }
 
-  .page { max-width: 620px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
-  .page-title { font-family: 'Playfair Display', serif; font-size: 26px; margin-bottom: 6px; }
-  .page-sub { font-size: 14px; color: #888; margin-bottom: 2rem; line-height: 1.6; }
-  .page-sub span { color: #c0392b; }
+  .opts { display: flex; flex-wrap: wrap; gap: 9px; }
+  .opts label { cursor: pointer; }
+  .opts input { position: absolute; opacity: 0; pointer-events: none; }
+  .opts span { display: inline-flex; padding: 10px 17px; border: 1px solid var(--line-2); border-radius: 999px; background: #fff; font-size: 15px; font-weight: 500; color: var(--ink-2); transition: all .2s var(--ease); user-select: none; }
+  .opts label:hover span { border-color: var(--blue); }
+  .opts input:checked + span { background: var(--blue); border-color: var(--blue); color: #fff; box-shadow: 0 4px 14px rgba(37,87,184,.25); }
+  .opts input:focus-visible + span { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; }
+  .other-input { display: none; margin-top: 10px; }
+  .other-input.show { display: block; }
 
-  .section { background: #fff; border: 1px solid #e8e4dc; border-radius: 10px; padding: 20px 22px; margin-bottom: 1.25rem; }
-  label.lbl { font-size: 12px; font-weight: 500; color: #666; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; margin-top: 16px; }
-  label.lbl:first-child { margin-top: 0; }
-  .req { color: #c0392b; margin-left: 2px; }
-  input[type=text], input[type=date], input[type=number], select, textarea {
-    width: 100%; background: #fff; border: 1px solid #d1cdc4; border-radius: 7px; padding: 10px 12px;
-    font-size: 14px; color: #1a1a1a; font-family: 'Inter', sans-serif;
-  }
-  input:focus, select:focus, textarea:focus { outline: none; border-color: #2557b8; box-shadow: 0 0 0 3px rgba(37,87,184,.1); }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  @media(max-width:520px) { .row { grid-template-columns: 1fr; } }
+  .agree-box { background: var(--bg); border-radius: var(--radius-md); padding: 14px 16px; font-size: 14px; color: var(--ink-2); line-height: 1.55; margin-bottom: 14px; }
+  .f > label.agree { text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 400; color: var(--ink); }
+  .agree { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 15px; }
+  .agree input { width: 20px; height: 20px; accent-color: var(--blue); margin-top: 2px; }
+  .submit-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .submit-row .note { color: var(--ink-3); font-size: 13px; flex: 1 1 220px; }
+  .btn-submit { background: var(--blue); color: #fff; border: none; border-radius: 999px; padding: 15px 38px; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 6px 20px rgba(37,87,184,.3); transition: transform .15s var(--ease), background .2s; }
+  .btn-submit:hover { background: var(--blue-ink); transform: translateY(-1px); }
+  .btn-submit:disabled { opacity: .6; cursor: wait; }
+  .formerr { display: none; background: var(--red-soft); color: var(--red-ink); border-radius: var(--radius-md); padding: 12px 16px; font-size: 14px; margin-bottom: 16px; }
+  .formerr.show { display: block; }
 
-  .other-input { margin-top: 8px; }
+  .done { display: none; text-align: center; padding: 56px 20px; }
+  .done.show { display: block; animation: rise .5s var(--ease) both; }
+  .done .tick { width: 74px; height: 74px; border-radius: 50%; background: var(--green-soft); color: var(--green); display: inline-flex; align-items: center; justify-content: center; font-size: 36px; margin-bottom: 18px; }
+  .done h2 { font-size: 32px; margin-bottom: 10px; }
+  .done p { color: var(--ink-2); max-width: 46ch; margin: 0 auto 22px; }
 
-  .agree-box { background: #faf9f6; border: 1px solid #e8e4dc; border-radius: 10px; padding: 16px 18px; font-size: 13px; color: #666; line-height: 1.6; margin-top: 16px; }
-  .check-opt { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 14px; margin-top: 10px; }
-  .check-opt input { margin-top: 2px; accent-color: #2557b8; }
-
-  .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 1.25rem; }
-  .btn-primary { background: #2557b8; color: #fff; border: none; border-radius: 7px; padding: 12px 28px; font-size: 14px; font-weight: 500; cursor: pointer; }
-  .btn-primary:hover { background: #1e4694; }
-  .btn-primary:disabled { opacity: 0.5; cursor: default; }
-
-  .success { background: #fff; border: 1px solid #e8e4dc; border-radius: 10px; padding: 3rem 2rem; text-align: center; display: none; }
-  .success h2 { font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 6px; }
-  .success p { font-size: 14px; color: #888; }
-
-  #loginScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px; text-align: center; }
-  #googleSignInBtn { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #d1cdc4; border-radius:12px; padding:14px 24px; font-size:15px; cursor:pointer; }
-  .access-denied { text-align: center; padding: 60px 24px; }
-  .access-denied .title { font-family: 'Playfair Display', serif; font-size: 22px; color: #a03030; margin-bottom: 10px; }
+  @media (max-width: 560px) { .row { grid-template-columns: 1fr; gap: 0; } .row .f { margin-bottom: 16px; } }
 </style>
 </head>
 <body>
 
-<div id="loginScreen">
-  <h1 style="font-family:'Playfair Display',serif; font-size:28px; margin-bottom:20px;">RCC Vacation / Leave Request</h1>
-  <button id="googleSignInBtn">
+<div id="loginScreen" class="rcc-login" style="display:none;">
+  <img src="assets/rcc-logo-plain.png" alt="">
+  <h1>Vacation / Leave Request</h1>
+  <p>Staff sign in to request time away.</p>
+  <button id="googleSignInBtn" type="button">
     <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
     Sign in with Google
   </button>
 </div>
 
 <div id="appShell" style="display:none;">
-  <nav class="nav">
-    <a href="index.html" class="nav-brand">RCC <span>· All apps</span></a>
-    <div style="display:flex; align-items:center; gap:12px;">
-      <a href="admin.html?section=timeoff" id="adminLink" style="display:none; font-size:13px; color:#2557b8; text-decoration:none; font-weight:500;">Admin</a>
-      <span class="nav-user" id="navUser"></span>
-      <button class="nav-signout" id="signOutBtn">Sign out</button>
-    </div>
-  </nav>
+  <header id="rccNav"></header>
 
-  <div class="page">
-    <div id="accessCheck" style="text-align:center; padding:60px; color:#999;">Checking access...</div>
+  <main class="wrap">
+    <div id="accessCheck" class="empty">Checking access…</div>
 
-    <div id="formUI" style="display:none;">
-      <h1 class="page-title">Vacation / Leave of Absence</h1>
-      <p class="page-sub">Please submit the times you need to take off work and the type of leave you are taking. <span class="req">*</span> Required.</p>
+    <div id="formUI" hidden>
+      <section class="hero">
+        <span class="eyebrow">Staff</span>
+        <h1>Vacation / leave of absence</h1>
+        <p>Tell us when you'll be away and what kind of leave it is. Fields marked <b style="color:var(--red)">*</b> are required.</p>
+        <a class="adminlink" id="adminLink" href="admin.html?section=timeoff" hidden>Review time-off requests in Admin →</a>
+      </section>
 
       <form id="lv-form" novalidate>
-        <div class="section">
-          <label class="lbl">Name <span class="req">*</span></label>
-          <input type="text" id="lv-name" required>
-
+        <section class="card">
+          <h2>When will you be away?</h2>
+          <p class="hint">Pick your dates — we'll suggest the rest.</p>
+          <div class="f"><label for="lv-name">Your name <em>*</em></label><input type="text" id="lv-name" autocomplete="name"><span class="msg">Please add your name.</span></div>
           <div class="row">
-            <div>
-              <label class="lbl">Beginning On <span class="req">*</span></label>
-              <input type="date" id="lv-start" required>
-            </div>
-            <div>
-              <label class="lbl">Ending On <span class="req">*</span></label>
-              <input type="date" id="lv-end" required>
-            </div>
+            <div class="f"><label for="lv-start">Beginning on <em>*</em></label><input type="date" id="lv-start"><span class="msg">Pick the first day.</span></div>
+            <div class="f"><label for="lv-end">Ending on <em>*</em></label><input type="date" id="lv-end"><span class="msg" id="lv-end-msg">Pick the last day.</span></div>
           </div>
+          <div class="f"><label for="lv-return">Office return date</label><input type="date" id="lv-return">
+            <span class="suggest" id="sug-return"></span></div>
+          <div class="f"><label for="lv-amount">How many days or hours will you be off? <em>*</em></label><input type="text" id="lv-amount" placeholder="e.g. 3 days, or 16 hours"><span class="msg">Tell us how much time.</span>
+            <span class="suggest" id="sug-amount"></span></div>
+        </section>
 
-          <label class="lbl">Office Return Date</label>
-          <input type="date" id="lv-return">
-
-          <label class="lbl">How many days/hours will you be off? <span class="req">*</span></label>
-          <input type="text" id="lv-amount" placeholder="e.g. 3 days, or 16 hours" required>
-
-          <label class="lbl">Who will be covering for you? <span class="req">*</span></label>
-          <input type="text" id="lv-coverage" required>
-
-          <label class="lbl">Type of Request <span class="req">*</span></label>
-          <select id="lv-type" required>
-            <option value="">Select...</option>
-            <option value="Vacation">Vacation</option>
-            <option value="Personal">Personal</option>
-            <option value="Bereavement leave">Bereavement leave</option>
-            <option value="Leave of Absence">Leave of Absence</option>
-            <option value="Unpaid">Unpaid</option>
-            <option value="Medical">Medical</option>
-            <option value="Maternity">Maternity</option>
-            <option value="Ministry">Ministry</option>
-            <option value="Sick">Sick</option>
-            <option value="Other">Other</option>
-          </select>
-          <input type="text" id="lv-type-other" class="other-input" placeholder="Please specify" style="display:none;">
-
-          <div class="agree-box">
-            I understand that my request has not been approved until the Administrative Pastor approves it.
+        <section class="card">
+          <h2>Coverage &amp; type</h2>
+          <p class="hint">Who's covering, and what kind of leave is it?</p>
+          <div class="f"><label for="lv-coverage">Who will be covering for you? <em>*</em></label><input type="text" id="lv-coverage"><span class="msg">Tell us who's covering.</span></div>
+          <div class="f" id="f-type">
+            <span class="lbl">Type of request <em>*</em></span>
+            <div class="opts" id="lv-type">
+              <label><input type="radio" name="lvtype" value="Vacation"><span>Vacation</span></label>
+              <label><input type="radio" name="lvtype" value="Personal"><span>Personal</span></label>
+              <label><input type="radio" name="lvtype" value="Sick"><span>Sick</span></label>
+              <label><input type="radio" name="lvtype" value="Medical"><span>Medical</span></label>
+              <label><input type="radio" name="lvtype" value="Bereavement leave"><span>Bereavement leave</span></label>
+              <label><input type="radio" name="lvtype" value="Leave of Absence"><span>Leave of Absence</span></label>
+              <label><input type="radio" name="lvtype" value="Maternity"><span>Maternity</span></label>
+              <label><input type="radio" name="lvtype" value="Ministry"><span>Ministry</span></label>
+              <label><input type="radio" name="lvtype" value="Unpaid"><span>Unpaid</span></label>
+              <label><input type="radio" name="lvtype" value="Other"><span>Other</span></label>
+            </div>
+            <span class="grp-err" id="err-type">Choose the type of leave.</span>
+            <div class="f other-input" id="f-type-other"><input type="text" id="lv-type-other" placeholder="Please specify"><span class="msg">Please say what kind.</span></div>
           </div>
-          <label class="check-opt">
-            <input type="checkbox" id="lv-understand" required> I understand <span class="req">*</span>
-          </label>
-        </div>
+        </section>
 
-        <div class="btn-row">
-          <button type="submit" class="btn-primary" id="lv-submit-btn">Submit Request</button>
+        <section class="card">
+          <h2>Almost done</h2>
+          <div class="agree-box">I understand that my request has not been approved until the Administrative Pastor approves it.</div>
+          <div class="f" id="f-agree" style="margin-bottom:0">
+            <label class="agree"><input type="checkbox" id="lv-understand"><span>I understand <em style="color:var(--red);font-style:normal">*</em></span></label>
+            <span class="grp-err" id="err-agree">Please tick "I understand" to submit.</span>
+          </div>
+        </section>
+
+        <div class="formerr" id="formErr">A few things need a look — they're highlighted above.</div>
+        <div class="submit-row">
+          <span class="note">The Administrative Pastor will review it, and you'll be informed once it's decided.</span>
+          <button type="submit" class="btn-submit" id="lv-submit-btn">Submit request</button>
         </div>
       </form>
 
-      <div class="success" id="lv-success">
+      <section class="done" id="lv-success">
+        <div class="tick">✓</div>
         <h2>Request submitted</h2>
         <p>The Administrative Pastor will review it. You'll be informed once it's decided.</p>
-      </div>
+        <button class="btn" id="againBtn" type="button">Submit another request</button>
+      </section>
     </div>
 
-    <div id="accessDenied" class="access-denied" style="display:none;">
-      <div class="title">Access Restricted</div>
-      <p style="color:#888; font-size:14px;">This form is limited to staff. Contact an admin if you believe this is a mistake.</p>
+    <div id="accessDenied" class="empty" hidden>
+      <b>Access restricted</b>
+      This form is limited to staff. Contact an admin if you believe this is a mistake.
     </div>
-  </div>
+  </main>
 </div>
 
 <script>
@@ -169,81 +175,153 @@
   var auth = firebase.auth();
   var db = firebase.firestore();
   var currentUser = null;
+  function $(id){ return document.getElementById(id); }
 
-  document.getElementById('googleSignInBtn').addEventListener('click', function(){
-    var provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(function(err){ alert('Sign-in failed: ' + err.message); });
+  $('googleSignInBtn').addEventListener('click', function(){
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(err){ alert('Sign-in failed: ' + err.message); });
   });
-  document.getElementById('signOutBtn').addEventListener('click', function(){ auth.signOut(); });
 
   auth.onAuthStateChanged(function(user){
     if(user){
       currentUser = user;
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('appShell').style.display = 'block';
-      document.getElementById('navUser').textContent = user.displayName || user.email;
+      $('loginScreen').style.display = 'none';
+      $('appShell').style.display = 'block';
 
       db.collection('users').doc(user.uid).get().then(function(doc){
         var data = doc.exists ? doc.data() : {};
-        var hasAccess = data.isAdmin === true || (data.modules && data.modules.timeOff === true);
-        document.getElementById('accessCheck').style.display = 'none';
-        document.getElementById('adminLink').style.display = data.isAdmin === true ? '' : 'none';
+        var roles = data.roles || {};
+        var isAdmin = data.isAdmin === true;
+        RccShell.render($('rccNav'), { active: '', user: user, onSignOut: function(){ auth.signOut(); }, roles: Object.assign({}, roles, { isAdmin: isAdmin }) });
+        var hasAccess = isAdmin || (data.modules && data.modules.timeOff === true);
+        $('accessCheck').hidden = true;
+        $('adminLink').hidden = !isAdmin;
         if(hasAccess){
-          document.getElementById('formUI').style.display = 'block';
-          if(!document.getElementById('lv-name').value) document.getElementById('lv-name').value = user.displayName || '';
+          $('formUI').hidden = false;
+          if(!$('lv-name').value) $('lv-name').value = user.displayName || '';
         } else {
-          document.getElementById('accessDenied').style.display = 'block';
+          $('accessDenied').hidden = false;
         }
       });
     } else {
       currentUser = null;
-      document.getElementById('loginScreen').style.display = 'flex';
-      document.getElementById('appShell').style.display = 'none';
+      $('loginScreen').style.display = 'flex';
+      $('appShell').style.display = 'none';
     }
   });
 
-  document.getElementById('lv-type').addEventListener('change', function(){
-    document.getElementById('lv-type-other').style.display = this.value === 'Other' ? 'block' : 'none';
+  /* ---------- small helpers: suggestions, never filled in silently ---------- */
+  function parse(s){ var p = (s||'').split('-').map(Number); return p.length===3 && !p.some(isNaN) ? new Date(p[0], p[1]-1, p[2]) : null; }
+  function iso(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function weekdaysBetween(a, b){
+    var n = 0, d = new Date(a);
+    while(d <= b){ var w = d.getDay(); if(w !== 0 && w !== 6) n++; d.setDate(d.getDate()+1); }
+    return n;
+  }
+  function nextWorkday(d){
+    var n = new Date(d); n.setDate(n.getDate()+1);
+    while(n.getDay() === 0 || n.getDay() === 6) n.setDate(n.getDate()+1);
+    return n;
+  }
+  function pretty(d){ return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }); }
+  function suggest(el, text, btnLabel, onUse){
+    el.replaceChildren();
+    if(!text){ el.classList.remove('show'); return; }
+    el.appendChild(document.createTextNode(text));
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = btnLabel;
+    b.addEventListener('click', function(){ onUse(); el.classList.remove('show'); });
+    el.appendChild(b); el.classList.add('show');
+  }
+  function refreshSuggestions(){
+    var s = parse($('lv-start').value), e = parse($('lv-end').value);
+    if(s && e && e >= s){
+      var n = weekdaysBetween(s, e);
+      if(!$('lv-amount').value.trim() && n > 0){
+        var label = n + (n === 1 ? ' day' : ' days');
+        suggest($('sug-amount'), 'That\'s ' + n + ' weekday' + (n === 1 ? '' : 's') + ' (Mon–Fri) between your dates.', 'Use "' + label + '"', function(){ $('lv-amount').value = label; $('lv-amount').closest('.f').classList.remove('err'); });
+      } else suggest($('sug-amount'), '', '', null);
+      if(!$('lv-return').value){
+        var r = nextWorkday(e);
+        suggest($('sug-return'), 'Usually the next workday after you end:', pretty(r), function(){ $('lv-return').value = iso(r); });
+      } else suggest($('sug-return'), '', '', null);
+    } else { suggest($('sug-amount'), '', '', null); suggest($('sug-return'), '', '', null); }
+  }
+  ['lv-start','lv-end','lv-amount','lv-return'].forEach(function(id){ $(id).addEventListener('input', refreshSuggestions); });
+  // picking a first day with no last day yet: assume a single day (easy to change)
+  $('lv-start').addEventListener('change', function(){ if($('lv-start').value && !$('lv-end').value) $('lv-end').value = $('lv-start').value; refreshSuggestions(); });
+
+  /* ---------- the type chips ---------- */
+  document.querySelectorAll('input[name="lvtype"]').forEach(function(r){
+    r.addEventListener('change', function(){
+      $('f-type-other').classList.toggle('show', r.value === 'Other' && r.checked);
+      $('err-type').classList.remove('show');
+    });
   });
 
-  document.getElementById('lv-form').addEventListener('submit', function(e){
+  ['lv-name','lv-start','lv-end','lv-amount','lv-coverage','lv-type-other'].forEach(function(id){
+    $(id).addEventListener('input', function(){ $(id).closest('.f').classList.remove('err'); });
+  });
+  $('lv-understand').addEventListener('change', function(){ $('err-agree').classList.remove('show'); });
+
+  function validate(){
+    var first = null;
+    function bad(el, isBad){ if(isBad && !first) first = el; return isBad; }
+    function flag(id, isBad){ $(id).closest('.f').classList.toggle('err', isBad); return bad($(id), isBad); }
+    flag('lv-name', !$('lv-name').value.trim());
+    var sBad = flag('lv-start', !$('lv-start').value);
+    var s = parse($('lv-start').value), e = parse($('lv-end').value);
+    $('lv-end-msg').textContent = (s && e && e < s) ? 'The last day must be on or after the first day.' : 'Pick the last day.';
+    flag('lv-end', !$('lv-end').value || (s && e && e < s));
+    flag('lv-amount', !$('lv-amount').value.trim());
+    flag('lv-coverage', !$('lv-coverage').value.trim());
+    var t = document.querySelector('input[name="lvtype"]:checked');
+    $('err-type').classList.toggle('show', !t); bad($('f-type'), !t);
+    if(t && t.value === 'Other') flag('lv-type-other', !$('lv-type-other').value.trim());
+    $('err-agree').classList.toggle('show', !$('lv-understand').checked); bad($('f-agree'), !$('lv-understand').checked);
+    return first;
+  }
+
+  $('lv-form').addEventListener('submit', function(e){
     e.preventDefault();
-    if(!document.getElementById('lv-understand').checked){
-      alert('Please check "I understand" to submit.');
-      return;
-    }
-    var start = document.getElementById('lv-start').value;
-    var end = document.getElementById('lv-end').value;
-    if(start && end && new Date(end) < new Date(start)){
-      alert('Ending date must be on or after the beginning date.');
-      return;
-    }
+    var missing = validate();
+    $('formErr').classList.toggle('show', !!missing);
+    if(missing){ missing.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
 
-    var typeVal = document.getElementById('lv-type').value;
-    var typeOther = document.getElementById('lv-type-other').value;
-
+    var t = document.querySelector('input[name="lvtype"]:checked').value;
     var request = {
-      name: document.getElementById('lv-name').value,
-      startDate: start,
-      endDate: end,
-      officeReturnDate: document.getElementById('lv-return').value,
-      amountOff: document.getElementById('lv-amount').value,
-      coverage: document.getElementById('lv-coverage').value,
-      requestType: typeVal === 'Other' ? ('Other: ' + typeOther) : typeVal,
+      name: $('lv-name').value.trim(),
+      startDate: $('lv-start').value,
+      endDate: $('lv-end').value,
+      officeReturnDate: $('lv-return').value,
+      amountOff: $('lv-amount').value.trim(),
+      coverage: $('lv-coverage').value.trim(),
+      requestType: t === 'Other' ? ('Other: ' + $('lv-type-other').value.trim()) : t,
       status: 'pending', // pending | approved | denied
       submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
       uid: currentUser.uid,
       email: currentUser.email,
     };
 
+    var btn = $('lv-submit-btn'); btn.disabled = true; btn.textContent = 'Sending…';
     db.collection('timeOffRequests').add(request).then(function(){
       // The Sheet row and the notification emails are sent from the server
       // when this document is created (Cloud Function notifyTimeOffCreated).
-      document.getElementById('lv-form').style.display = 'none';
-      document.getElementById('lv-success').style.display = 'block';
+      $('lv-form').style.display = 'none';
+      $('lv-success').classList.add('show');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }).catch(function(err){
       alert('Something went wrong submitting your request: ' + err.message);
-    });
+    }).then(function(){ btn.disabled = false; btn.textContent = 'Submit request'; });
+  });
+
+  $('againBtn').addEventListener('click', function(){
+    var keep = $('lv-name').value;
+    $('lv-form').reset(); $('lv-name').value = keep;
+    $('f-type-other').classList.remove('show');
+    document.querySelectorAll('.err').forEach(function(el){ el.classList.remove('err'); });
+    document.querySelectorAll('.grp-err.show').forEach(function(el){ el.classList.remove('show'); });
+    $('formErr').classList.remove('show'); refreshSuggestions();
+    $('lv-form').style.display = ''; $('lv-success').classList.remove('show');
+    window.scrollTo({ top: 0 });
   });
 })();
 </script>
