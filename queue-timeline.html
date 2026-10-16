@@ -4,248 +4,267 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RCC — Creative Timeline</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#2557b8">
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="room-logic.js"></script>
+<script src="rcc-shell.js"></script>
+<script>if(/[?&]embed=1(&|$)/.test(location.search))document.documentElement.classList.add('embedded');</script>
+<link rel="stylesheet" href="rcc-ui.css">
 
 <style>
-  :root {
-    --bg:         #f7f6f3;
-    --bg-card:    #ffffff;
-    --bg-raised:  #f0ece4;
-    --border:     #e8e4dc;
-    --border-mid: rgba(0,0,0,0.14);
-    --text:       #1a1a1a;
-    --text-mid:   #5c5650;
-    --text-soft:  #9e9890;
-    --blue:       #2557b8;
-    --blue-dim:   rgba(37,87,184,0.08);
-    --blue-glow:  rgba(37,87,184,0.20);
-    --gold:       #b5892a;
-    --gold-dim:   rgba(181,137,42,0.10);
-    --gold-glow:  rgba(181,137,42,0.22);
-    --green:      #2e7a52;
-    --green-dim:  rgba(46,122,82,0.10);
-    --red:        #a03030;
-    --red-dim:    rgba(160,48,48,0.10);
-    --radius:     14px;
-    --radius-sm:  8px;
+  .embedded #rccNav { display: none !important; }
+  .embedded .page { padding-top: 16px; }
+
+  .live { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--green-ink); background: var(--green-soft); padding: 4px 12px; border-radius: 999px; margin-bottom: 14px; }
+  .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .view { animation: fade .35s var(--ease) both; }
+
+  /* ---------- deck ---------- */
+  .group { margin-bottom: 30px; }
+  .group-head { display: flex; align-items: baseline; gap: 12px; margin: 0 2px 14px; }
+  .group-head h2 { font-size: 22px; }
+  .group-head .n { font-size: 13px; color: var(--ink-3); font-weight: 500; }
+  .group-head .rail { flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-2), transparent); }
+  .group.late .group-head h2 { color: var(--red); }
+  details.group > summary { list-style: none; cursor: pointer; }
+  details.group > summary::-webkit-details-marker { display: none; }
+  details.group > summary .group-head { margin-bottom: 0; }
+  details.group > summary .chev { color: var(--ink-3); font-size: 13px; transition: transform .25s var(--ease); }
+  details.group[open] > summary .chev { transform: rotate(90deg); }
+  details.group[open] > summary .group-head { margin-bottom: 14px; }
+  details.group > summary:hover h2 { color: var(--blue); }
+  .deck { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 430px), 1fr)); gap: 16px; align-items: start; }
+  .deck > .rc { animation: rise .45s var(--ease) both; }
+  .deck > .rc:nth-child(2) { animation-delay: .04s; } .deck > .rc:nth-child(3) { animation-delay: .08s; } .deck > .rc:nth-child(n+4) { animation-delay: .12s; }
+
+  .rc {
+    --tone: var(--blue); --tone-soft: var(--blue-soft);
+    display: grid; grid-template-columns: 74px minmax(0, 1fr); background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow-1); overflow: hidden; transition: box-shadow .3s var(--ease), transform .3s var(--ease);
   }
+  .deck > .rc:hover { box-shadow: var(--shadow-2); }
+  .rc.done { opacity: .75; }
+  .rc.pending { border-style: dashed; border-color: var(--blue); }
+  .rc-date { background: var(--tone-soft); color: var(--tone); display: flex; flex-direction: column; align-items: center; padding: 15px 6px; text-align: center; border-right: 1px solid var(--line); }
+  .rc-date small { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; opacity: .85; }
+  .rc-date strong { font-family: 'Playfair Display', serif; font-weight: 500; font-size: 34px; line-height: 1.05; margin: 2px 0; }
+  .rc-date em { font-style: normal; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+  .rc-date i { font-style: normal; font-size: 10px; font-weight: 600; margin-top: 9px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.75); letter-spacing: .06em; text-transform: uppercase; }
+  .rc-main { padding: 15px 18px 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; position: relative; }
+  .rc-top { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rc h3 { font-size: 20px; }
+  .rc-who { font-size: 13px; color: var(--ink-3); margin-top: -5px; }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
-  a { color: var(--blue); }
+  .meta { display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; color: var(--ink-2); }
+  .meta div { display: flex; gap: 9px; align-items: baseline; }
+  .meta .ic { width: 18px; text-align: center; flex-shrink: 0; }
+  .meta small { color: var(--ink-3); }
 
-  .nav {
-    background: #fff; border-bottom: 1px solid var(--border); padding: 0 2rem; height: 60px;
-    display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10;
-  }
-  .nav-brand { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--blue); text-decoration: none; }
-  .nav-brand span { font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text-soft); margin-left: 6px; }
-  .nav-links { display: flex; align-items: center; gap: 18px; }
-  .nav-links a { font-size: 13px; color: var(--text-mid); text-decoration: none; }
-  .nav-links a:hover { color: var(--blue); }
-  .nav-user { font-size: 13px; color: var(--text-mid); }
-  .nav-signout { background: none; border: none; font-size: 13px; color: var(--text-soft); cursor: pointer; }
+  .track { display: flex; align-items: center; flex-wrap: wrap; row-gap: 6px; }
+  .st { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+  .st i { width: 17px; height: 17px; border-radius: 50%; border: 2px solid var(--line-2); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-style: normal; color: #fff; background: #fff; transition: all .3s var(--ease); }
+  .st.done { color: var(--green-ink); } .st.done i { background: var(--green); border-color: var(--green); }
+  .st.doing { color: var(--gold-ink); } .st.doing i { border-color: var(--gold); background: var(--gold-soft); }
+  .track .bar { width: 18px; height: 2px; background: var(--line-2); margin: 0 7px; border-radius: 2px; }
 
-  .page { max-width: 1180px; margin: 0 auto; padding: 2.25rem 1.5rem 4rem; }
-  .page-title { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 600; margin-bottom: 6px; }
-  .page-sub { font-size: 14px; color: var(--text-mid); max-width: 62ch; line-height: 1.5; margin-bottom: 10px; }
-  .meta-line { font-size: 12.5px; color: var(--text-soft); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 1.4rem; }
-  .meta-line b { color: var(--text-mid); font-weight: 600; }
-  .live-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--green-dim); color: var(--green); padding: 3px 10px; border-radius: 999px; font-weight: 600; font-size: 12px; }
-  .live-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .approve { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--blue-soft); border-radius: var(--radius-md); padding: 9px 12px; font-size: 13px; color: var(--blue-ink); }
+  .approve span { flex: 1 1 auto; font-weight: 500; }
 
-  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 1.8rem; }
-  .controls input[type="search"], .controls select {
-    border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: var(--radius-sm);
-    padding: 8px 11px; font-family: 'Inter', sans-serif; font-size: 13.5px;
-  }
-  .controls input[type="search"] { flex: 1 1 180px; min-width: 160px; }
-  .controls label.toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-mid); white-space: nowrap; }
-  .count-pill { font-size: 12.5px; color: var(--text-soft); margin-left: auto; white-space: nowrap; }
-  .count-pill b { color: var(--text); }
+  .rc-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 2px; }
+  .more-btn { background: none; border: none; color: var(--ink-3); font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px 0; display: inline-flex; align-items: center; gap: 5px; transition: color .2s; margin-left: auto; }
+  .more-btn:hover { color: var(--blue); }
+  .more-btn .chev { transition: transform .25s var(--ease); display: inline-block; }
+  .rc.open .more-btn .chev { transform: rotate(180deg); }
 
-  .view-tabs { display: flex; gap: 4px; margin-bottom: 1.6rem; border-bottom: 1px solid var(--border); }
-  .view-tab { font-family: 'Inter', sans-serif; font-size: 13.5px; font-weight: 600; color: var(--text-soft); background: none; border: none; border-bottom: 2px solid transparent; padding: 8px 4px; margin-right: 18px; cursor: pointer; }
-  .view-tab:hover { color: var(--text-mid); }
-  .view-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+  /* the working controls — hidden until "Details" */
+  .rc-more { display: none; flex-direction: column; gap: 12px; padding-top: 12px; border-top: 1px dashed var(--line-2); }
+  .rc.open .rc-more { display: flex; animation: fade .3s var(--ease) both; }
+  .desc { font-size: 13.5px; color: var(--ink-2); background: var(--bg); border-radius: var(--radius-md); padding: 10px 12px; line-height: 1.55; white-space: pre-wrap; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
 
-  .section-heading { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-  .section-heading h2 { font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 600; }
-  .section-heading .hint { font-size: 12px; color: var(--text-soft); }
+  .fields { display: flex; flex-direction: column; gap: 11px; }
+  .field { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .field .lbl { font-size: 12px; font-weight: 600; color: var(--ink-3); width: 68px; flex-shrink: 0; }
+  .seg { display: inline-flex; background: var(--bg-soft); border-radius: 999px; padding: 3px; }
+  .seg button { border: none; background: transparent; font-size: 12px; font-weight: 600; color: var(--ink-2); padding: 5px 11px; border-radius: 999px; cursor: pointer; transition: all .2s var(--ease); }
+  .seg button:hover:not(:disabled) { color: var(--ink); }
+  .seg button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(60,40,10,.15); }
+  .seg button.active[data-value="Completed"] { background: var(--green); color: #fff; }
+  .seg button.active[data-value="In Progress"] { background: var(--gold); color: #fff; }
+  .seg button:disabled { cursor: not-allowed; opacity: .6; }
+  .due-input, .cardin { font-family: inherit; font-size: 12.5px; color: var(--ink-2); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 5px 9px; }
+  .due-input:disabled { opacity: .6; }
+  .hint { font-size: 11px; color: var(--ink-3); font-style: italic; }
+  .calchk { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+  .calchk input { width: 16px; height: 16px; accent-color: var(--blue); }
+  .lab { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); display: block; margin-bottom: 4px; }
+  .cardin.wide, textarea.cardin { width: 100%; }
+  textarea.cardin { min-height: 54px; resize: vertical; font-size: 13.5px; }
+  .actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .actions > div { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .open-link { font-size: 13px; font-weight: 600; text-decoration: none; }
+  .editbox { background: var(--bg); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .editbox .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .editbox .row > div { flex: 1 1 130px; }
 
-  .gantt-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); margin-bottom: 2.4rem; }
-  .gantt { min-width: 820px; padding: 14px 16px 18px; }
-  .gantt-axis { display: grid; grid-template-columns: 220px 1fr; font-size: 11px; color: var(--text-soft); margin-bottom: 8px; position: relative; }
+  details.completed { margin-top: 6px; }
+  details.completed summary { cursor: pointer; list-style: none; font-family: 'Playfair Display', serif; font-size: 20px; color: var(--ink-2); padding: 10px 2px; }
+  details.completed summary::-webkit-details-marker { display: none; }
+  details.completed summary::before { content: "▸ "; color: var(--ink-3); }
+  details.completed[open] summary::before { content: "▾ "; }
+
+  /* ---------- calendar ---------- */
+  .calbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .calbar h2 { font-size: 28px; min-width: 210px; }
+  .calbar .navbtn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line-2); background: #fff; cursor: pointer; font-size: 16px; color: var(--ink-2); transition: all .2s var(--ease); }
+  .calbar .navbtn:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .calbar .legend { margin-left: auto; display: flex; gap: 14px; font-size: 12.5px; color: var(--ink-2); align-items: center; flex-wrap: wrap; }
+  .calbar .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .cal { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-1); overflow: hidden; }
+  .cal-dow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); background: var(--bg-soft); border-bottom: 1px solid var(--line); }
+  .cal-dow div { padding: 10px 8px; font-size: 11.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); text-align: center; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .day { min-height: 112px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 7px 7px 8px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; transition: background .2s; background: #fff; }
+  .day:nth-child(7n) { border-right: none; }
+  .day:hover { background: #fcfaf5; }
+  .day.out { background: #faf8f3; } .day.out .num { color: var(--ink-3); opacity: .55; }
+  .day .num { font-size: 13px; font-weight: 600; color: var(--ink-2); width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; }
+  .day.today .num { background: var(--blue); color: #fff; }
+  .chip-ev, .chip-due { display: block; width: 100%; text-align: left; border: none; font-family: inherit; cursor: pointer; font-size: 12px; line-height: 1.3; padding: 4px 8px; border-radius: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: transform .15s var(--ease), box-shadow .2s; }
+  .chip-ev { background: var(--tone-soft); color: var(--tone-ink); font-weight: 600; border-left: 3px solid var(--tone); }
+  .chip-ev small { font-weight: 500; opacity: .8; margin-right: 4px; }
+  .chip-due { background: #fff; color: var(--gold-ink); border: 1px dashed var(--gold); font-weight: 500; }
+  .chip-ev:hover, .chip-due:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(60,40,10,.14); }
+  .chip-ev.is-done { opacity: .55; text-decoration: line-through; }
+  .more { font-size: 11.5px; font-weight: 600; color: var(--blue); padding: 1px 4px; }
+  .dots { display: none; gap: 3px; flex-wrap: wrap; }
+  .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--tone); }
+  .daylist { display: flex; flex-direction: column; gap: 10px; }
+  .daylist h3 { font-size: 24px; margin-bottom: 4px; }
+  .dli { text-align: left; width: 100%; background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px 14px; cursor: pointer; font-family: inherit; transition: all .2s var(--ease); }
+  .dli:hover { border-color: var(--blue); box-shadow: var(--shadow-1); transform: translateY(-1px); }
+  .dli b { display: block; font-size: 15px; color: var(--ink); }
+  .dli small { color: var(--ink-3); font-size: 12.5px; }
+  .backlink { background: none; border: none; color: var(--blue); font-size: 13.5px; font-weight: 600; cursor: pointer; margin-bottom: 10px; padding: 0; }
+
+  /* ---------- list ---------- */
+  .list { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-1); overflow: hidden; }
+  .lrow { display: grid; grid-template-columns: 112px minmax(0, 2.2fr) minmax(0, 1.6fr) 118px 118px; gap: 14px; align-items: center; padding: 13px 18px; border: 0; border-bottom: 1px solid var(--line); width: 100%; text-align: left; background: #fff; font-family: inherit; cursor: pointer; transition: background .2s; }
+  .lrow:last-child { border-bottom: none; }
+  .lrow:hover:not(.lhead) { background: #fcfaf5; }
+  .lrow.lhead { background: var(--bg-soft); cursor: default; padding-top: 10px; padding-bottom: 10px; }
+  .lrow.lhead button, .lrow.lhead span { background: none; border: none; font-family: inherit; font-size: 11.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); text-align: left; padding: 0; }
+  .lrow.lhead button { cursor: pointer; } .lrow.lhead button.on { color: var(--blue); }
+  .lrow.done { opacity: .6; }
+  .ld b { display: block; font-size: 14.5px; } .ld small { color: var(--ink-3); font-size: 12px; }
+  .ltitle b { display: block; font-family: 'Playfair Display', serif; font-weight: 500; font-size: 17px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ltitle small { color: var(--ink-3); font-size: 12.5px; }
+  .needs { display: flex; flex-wrap: wrap; gap: 5px; }
+  .lcell { font-size: 13px; color: var(--ink-2); }
+
+  /* ---------- timeline (gantt) ---------- */
+  .gantt-scroll { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-1); }
+  .gantt { min-width: 860px; padding: 40px 20px 20px; }
+  .gantt-axis { display: grid; grid-template-columns: 230px 1fr; column-gap: 14px; font-size: 11px; color: var(--ink-3); margin-bottom: 10px; }
   .gantt-axis .months { position: relative; height: 18px; }
-  .gantt-axis .months span { position: absolute; transform: translateX(-2px); text-transform: uppercase; letter-spacing: 0.04em; }
-  .gantt-row { display: grid; grid-template-columns: 220px 1fr; align-items: center; gap: 12px; padding: 5px 0; border-top: 1px solid var(--bg-raised); }
-  .gantt-row:first-of-type { border-top: none; }
-  .gantt-row .label { font-size: 12.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 6px; }
-  .gantt-row .label .dept { display: block; font-size: 10.5px; color: var(--text-soft); }
-  .gantt-track { position: relative; height: 20px; background: var(--bg-raised); border-radius: 5px; }
-  .gantt-bar { position: absolute; top: 3px; bottom: 3px; border-radius: 4px; min-width: 6px; }
-  .gantt-marker { position: absolute; top: -3px; bottom: -3px; width: 2px; }
-  .gantt-today { position: absolute; top: -8px; bottom: -8px; width: 2px; background: var(--blue); z-index: 3; }
-  .gantt-today-label { position: absolute; top: -20px; transform: translateX(-50%); font-size: 10px; color: var(--blue); letter-spacing: 0.04em; white-space: nowrap; font-weight: 600; }
+  .gantt-axis .months span { position: absolute; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+  .gantt-row { display: grid; grid-template-columns: 230px 1fr; align-items: center; gap: 14px; padding: 7px 0; border-top: 1px solid var(--bg-soft); cursor: pointer; }
+  .gantt-row:hover { background: #fcfaf5; }
+  .gantt-row .label { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 6px; font-weight: 500; }
+  .gantt-row .label .dept { display: block; font-size: 11px; color: var(--ink-3); font-weight: 400; }
+  .gantt-track { position: relative; height: 22px; background: var(--bg-soft); border-radius: 6px; }
+  .gantt-bar { position: absolute; top: 4px; bottom: 4px; border-radius: 5px; min-width: 7px; }
+  .gantt-marker { position: absolute; top: -3px; bottom: -3px; width: 3px; border-radius: 2px; }
+  .gantt-today { position: absolute; top: 4px; bottom: -6px; width: 2px; background: var(--blue); z-index: 3; }
+  .gantt-today-label { position: absolute; top: -20px; transform: translateX(-50%); font-size: 10.5px; color: #fff; background: var(--blue); padding: 2px 8px; border-radius: 999px; letter-spacing: .06em; font-weight: 700; z-index: 3; }
 
-  .lanes { display: flex; flex-direction: column; gap: 30px; }
-  .lane-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-  .lane-rail { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-  .lane-head h3 { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 600; }
-  .lane-head .lane-count { font-size: 12px; color: var(--text-soft); }
-  .lane-desc { font-size: 12px; color: var(--text-soft); margin-left: auto; text-align: right; max-width: 38ch; }
-  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 14px; }
+  .dup { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 14px; box-shadow: var(--shadow-1); }
+  .dup h3 { font-size: 19px; margin-bottom: 8px; }
+  .duprow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .duprow.best { border-left: 3px solid var(--green); padding-left: 10px; }
 
-  .card { position: relative; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
-  .card.is-complete { opacity: 0.68; }
-  .card.is-complete h4 { text-decoration: line-through; text-decoration-color: var(--green); }
-  .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-  .card-top.has-delete { padding-right: 22px; }
-  .chip { font-size: 11px; letter-spacing: 0.02em; font-weight: 700; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
-  .chip.dept { background: var(--bg-raised); color: var(--text-soft); text-transform: none; font-weight: 600; letter-spacing: 0; font-size: 11.5px; }
-  .btn-delete { position: absolute; top: 10px; right: 10px; background: none; border: none; color: var(--text-soft); font-size: 13px; line-height: 1; cursor: pointer; padding: 3px 5px; border-radius: 4px; }
-  .btn-delete:hover { color: var(--red); background: var(--red-dim); }
-  .card h4 { font-family: 'Playfair Display', serif; font-size: 16.5px; font-weight: 600; line-height: 1.28; }
-  .card .who { font-size: 12.5px; color: var(--text-mid); margin-top: -4px; }
-  .due-line { font-size: 12.5px; color: var(--text-mid); display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
-  .due-line .approx { color: var(--text-soft); font-size: 11.5px; }
-
-  .mini-track { position: relative; height: 6px; background: var(--bg-raised); border-radius: 4px; }
-  .mini-bar { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
-  .mini-today { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--blue); }
-
-  .desc-text { font-size: 12.5px; color: var(--text-mid); line-height: 1.5; background: var(--bg-raised); border-radius: 8px; padding: 8px 10px; }
-
-  .approval-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-mid); background: var(--blue-dim); border-radius: 8px; padding: 8px 10px; flex-wrap: wrap; }
-  .approval-row span { flex: 1 1 auto; }
-  .btn-approve, .btn-deny { font-size: 11.5px; font-weight: 600; border: none; border-radius: 7px; padding: 6px 10px; cursor: pointer; }
-  .btn-approve { color: var(--green); background: var(--green-dim); }
-  .btn-approve:hover { background: rgba(46,122,82,0.18); }
-  .btn-deny { color: var(--red); background: var(--red-dim); }
-  .btn-deny:hover { background: rgba(160,48,48,0.16); }
-
-  .status-fields { display: flex; flex-direction: column; gap: 8px; }
-  .status-field { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .status-field .field-label { font-size: 12px; color: var(--text-soft); width: 66px; flex-shrink: 0; font-weight: 600; }
-  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
-  .seg-btn { font-family: 'Inter', sans-serif; font-size: 11.5px; font-weight: 600; color: var(--text-mid); background: var(--bg); border: none; border-right: 1px solid var(--border); padding: 5px 9px; cursor: pointer; }
-  .seg-btn:last-child { border-right: none; }
-  .seg-btn:hover { background: var(--bg-raised); }
-  .seg-btn:disabled, .due-input:disabled { cursor: not-allowed; opacity: 0.55; }
-  .seg-btn:disabled:hover { background: var(--bg); }
-  .locked-hint { font-size: 10.5px; color: var(--text-soft); font-style: italic; }
-  .cal-toggle input:disabled { cursor: not-allowed; opacity: 0.55; }
-  .seg-btn.active[data-value="Completed"] { background: var(--green); color: #fff; }
-  .seg-btn.active[data-value="In Progress"] { background: var(--gold); color: #fff; }
-  .seg-btn.active[data-value=""] { background: var(--text-soft); color: #fff; }
-  .due-input { border: 1px solid var(--border); border-radius: 6px; padding: 4px 7px; font-size: 11.5px; font-family: 'Inter', sans-serif; color: var(--text-mid); background: var(--bg); }
-  .cal-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-mid); cursor: pointer; }
-  .cal-toggle input { width: 15px; height: 15px; accent-color: var(--blue); cursor: pointer; }
-
-  .chips-row { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chips-row .tag { font-size: 11.5px; background: var(--bg-raised); color: var(--text-mid); padding: 3px 9px; border-radius: 999px; }
-
-  .note-field textarea { width: 100%; font-family: 'Inter', sans-serif; font-size: 12.5px; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 9px; resize: vertical; min-height: 44px; background: var(--bg); }
-  .note-field label, .link-field label { font-size: 11px; color: var(--text-soft); font-weight: 600; display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
-  .link-field input { width: 100%; font-family: 'Inter', sans-serif; font-size: 12.5px; border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; background: var(--bg); color: var(--text); }
-
-  .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: auto; gap: 8px; }
-  .btn-complete-all { font-size: 11.5px; font-weight: 600; color: var(--green); background: var(--green-dim); border: none; border-radius: 7px; padding: 6px 10px; cursor: pointer; }
-  .btn-complete-all:hover { background: rgba(46,122,82,0.18); }
-  .link-open { font-size: 11.5px; color: var(--blue); text-decoration: none; font-weight: 600; }
-
-  details.lane-completed summary { cursor: pointer; font-family: 'Playfair Display', serif; font-weight: 600; font-size: 17px; color: var(--text-mid); list-style: none; }
-  details.lane-completed summary::-webkit-details-marker { display: none; }
-  details.lane-completed summary::before { content: "▸ "; }
-  details.lane-completed[open] summary::before { content: "▾ "; }
-
-  .empty-note, .loading { color: var(--text-soft); font-size: 13.5px; font-style: italic; padding: 20px 0; }
-
-  #loginScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px; text-align: center; }
-  #googleSignInBtn { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #d1cdc4; border-radius:12px; padding:14px 24px; font-size:15px; cursor:pointer; }
-  .access-denied { text-align: center; padding: 60px 24px; }
-  .access-denied .title { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--red); margin-bottom: 10px; }
+  @media (max-width: 860px) {
+    .lrow { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px; }
+    .lrow > :nth-child(3), .lrow > :nth-child(4) { grid-column: 1 / -1; }
+    .lrow.lhead { display: none; }
+    .rc { grid-template-columns: 62px minmax(0, 1fr); }
+    .rc-date strong { font-size: 29px; }
+    .day { min-height: 64px; padding: 5px 4px; align-items: center; }
+    .day .chip-ev, .day .chip-due, .day .more { display: none; }
+    .day .dots { display: flex; justify-content: center; }
+    .cal-dow div { padding: 8px 2px; font-size: 10px; letter-spacing: .04em; }
+    .calbar h2 { font-size: 22px; min-width: 0; }
+    .calbar .legend { margin-left: 0; }
+  }
 </style>
-<script>if(/[?&]embed=1(&|$)/.test(location.search))document.documentElement.classList.add('embedded');</script>
-<style>.embedded #appShell>header,.embedded #appShell>nav.nav,.embedded .topbar{display:none!important}</style>
 </head>
 <body>
 
-<div id="loginScreen">
-  <h1 style="font-family:'Playfair Display',serif; font-size:28px; margin-bottom:20px;">RCC Creative Timeline</h1>
-  <button id="googleSignInBtn">
+<div id="loginScreen" class="rcc-login">
+  <img src="assets/rcc-logo-plain.png" alt="">
+  <h1>Creative Timeline</h1>
+  <p>Sign in to see what's coming up and what needs doing.</p>
+  <button id="googleSignInBtn" type="button">
     <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
     Sign in with Google
   </button>
 </div>
 
-<div id="appShell" style="display:none;">
-  <nav class="nav">
-    <a href="index.html" class="nav-brand">RCC <span>· Creative Timeline</span></a>
-    <div class="nav-links">
-      <a href="admin.html?section=events" id="adminLink" style="display:none;">Admin</a>
-      <span class="nav-user" id="navUser"></span>
-      <button class="nav-signout" id="signOutBtn">Sign out</button>
-    </div>
-  </nav>
+<div id="appShell" hidden>
+  <header id="rccNav"></header>
 
-  <div class="page">
-    <div id="accessCheck" class="loading">Checking access…</div>
+  <main class="page">
+    <div id="accessCheck" class="empty">Checking access…</div>
 
-    <div id="timelineUI" style="display:none;">
-      <h1 class="page-title">Creative Timeline</h1>
-      <p class="page-sub">Every open request from the Event Request form, grouped by what's still outstanding — approval, calendar, graphic, marketing — and colored by how soon it's due. Check things off, update status, and everyone sees the same board.</p>
-      <div class="meta-line">
-        <span class="live-pill"><span class="dot"></span>Live — synced to Firestore</span>
-        <span>·</span>
-        <span><b id="statTotal">–</b> requests in queue</span>
-        <span id="statExcluded"></span>
-      </div>
+    <div id="timelineUI" hidden>
+      <section class="hero">
+        <span class="eyebrow">Creative team</span>
+        <h1>Creative timeline</h1>
+        <p>What's coming up, in the order it needs you.</p>
+      </section>
+      <span class="live"><i></i>Live · <span id="statTotal">–</span> in the queue</span>
 
-      <div class="controls">
-        <input type="search" id="search" placeholder="Search by title or name…" aria-label="Search requests">
+      <div class="toolbar">
+        <div class="viewswitch" role="tablist" aria-label="View" id="viewSwitch">
+          <button type="button" data-view="deck" role="tab"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg><span class="lbl">Deck</span></button>
+          <button type="button" data-view="calendar" role="tab"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span class="lbl">Calendar</span></button>
+          <button type="button" data-view="list" role="tab"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg><span class="lbl">List</span></button>
+          <button type="button" data-view="timeline" role="tab"><svg viewBox="0 0 24 24"><path d="M3 6h9M7 12h12M3 18h7"/></svg><span class="lbl">Timeline</span></button>
+          <button type="button" data-view="duplicates" role="tab" id="dupTab" hidden><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg><span class="lbl">Duplicates <span id="dupCount"></span></span></button>
+        </div>
+        <input type="search" id="search" class="grow" placeholder="Search by title or name…" aria-label="Search requests">
         <select id="deptFilter" aria-label="Filter by ministry department"><option value="">All departments</option></select>
-        <label class="toggle"><input type="checkbox" id="hideDone"> Hide completed</label>
-        <span class="count-pill"><b id="statShown">–</b> shown</span>
+        <label class="check"><input type="checkbox" id="hideDone"> Hide completed</label>
       </div>
 
-      <div class="view-tabs" role="tablist">
-        <button type="button" class="view-tab active" data-view="cards" role="tab" aria-selected="true">Cards</button>
-        <button type="button" class="view-tab" data-view="timeline" role="tab" aria-selected="false">Timeline</button>
-        <button type="button" class="view-tab" data-view="duplicates" role="tab" aria-selected="false" id="duplicatesTab" style="display:none;">Duplicates <span id="dupCountBadge"></span></button>
-      </div>
+      <div class="chips" id="focusChips" role="group" aria-label="Show"></div>
 
-      <div id="cardsView">
-        <div class="lanes" id="lanes"></div>
-      </div>
-
-      <div id="timelineView" style="display:none;">
-        <div class="section-heading">
-          <h2>Timeline</h2>
-          <span class="hint">bar runs from today to the due date · diamond marks the event date · blue line is today</span>
-        </div>
-        <div class="gantt-scroll"><div class="gantt" id="gantt"></div></div>
-      </div>
-
-      <div id="duplicatesView" style="display:none;">
-        <div class="section-heading">
-          <h2>Possible Duplicates</h2>
-          <span class="hint">same requester, title, date &amp; department — usually an accidental double-submit</span>
-        </div>
+      <div id="viewDeck" class="view"></div>
+      <div id="viewCalendar" class="view" hidden></div>
+      <div id="viewList" class="view" hidden></div>
+      <div id="viewTimeline" class="view" hidden><div class="gantt-scroll"><div class="gantt" id="gantt"></div></div></div>
+      <div id="viewDuplicates" class="view" hidden>
+        <p style="color:var(--ink-2); margin-bottom:14px; max-width:64ch;">Same requester, title, date and department — usually an accidental double-submit. Keep the copy with the most progress.</p>
         <div id="duplicatesList"></div>
       </div>
+      <p id="statExcluded" style="color:var(--ink-3); font-size:12.5px; margin-top:24px;"></p>
     </div>
 
-    <div id="accessDenied" class="access-denied" style="display:none;">
-      <div class="title">No Timeline Access</div>
-      <p style="color: var(--text-soft); font-size:14px;">Ask an admin to add you to the Graphics or Marketing team to see this page.</p>
+    <div id="accessDenied" class="empty" hidden>
+      <b>No timeline access</b>
+      Ask an admin to add you to the Graphics or Marketing team to see this page.
     </div>
-  </div>
+  </main>
+
+  <div class="scrim" id="scrim"></div>
+  <aside class="panel" id="panel" aria-hidden="true" aria-label="Request details">
+    <div class="panel-head"><span id="panelKind">Details</span><button class="panel-x" id="panelClose" type="button" aria-label="Close">✕</button></div>
+    <div class="panel-body" id="panelBody"></div>
+  </aside>
 </div>
 
 <script>
@@ -265,38 +284,47 @@
   let allRequests = [];
   let excludedCount = 0;
   let myRoles = { graphics: false, marketing: false, isAdmin: false };
-  let editingId = null; // which card (if any) is showing the "Edit Details" form
+  let editingId = null;                 // which card (if any) is showing the "Edit details" form
+  const expanded = new Set();           // cards whose working controls are open
+  const openGroups = new Set();         // folded deck groups the person has opened
+  let view = 'deck', focus = 'all';
+  try { view = localStorage.getItem('ctView') || 'deck'; } catch (e) {}
+  let calMonth = null;                  // first of the month being shown on the calendar
+  let panelState = null;                // { type:'card', id, from? } | { type:'day', date }
+  let listSort = { key: 'date', dir: 1 };
+  let renderPending = false;
 
+  /* ---------- sign in / access ---------- */
   document.getElementById('googleSignInBtn').addEventListener('click', () => {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(err => alert('Sign-in failed: ' + err.message));
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => alert('Sign-in failed: ' + err.message));
   });
-  document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
 
   auth.onAuthStateChanged(async user => {
-    if (user) {
-      currentUser = user;
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('appShell').style.display = 'block';
-      document.getElementById('navUser').textContent = user.displayName || user.email;
-
-      const doc = await db.collection('users').doc(user.uid).get();
-      const data = doc.exists ? doc.data() : {};
-      const roles = data.roles || {};
-      myRoles = { graphics: roles.graphics === true, marketing: roles.marketing === true, isAdmin: data.isAdmin === true };
-      document.getElementById('accessCheck').style.display = 'none';
-      document.getElementById('adminLink').style.display = myRoles.isAdmin ? '' : 'none';
-
-      if (myRoles.graphics || myRoles.marketing || myRoles.isAdmin) {
-        document.getElementById('timelineUI').style.display = 'block';
-        loadRequests();
-      } else {
-        document.getElementById('accessDenied').style.display = 'block';
-      }
-    } else {
+    if (!user) {
       currentUser = null;
-      document.getElementById('loginScreen').style.display = 'flex';
-      document.getElementById('appShell').style.display = 'none';
+      document.getElementById('loginScreen').hidden = false;
+      document.getElementById('appShell').hidden = true;
+      return;
+    }
+    currentUser = user;
+    document.getElementById('loginScreen').hidden = true;
+    document.getElementById('appShell').hidden = false;
+
+    const doc = await db.collection('users').doc(user.uid).get();
+    const data = doc.exists ? doc.data() : {};
+    const roles = data.roles || {};
+    myRoles = { graphics: roles.graphics === true, marketing: roles.marketing === true, isAdmin: data.isAdmin === true };
+    RccShell.render(document.getElementById('rccNav'), {
+      active: 'timeline', user, onSignOut: () => auth.signOut(),
+      roles: Object.assign({}, roles, { isAdmin: myRoles.isAdmin }),
+    });
+    document.getElementById('accessCheck').hidden = true;
+
+    if (myRoles.graphics || myRoles.marketing || myRoles.isAdmin) {
+      document.getElementById('timelineUI').hidden = false;
+      loadRequests();
+    } else {
+      document.getElementById('accessDenied').hidden = false;
     }
   });
 
@@ -305,43 +333,33 @@
       allRequests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       render();
     }, err => {
-      document.getElementById('lanes').innerHTML = '<p class="empty-note">Could not load requests: ' + err.message + '</p>';
+      document.getElementById('viewDeck').innerHTML = '<div class="empty"><b>Couldn\'t load requests</b>' + escHtml(err.message) + '</div>';
       console.error(err);
     });
   }
 
-  /* ---------- derive + classify ---------- */
+  /* ---------- dates + classification ---------- */
   const DAY = 86400000;
   function startOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
   const TODAY = startOfDay(new Date());
-  function parseISO(s){ if(!s) return null; const p = s.split("-").map(Number); if(p.length!==3||p.some(isNaN)) return null; return new Date(p[0], p[1]-1, p[2]); }
+  function parseISO(s){ if(!s) return null; const p = String(s).split("-").map(Number); if(p.length!==3||p.some(isNaN)) return null; return new Date(p[0], p[1]-1, p[2]); }
+  function iso(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
   function fmtDate(d){ return d ? d.toLocaleDateString("en-US",{month:"short", day:"numeric", year:"numeric"}) : "—"; }
+  function fmtLong(d){ return d.toLocaleDateString("en-US",{weekday:"long", month:"long", day:"numeric", year:"numeric"}); }
+  function fmtTime(t){ const m = String(t||'').match(/^(\d{1,2}):(\d{2})/); if(!m) return ''; let h=+m[1]; const ap=h>=12?'PM':'AM'; h=h%12||12; return h+':'+m[2]+' '+ap; }
+  function timeRange(r){ const a=fmtTime(r.startTime), b=fmtTime(r.endTime); return a&&b ? a+' – '+b : (a||b||''); }
 
-  // Urgency: drives the colored badge on each card and the Gantt bars —
-  // purely about timing, independent of which section(s) a card sits in.
+  // Urgency colors: purely about timing, independent of which section(s) a request sits in.
   const URGENCY = [
-    {key:"overdue",  label:"Overdue",           color:"var(--red)",       bg:"var(--red-dim)"},
-    {key:"week",     label:"Due This Week",     color:"var(--gold)",      bg:"var(--gold-dim)"},
-    {key:"blocked",  label:"Awaiting Approval", color:"var(--blue)",      bg:"var(--blue-dim)"},
-    {key:"month",    label:"Due This Month",    color:"var(--gold)",      bg:"rgba(181,137,42,0.06)"},
-    {key:"upcoming", label:"Upcoming",          color:"var(--blue)",      bg:"rgba(37,87,184,0.05)"},
-    {key:"later",    label:"Later / No Date",   color:"var(--text-soft)", bg:"var(--bg-raised)"},
-    {key:"done",     label:"Completed",         color:"var(--green)",     bg:"var(--green-dim)"}
+    {key:"overdue",  label:"Overdue",           tone:"var(--red)",   soft:"var(--red-soft)",   ink:"var(--red-ink)",   pill:"red"},
+    {key:"week",     label:"Due this week",     tone:"var(--gold)",  soft:"var(--gold-soft)",  ink:"var(--gold-ink)",  pill:"gold"},
+    {key:"blocked",  label:"Awaiting approval", tone:"var(--blue)",  soft:"var(--blue-soft)",  ink:"var(--blue-ink)",  pill:"blue"},
+    {key:"month",    label:"Due this month",    tone:"var(--gold)",  soft:"var(--gold-soft)",  ink:"var(--gold-ink)",  pill:"gold"},
+    {key:"upcoming", label:"Upcoming",          tone:"var(--blue)",  soft:"var(--blue-soft)",  ink:"var(--blue-ink)",  pill:"blue"},
+    {key:"later",    label:"Later / no date",   tone:"#8e877c",      soft:"var(--bg-soft)",    ink:"var(--ink-2)",     pill:"gray"},
+    {key:"done",     label:"Completed",         tone:"var(--green)", soft:"var(--green-soft)", ink:"var(--green-ink)", pill:"green"}
   ];
-  const URGENCY_RANK = Object.fromEntries(URGENCY.map((u,i)=>[u.key,i]));
   function urgencyOf(key){ return URGENCY.find(u=>u.key===key) || URGENCY[URGENCY.length-1]; }
-
-  // Sections: what's still outstanding. A request can sit in more than
-  // one "Needs ___" section at once — Calendar, Graphic and Marketing
-  // are independent tracks, not sequential steps.
-  const SECTIONS = [
-    {key:"blocked",   label:"Awaiting Approval", desc:"Can't start creative work until approved"},
-    {key:"calendar",  label:"Needs Calendar",     desc:"Hasn't been added to the church calendar yet"},
-    {key:"graphic",   label:"Needs Graphic",      desc:"Graphic or media work still outstanding"},
-    {key:"marketing", label:"Needs Marketing",    desc:"Marketing push still outstanding"},
-    {key:"done",      label:"Completed",          desc:"Everything needed is done"}
-  ];
-  const SECTION_COLOR = { blocked:"var(--blue)", calendar:"var(--gold)", graphic:"var(--gold)", marketing:"var(--gold)", done:"var(--green)" };
 
   function marketingHasWork(arr){ return Array.isArray(arr) && arr.length>0 && !(arr.length===1 && arr[0]==='None'); }
 
@@ -386,437 +404,489 @@
       if (hasGraphic && r.graphicStatus !== 'Completed') sections.push('graphic');
       if (hasMarketing && r.marketingStatus !== 'Completed') sections.push('marketing');
     }
-
-    return { ...r, hasCalendar, hasGraphic, hasMarketing, relevant, completed, pending, dueDate, dueApprox, urgencyKey, sections };
+    const keyDate = parseISO(dueDate);
+    return { ...r, hasCalendar, hasGraphic, hasMarketing, relevant, completed, pending, dueDate, dueApprox, urgencyKey, sections, keyDate };
   }
+  const titleOf = r => r.eventTitle || r.projectTitle || 'Untitled request';
 
-  /* ---------- rendering ---------- */
-  function render(){
+  /* ---------- filtering ---------- */
+  const FOCUS = [
+    { key: 'all',       label: 'Everything',        test: () => true },
+    { key: 'overdue',   label: 'Overdue',           test: r => r.urgencyKey === 'overdue', warn: true },
+    { key: 'blocked',   label: 'Awaiting approval', test: r => r.sections.includes('blocked') },
+    { key: 'calendar',  label: 'Needs calendar',    test: r => r.sections.includes('calendar') },
+    { key: 'graphic',   label: 'Needs graphic',     test: r => r.sections.includes('graphic') },
+    { key: 'marketing', label: 'Needs marketing',   test: r => r.sections.includes('marketing') },
+  ];
+
+  function baseVisible(){
     const derived = allRequests.filter(r => r.status !== 'denied').map(derive);
     excludedCount = allRequests.length - derived.filter(r=>r.relevant).length;
-    let items = derived.filter(r => r.relevant);
-
+    const items = derived.filter(r => r.relevant);
     const q = document.getElementById('search').value.trim().toLowerCase();
     const dept = document.getElementById('deptFilter').value;
     const hideDone = document.getElementById('hideDone').checked;
-
-    const deptSet = new Set();
-    items.forEach(r => (r.department||[]).forEach(d=>deptSet.add(d)));
-    const sel = document.getElementById('deptFilter');
-    const prev = sel.value;
-    sel.innerHTML = '<option value="">All departments</option>' + [...deptSet].sort().map(d=>`<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
-    sel.value = prev;
-
-    let visible = items.filter(r => {
-      const title = (r.eventTitle || r.projectTitle || '').toLowerCase();
-      const who = (r.requesterName||'').toLowerCase();
-      const matchesText = !q || title.includes(q) || who.includes(q);
+    return { items, list: items.filter(r => {
+      const matchesText = !q || titleOf(r).toLowerCase().includes(q) || (r.requesterName||'').toLowerCase().includes(q);
       const matchesDept = !dept || (r.department||[]).includes(dept);
-      const matchesDone = !hideDone || !r.completed;
-      return matchesText && matchesDept && matchesDone;
-    });
+      return matchesText && matchesDept && (!hideDone || !r.completed);
+    }) };
+  }
 
-    function byDueDate(a,b){
-      const da = parseISO(a.dueDate), db_ = parseISO(b.dueDate);
-      if (!da && !db_) return 0;
-      if (!da) return 1;
-      if (!db_) return -1;
-      return da - db_;
-    }
+  /* ---------- the one render ---------- */
+  function isTyping(){
+    const a = document.activeElement;
+    return a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && a.type !== 'checkbox' && a.type !== 'search')) && (a.closest('#timelineUI') || a.closest('#panel')) && a.dataset.action !== undefined;
+  }
 
-    visible.sort((a,b) => {
-      const rr = URGENCY_RANK[a.urgencyKey] - URGENCY_RANK[b.urgencyKey];
-      if (rr !== 0) return rr;
-      return byDueDate(a,b);
-    });
+  function render(){
+    if (isTyping()) { renderPending = true; return; }   // never rebuild a box someone is typing in
+    renderPending = false;
+    const { items, list } = baseVisible();
+
+    const deptSet = new Set(); items.forEach(r => (r.department||[]).forEach(d=>deptSet.add(d)));
+    const sel = document.getElementById('deptFilter'), prev = sel.value;
+    sel.innerHTML = '<option value="">All departments</option>' + [...deptSet].sort().map(d=>`<option value="${escAttr(d)}">${escHtml(d)}</option>`).join('');
+    sel.value = deptSet.has(prev) ? prev : '';
+
+    // focus chips (counts respect search / department / hide-completed); empty ones stay out of the way
+    document.getElementById('focusChips').innerHTML = FOCUS.map(f => {
+      const n = list.filter(f.test).length;
+      if (f.key !== 'all' && f.key !== focus && n === 0) return '';
+      return `<button type="button" class="fchip ${focus===f.key?'active':''} ${f.warn&&n?'warn':''}" data-focus="${f.key}">${f.label}<b>${n}</b></button>`;
+    }).join('');
+
+    const focusFn = (FOCUS.find(f => f.key === focus) || FOCUS[0]).test;
+    const visible = list.filter(focusFn);
 
     document.getElementById('statTotal').textContent = items.length;
-    document.getElementById('statShown').textContent = visible.length;
-    document.getElementById('statExcluded').textContent = excludedCount > 0 ? `· ${excludedCount} excluded (no graphic, marketing, or calendar work needed)` : '';
+    document.getElementById('statExcluded').textContent = excludedCount > 0 ? `${excludedCount} request${excludedCount===1?'':'s'} left out (no graphic, marketing, or calendar work needed).` : '';
 
-    renderSections(visible, byDueDate);
+    document.querySelectorAll('#viewSwitch [data-view]').forEach(b => {
+      const on = b.dataset.view === view; b.classList.toggle('active', on); b.setAttribute('aria-selected', on);
+    });
+    ['deck','calendar','list','timeline','duplicates'].forEach(v => { document.getElementById('view' + v[0].toUpperCase() + v.slice(1)).hidden = v !== view; });
+
+    renderDeck(visible);
+    renderCalendar(visible);
+    renderList(visible);
     renderGantt(visible);
     renderDuplicates();
+    renderPanel();
   }
 
-  function renderSections(items, byDueDate){
-    const el = document.getElementById('lanes');
-    let html = '';
-    SECTIONS.forEach(section => {
-      const sectionItems = items.filter(r => r.sections.includes(section.key)).sort(byDueDate);
-      if (sectionItems.length === 0 && section.key !== 'done') return;
-      const grid = `<div class="card-grid">${sectionItems.map(cardHtml).join('') || '<p class="empty-note">Nothing here right now.</p>'}</div>`;
-      if (section.key === 'done') {
-        html += `<details class="lane-completed"><summary>(${sectionItems.length}) ${section.label}</summary><div style="margin-top:10px">${grid}</div></details>`;
-      } else {
-        html += `<div class="lane">
-          <div class="lane-head">
-            <span class="lane-rail" style="background:${SECTION_COLOR[section.key]}"></span>
-            <h3>${section.label}</h3>
-            <span class="lane-count">${sectionItems.length}</span>
-            <span class="lane-desc">${section.desc}</span>
-          </div>
-          ${grid}
-        </div>`;
-      }
-    });
-    el.innerHTML = html || '<p class="empty-note">Nothing matches those filters.</p>';
-  }
-
+  /* ---------- the card ---------- */
   function statusField(id, name, field, value, dueField, dueValue, canEdit, lockedHint){
     const opts = [["","Not started"],["In Progress","In progress"],["Completed","Done"]];
     const dis = canEdit ? '' : 'disabled';
-    const btns = opts.map(([v,label]) => `<button type="button" class="seg-btn ${v===(value||'')?'active':''}" data-value="${v}" data-action="status" data-id="${id}" data-field="${field}" ${dis}>${label}</button>`).join('');
-    const dueHtml = dueField ? `<input type="date" class="due-input" data-action="due" data-id="${id}" data-field="${dueField}" value="${dueValue||''}" ${dis}>` : '';
-    const hint = !canEdit && lockedHint ? `<span class="locked-hint">${lockedHint}</span>` : '';
-    return `<div class="status-field"><span class="field-label">${name}</span><div class="seg">${btns}</div>${dueHtml}${hint}</div>`;
+    const btns = opts.map(([v,label]) => `<button type="button" data-value="${v}" class="${v===(value||'')?'active':''}" data-action="status" data-id="${id}" data-field="${field}" ${dis}>${label}</button>`).join('');
+    const dueHtml = dueField ? `<input type="date" class="due-input" data-action="due" data-id="${id}" data-field="${dueField}" value="${dueValue||''}" ${dis} aria-label="${name} due date">` : '';
+    const hint = !canEdit && lockedHint ? `<span class="hint">${lockedHint}</span>` : '';
+    return `<div class="field"><span class="lbl">${name}</span><div class="seg">${btns}</div>${dueHtml}${hint}</div>`;
   }
 
-  // The requester's own submitted details (title, date, times, location,
-  // who submitted it) — separate from the staff-tracking fields above,
-  // which already have their own inline controls. Admin-only, since
-  // that's what the Firestore rules actually allow for these fields.
+  // The requester's own submitted details — admin-only, since that's what the Firestore rules allow.
   function editFieldsHtml(r){
     const titleField = r.eventTitle ? 'eventTitle' : 'projectTitle';
-    const titleValue = r.eventTitle || r.projectTitle || '';
-    const row = (label, field, type, value) => `
-      <div style="flex:1 1 120px;">
-        <label style="font-size:11px; color:var(--text-soft); font-weight:600; display:block; margin-bottom:3px;">${label}</label>
-        <input type="${type}" class="due-input" style="width:100%;" data-edit-field="${field}" value="${escAttr(value||'')}">
-      </div>`;
-    return `<div style="display:flex; flex-direction:column; gap:8px; background:var(--bg-raised); border-radius:8px; padding:10px; margin-bottom:10px;" data-edit-card="${r.id}">
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        ${row('Title', titleField, 'text', titleValue)}
-        ${row('Requester Name', 'requesterName', 'text', r.requesterName)}
-      </div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        ${row('Event Date', 'eventDate', 'date', r.eventDate)}
-        ${row('Start Time', 'startTime', 'time', r.startTime)}
-        ${row('End Time', 'endTime', 'time', r.endTime)}
-      </div>
+    const row = (label, field, type, value) => `<div><label class="lab">${label}</label><input type="${type}" class="cardin wide" data-edit-field="${field}" value="${escAttr(value||'')}"></div>`;
+    return `<div class="editbox" data-edit-card="${r.id}">
+      <div class="row">${row('Title', titleField, 'text', r.eventTitle || r.projectTitle || '')}${row('Requester name', 'requesterName', 'text', r.requesterName)}</div>
+      <div class="row">${row('Event date', 'eventDate', 'date', r.eventDate)}${row('Start time', 'startTime', 'time', r.startTime)}${row('End time', 'endTime', 'time', r.endTime)}</div>
       ${row('Location', 'location', 'text', r.location)}
-      <div style="display:flex; gap:8px; margin-top:2px;">
-        <button type="button" class="btn-complete-all" data-action="save-details" data-id="${r.id}">Save changes</button>
-        <button type="button" class="btn-deny" data-action="cancel-edit" data-id="${r.id}">Cancel</button>
-      </div>
+      <div class="actions"><div>
+        <button type="button" class="btn small primary" data-action="save-details" data-id="${r.id}">Save changes</button>
+        <button type="button" class="btn small" data-action="cancel-edit" data-id="${r.id}">Cancel</button>
+      </div></div>
     </div>`;
   }
 
-  function cardHtml(r){
-    const urgency = urgencyOf(r.urgencyKey);
-    const due = parseISO(r.dueDate);
-    const ev = parseISO(r.eventDate);
-    const title = escHtml(r.eventTitle || r.projectTitle || 'Untitled request');
-    const kindLabel = r.requestType === 'church_event' ? 'Calendar Event' : r.requestType === 'media_only' ? 'Graphic / Media Only' : 'Request';
-    const dept = (r.department||[]).join(', ') || '—';
+  function stepsHtml(r){
+    const steps = [{ label: 'Approved', st: r.pending ? 'todo' : 'done' }];
+    if (r.hasCalendar) steps.push({ label: 'On calendar', st: r.calendarAdded ? 'done' : 'todo' });
+    if (r.hasGraphic) steps.push({ label: 'Graphic', st: r.graphicStatus === 'Completed' ? 'done' : (r.graphicStatus === 'In Progress' ? 'doing' : 'todo') });
+    if (r.hasMarketing) steps.push({ label: 'Marketing', st: r.marketingStatus === 'Completed' ? 'done' : (r.marketingStatus === 'In Progress' ? 'doing' : 'todo') });
+    return '<div class="track" aria-label="Progress">' + steps.map((s,i) =>
+      (i ? '<span class="bar"></span>' : '') + `<span class="st ${s.st}"><i>${s.st==='done'?'✓':''}</i>${s.label}</span>`).join('') + '</div>';
+  }
+
+  // Calm by default: date, title, who/where, progress, and the one next step. Everything you
+  // work with (statuses, due dates, link, notes, edit) opens with "Details" — and is always
+  // open in the side panel.
+  function cardHtml(r, forcedOpen){
+    const u = urgencyOf(r.urgencyKey);
+    const ev = parseISO(r.eventDate), key = r.keyDate;
+    const title = escHtml(titleOf(r));
+    const kindLabel = r.requestType === 'church_event' ? 'Calendar event' : r.requestType === 'media_only' ? 'Graphic / media only' : 'Request';
+    const dept = (r.department||[]).join(', ');
     const isEditing = editingId === r.id;
+    const isOpen = forcedOpen || expanded.has(r.id) || isEditing;
+    const canCalendar = myRoles.isAdmin, canGraphic = myRoles.isAdmin || myRoles.graphics, canMarketing = myRoles.isAdmin || myRoles.marketing;
 
-    let dueLine = `Due <strong>${fmtDate(due)}</strong>`;
-    if (ev && (!due || +ev !== +due)) dueLine += ` &nbsp;·&nbsp; Event ${fmtDate(ev)}`;
-    if (r.dueApprox) dueLine += ` <span class="approx">(no due date set — showing event date)</span>`;
-    if (!due && !ev) dueLine = `<span class="approx">No due date or event date on file</span>`;
+    const dateTab = key
+      ? `<small>${key.toLocaleDateString('en-US',{weekday:'short'})}</small><strong>${key.getDate()}</strong><em>${key.toLocaleDateString('en-US',{month:'short'})}</em><i>${r.dueApprox ? 'event' : 'due'}</i>`
+      : `<small>No</small><strong>—</strong><em>date</em>`;
 
-    let miniBar = '';
-    if (due) {
-      const span = 60*DAY;
-      const a = Math.min(+TODAY, +due), b = Math.max(+TODAY, +due);
-      const left = Math.max(0, Math.min(100, ((a-(+TODAY-span/2))/span)*100));
-      const width = Math.max(2, Math.min(100-left, ((b-a)/span)*100));
-      const todayLeft = Math.max(0, Math.min(100, ((+TODAY-(+TODAY-span/2))/span)*100));
-      miniBar = `<div class="mini-track"><div class="mini-bar" style="left:${left}%; width:${width}%; background:${urgency.color}; opacity:${r.completed?0.4:0.85}"></div><div class="mini-today" style="left:${todayLeft}%"></div></div>`;
-    }
+    const meta = [];
+    if (ev) meta.push(`<div><span class="ic">📅</span><span>${fmtLong(ev)}${timeRange(r) ? ' · ' + escHtml(timeRange(r)) : ''}${key && !r.dueApprox && +ev !== +key ? `<br><small>Work due ${fmtDate(key)}</small>` : ''}</span></div>`);
+    const rooms = RoomLogic.roomsForRequest(r).map(id => RoomLogic.BY_ID[id].name);
+    const where = [r.location, rooms.length >= RoomLogic.ALL_IDS.length ? 'Whole building' : rooms.join(', ')].filter(Boolean).join(' — ');
+    if (where) meta.push(`<div><span class="ic">📍</span><span>${escHtml(where)}${rooms.length ? `<br><small>${r.roomConfirmed ? 'Room confirmed' : 'Room held as TBD'}</small>` : ''}</span></div>`);
 
-    const canCalendar = myRoles.isAdmin;
-    const canGraphic = myRoles.isAdmin || myRoles.graphics;
-    const canMarketing = myRoles.isAdmin || myRoles.marketing;
-
+    // ---- the working controls (inside "Details") ----
     let fields = '';
     if (r.hasCalendar) {
       const dis = canCalendar ? '' : 'disabled';
-      const hint = canCalendar ? '' : '<span class="locked-hint">admin only</span>';
-      fields += `<div class="status-field"><span class="field-label">Calendar</span><label class="cal-toggle"><input type="checkbox" data-action="calendar" data-id="${r.id}" ${r.calendarAdded?'checked':''} ${dis}> Added to church calendar</label>${hint}</div>`;
+      fields += `<div class="field"><span class="lbl">Calendar</span><label class="calchk"><input type="checkbox" data-action="calendar" data-id="${r.id}" ${r.calendarAdded?'checked':''} ${dis}> Added to church calendar</label>${canCalendar ? '' : '<span class="hint">admin only</span>'}</div>`;
     }
     if (r.hasGraphic) fields += statusField(r.id, 'Graphic', 'graphicStatus', r.graphicStatus, 'graphicDueDate', r.graphicDueDate, canGraphic, 'graphics team');
     if (r.hasMarketing) fields += statusField(r.id, 'Marketing', 'marketingStatus', r.marketingStatus, 'marketingDueDate', r.marketingDueDate, canMarketing, 'marketing team');
-
-    const chips = [...(r.mediaSizes||[]), ...(Array.isArray(r.vansNeeded) && r.vansNeeded.length ? ['Van needed'] : [])]
-      .map(c=>`<span class="tag">${escHtml(c)}</span>`).join('');
-
+    const vans = Array.isArray(r.vansNeeded) ? r.vansNeeded.filter(v => v !== 'None') : [];
+    const tags = [...(r.mediaSizes||[]), ...(vans.length ? ['Van: ' + vans.join(', ')] : [])].map(c=>`<span class="pill gray">${escHtml(c)}</span>`).join('');
     const descText = r.mediaDesc || r.eventDesc || '';
+    const linkField = canGraphic
+      ? `<div><label class="lab">Graphic file link</label><input type="url" class="cardin wide" placeholder="Paste a Drive link once it's ready…" data-action="link" data-id="${r.id}" value="${escAttr(r.graphicLink||'')}"></div>` : '';
+
+    // ---- the one next step shown on the summary ----
+    const completable = [];
+    if (canCalendar && r.hasCalendar && !r.calendarAdded) completable.push('calendarAdded');
+    if (canGraphic && r.hasGraphic && r.graphicStatus !== 'Completed') completable.push('graphicStatus');
+    if (canMarketing && r.hasMarketing && r.marketingStatus !== 'Completed') completable.push('marketingStatus');
+    const completeLabel = completable.length > 1 ? 'Mark all complete' : completable[0] === 'calendarAdded' ? 'Mark calendar added' : completable[0] === 'graphicStatus' ? 'Mark graphic complete' : completable[0] === 'marketingStatus' ? 'Mark marketing complete' : '';
+    const completeBtn = completable.length && !r.pending ? `<button type="button" class="btn small good" data-action="complete-all" data-id="${r.id}" data-fields="${completable.join(',')}">${completeLabel}</button>` : '';
 
     let pendingBadge = '';
     if (r.pending && !r.completed) {
-      if (myRoles.isAdmin) {
-        pendingBadge = `<div class="approval-row">
-          <span>Status: ${escHtml(r.status || 'new')}</span>
-          <button type="button" class="btn-approve" data-action="approve" data-id="${r.id}">Approve</button>
-          <button type="button" class="btn-deny" data-action="deny" data-id="${r.id}">Deny</button>
-        </div>`;
-      } else {
-        pendingBadge = `<div class="desc-text" style="background:var(--blue-dim); color:var(--blue);">Status: ${escHtml(r.status || 'new')} — waiting on admin approval before creative work should start.</div>`;
-      }
+      pendingBadge = myRoles.isAdmin
+        ? `<div class="approve"><span>Awaiting your approval</span>
+            <button type="button" class="btn small good" data-action="approve" data-id="${r.id}">Approve</button>
+            <button type="button" class="btn small bad" data-action="deny" data-id="${r.id}">Deny</button></div>`
+        : `<div class="approve"><span>Waiting on admin approval before creative work should start.</span></div>`;
     }
 
-    const linkField = canGraphic
-      ? `<div class="link-field"><label>Graphic file link</label><input type="url" placeholder="Paste a Drive link once it's ready…" data-action="link" data-id="${r.id}" value="${escHtml(r.graphicLink||'')}"></div>`
-      : '';
-
-    const completableFields = [];
-    if (canCalendar && r.hasCalendar && !r.calendarAdded) completableFields.push('calendarAdded');
-    if (canGraphic && r.hasGraphic && r.graphicStatus !== 'Completed') completableFields.push('graphicStatus');
-    if (canMarketing && r.hasMarketing && r.marketingStatus !== 'Completed') completableFields.push('marketingStatus');
-    const completeLabel = completableFields.length > 1 ? 'Mark all complete'
-      : completableFields[0] === 'calendarAdded' ? 'Mark calendar added'
-      : completableFields[0] === 'graphicStatus' ? 'Mark graphic complete'
-      : completableFields[0] === 'marketingStatus' ? 'Mark marketing complete' : '';
-    const completeBtn = completableFields.length
-      ? `<button type="button" class="btn-complete-all" data-action="complete-all" data-id="${r.id}" data-fields="${completableFields.join(',')}">${completeLabel}</button>`
-      : '<span></span>';
-
-    const deleteBtn = myRoles.isAdmin
-      ? `<button type="button" class="btn-delete" data-action="delete" data-id="${r.id}" data-title="${title}" title="Delete this request">✕</button>`
-      : '';
-
-    return `<article class="card ${r.completed?'is-complete':''}" data-card-id="${r.id}">
-      <div class="card-top${myRoles.isAdmin ? ' has-delete' : ''}">
-        <span class="chip" style="background:${urgency.bg}; color:${urgency.color}">${escHtml(urgency.label)}</span>
-        <span class="chip dept">${escHtml(dept)}</span>
-        ${deleteBtn}
-      </div>
-      <h4>${title}</h4>
-      <div class="who">${escHtml(r.requesterName||'—')} · ${kindLabel}</div>
-      <div class="due-line">${dueLine}</div>
-      ${isEditing ? editFieldsHtml(r) : ''}
-      ${miniBar}
-      ${pendingBadge}
-      ${descText ? `<div class="desc-text">${escHtml(descText)}</div>` : ''}
-      ${chips ? `<div class="chips-row">${chips}</div>` : ''}
-      <div class="status-fields">${fields}</div>
-      ${linkField}
-      <div class="note-field">
-        <label>Staff note</label>
-        <textarea placeholder="Notes for the team…" data-action="note" data-id="${r.id}">${escHtml(r.internalNote||'')}</textarea>
-      </div>
-      <div class="card-actions">
-        <div style="display:flex; gap:6px; align-items:center;">
-          ${completeBtn}
-          ${myRoles.isAdmin && !isEditing ? `<button type="button" class="btn-complete-all" style="color:var(--blue); background:var(--blue-dim);" data-action="edit" data-id="${r.id}">Edit Details</button>` : ''}
+    return `<article class="rc ${r.completed?'done':''} ${r.pending&&!r.completed?'pending':''} ${isOpen?'open':''}" data-card-id="${r.id}" style="--tone:${u.tone}; --tone-soft:${u.soft}">
+      <div class="rc-date">${dateTab}</div>
+      <div class="rc-main">
+        <div class="rc-top"><span class="pill ${u.pill}">${escHtml(u.label)}</span><span class="pill gray">${kindLabel}</span>${dept ? `<span class="pill gray">${escHtml(dept)}</span>` : ''}</div>
+        <h3>${title}</h3>
+        <div class="rc-who">Requested by ${escHtml(r.requesterName||'—')}</div>
+        ${meta.length ? `<div class="meta">${meta.join('')}</div>` : ''}
+        ${stepsHtml(r)}
+        ${pendingBadge}
+        <div class="rc-foot">
+          <div>${completeBtn}</div>
+          ${forcedOpen ? '' : `<button type="button" class="more-btn" data-toggle="${r.id}" aria-expanded="${isOpen}">${isOpen ? 'Hide details' : 'Details'} <span class="chev">▾</span></button>`}
         </div>
-        ${r.graphicLink ? `<a class="link-open" href="${escAttr(r.graphicLink)}" target="_blank" rel="noopener">Open file ↗</a>` : ''}
+        <div class="rc-more">
+          ${isEditing ? editFieldsHtml(r) : ''}
+          ${descText ? `<div class="desc">${escHtml(descText)}</div>` : ''}
+          ${tags ? `<div class="tags">${tags}</div>` : ''}
+          ${fields ? `<div class="fields">${fields}</div>` : ''}
+          ${linkField}
+          <div><label class="lab">Staff note</label><textarea class="cardin" placeholder="Notes for the team…" data-action="note" data-id="${r.id}">${escHtml(r.internalNote||'')}</textarea></div>
+          <div class="actions">
+            <div>${myRoles.isAdmin && !isEditing ? `<button type="button" class="btn small soft" data-action="edit" data-id="${r.id}">Edit details</button>` : ''}${myRoles.isAdmin ? `<button type="button" class="btn small bad" data-action="delete" data-id="${r.id}" data-title="${escAttr(titleOf(r))}">Delete</button>` : ''}</div>
+            ${r.graphicLink ? `<a class="open-link" href="${escAttr(r.graphicLink)}" target="_blank" rel="noopener">Open file ↗</a>` : ''}
+          </div>
+        </div>
       </div>
     </article>`;
   }
 
-  /* ---------- Gantt ---------- */
+  /* ---------- deck ---------- */
+  function bucketOf(r){
+    const d = r.keyDate;
+    if (!d) return { key: 'z-none', label: 'No date yet', late: false, order: 99999999, later: true };
+    const diff = Math.round((d - TODAY)/DAY);
+    if (diff < 0)  return { key: 'a-late', label: 'Overdue', late: true, order: 0 };
+    if (diff <= 7) return { key: 'b-week', label: diff === 0 ? 'Today & this week' : 'This week', late: false, order: 1 };
+    if (diff <= 14) return { key: 'c-next', label: 'Next week', late: false, order: 2 };
+    const m = d.getFullYear()*12 + d.getMonth();
+    const label = (d.getMonth() === TODAY.getMonth() && d.getFullYear() === TODAY.getFullYear()) ? 'Later this month' : d.toLocaleDateString('en-US',{month:'long', year:'numeric'});
+    return { key: 'd-' + String(m), label, late: false, order: 3 + m, later: true };
+  }
+
+  function renderDeck(items){
+    const el = document.getElementById('viewDeck');
+    if (!items.length) { el.innerHTML = '<div class="empty"><b>Nothing here right now</b>No requests match these filters.</div>'; return; }
+    const filtering = focus !== 'all' || document.getElementById('search').value.trim() || document.getElementById('deptFilter').value;
+    const active = items.filter(r => !r.completed).sort((a,b) => {
+      const da = a.keyDate ? +a.keyDate : Infinity, db_ = b.keyDate ? +b.keyDate : Infinity;
+      return da - db_ || titleOf(a).localeCompare(titleOf(b));
+    });
+    const done = items.filter(r => r.completed).sort((a,b) => (+parseISO(b.eventDate)||0) - (+parseISO(a.eventDate)||0));
+
+    const groups = new Map();
+    active.forEach(r => { const b = bucketOf(r); if (!groups.has(b.key)) groups.set(b.key, { ...b, items: [] }); groups.get(b.key).items.push(r); });
+    let html = [...groups.values()].sort((a,b) => a.order - b.order).map(g => {
+      const head = (chev) => `<div class="group-head"><h2>${escHtml(g.label)}</h2><span class="n">${g.items.length}</span><span class="rail"></span>${chev ? '<span class="chev">▸</span>' : ''}</div>`;
+      const deck = `<div class="deck">${g.items.map(r => cardHtml(r)).join('')}</div>`;
+      // the near term is open; further-out months fold away until you want them
+      return g.later && !filtering
+        ? `<details class="group" data-group="${g.key}" ${openGroups.has(g.key) ? 'open' : ''}><summary>${head(true)}</summary>${deck}</details>`
+        : `<section class="group ${g.late?'late':''}">${head(false)}${deck}</section>`;
+    }).join('');
+    if (done.length) html += `<details class="completed" data-group="done" ${openGroups.has('done') ? 'open' : ''}><summary>Completed · ${done.length}</summary><div class="deck" style="margin-top:12px">${done.map(r => cardHtml(r)).join('')}</div></details>`;
+    el.innerHTML = html || '<div class="empty"><b>All caught up</b>Nothing is waiting on anyone.</div>';
+  }
+  document.addEventListener('toggle', e => {
+    const g = e.target && e.target.dataset && e.target.dataset.group; if (!g) return;
+    e.target.open ? openGroups.add(g) : openGroups.delete(g);
+  }, true);
+
+  /* ---------- calendar ---------- */
+  function itemsByDay(items){
+    const map = {};
+    const add = (date, o) => { (map[date] = map[date] || []).push(o); };
+    items.forEach(r => {
+      if (r.eventDate) add(r.eventDate, { kind: 'event', r });
+      if (r.hasGraphic && r.graphicStatus !== 'Completed' && r.graphicDueDate) add(r.graphicDueDate, { kind: 'due', r, what: 'Graphic due' });
+      if (r.hasMarketing && r.marketingStatus !== 'Completed' && r.marketingDueDate) add(r.marketingDueDate, { kind: 'due', r, what: 'Marketing due' });
+    });
+    Object.values(map).forEach(a => a.sort((x,y) => (x.kind === y.kind ? (x.r.startTime||'').localeCompare(y.r.startTime||'') : (x.kind === 'event' ? -1 : 1))));
+    return map;
+  }
+
+  function renderCalendar(items){
+    const el = document.getElementById('viewCalendar');
+    if (view !== 'calendar') { el.innerHTML = ''; return; }
+    if (!calMonth) calMonth = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+    const byDay = itemsByDay(items);
+    const first = calMonth, daysInMonth = new Date(first.getFullYear(), first.getMonth()+1, 0).getDate();
+    const lead = first.getDay(), total = Math.ceil((lead + daysInMonth) / 7) * 7;
+    let evCount = 0, dueCount = 0, cells = '';
+    for (let i = 0; i < total; i++) {
+      const d = new Date(first.getFullYear(), first.getMonth(), 1 - lead + i), key = iso(d);
+      const inMonth = d.getMonth() === first.getMonth(), list = byDay[key] || [];
+      if (inMonth) list.forEach(o => o.kind === 'event' ? evCount++ : dueCount++);
+      const shown = list.slice(0, 2), extra = list.length - shown.length;   // two per day keeps the grid calm; the rest are one tap away
+      const chips = shown.map(o => {
+        const u = urgencyOf(o.r.urgencyKey);
+        if (o.kind === 'event') return `<button type="button" class="chip-ev ${o.r.completed?'is-done':''}" data-open="${o.r.id}" style="--tone:${u.tone}; --tone-soft:${u.soft}; --tone-ink:${u.ink}" title="${escAttr(titleOf(o.r))}">${o.r.startTime ? `<small>${escHtml(fmtTime(o.r.startTime).replace(':00','').replace(' ','').toLowerCase())}</small>` : ''}${escHtml(titleOf(o.r))}</button>`;
+        return `<button type="button" class="chip-due" data-open="${o.r.id}" title="${escAttr(o.what + ': ' + titleOf(o.r))}">◆ ${escHtml(o.what.split(' ')[0])} · ${escHtml(titleOf(o.r))}</button>`;
+      }).join('');
+      const dots = list.slice(0, 6).map(o => `<i style="--tone:${o.kind === 'due' ? 'var(--gold)' : urgencyOf(o.r.urgencyKey).tone}"></i>`).join('');
+      cells += `<div class="day ${inMonth?'':'out'} ${key===iso(TODAY)?'today':''}" data-day="${key}" role="button" tabindex="0" aria-label="${escAttr(fmtLong(d))}, ${list.length} item${list.length===1?'':'s'}">
+        <span class="num">${d.getDate()}</span>${chips}${extra > 0 ? `<span class="more">+${extra} more</span>` : ''}<div class="dots">${dots}</div></div>`;
+    }
+    el.innerHTML = `
+      <div class="calbar">
+        <button type="button" class="navbtn" data-cal="-1" aria-label="Previous month">‹</button>
+        <h2>${first.toLocaleDateString('en-US',{month:'long', year:'numeric'})}</h2>
+        <button type="button" class="navbtn" data-cal="1" aria-label="Next month">›</button>
+        <button type="button" class="btn small" data-cal="today">Today</button>
+        <div class="legend"><span>${evCount} event${evCount===1?'':'s'}</span><span>${dueCount} deadline${dueCount===1?'':'s'}</span>
+          <span><i style="background:var(--blue)"></i>Event</span><span><i style="background:#fff; border:1px dashed var(--gold)"></i>Work due</span></div>
+      </div>
+      <div class="cal"><div class="cal-dow">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div>${d}</div>`).join('')}</div><div class="cal-grid">${cells}</div></div>`;
+  }
+
+  /* ---------- list ---------- */
+  function needsPills(r){
+    const out = [];
+    if (r.pending) out.push('<span class="pill blue">Approval</span>');
+    if (r.hasCalendar) out.push(`<span class="pill ${r.calendarAdded?'green':'gold'}">Calendar</span>`);
+    if (r.hasGraphic) out.push(`<span class="pill ${r.graphicStatus==='Completed'?'green':r.graphicStatus==='In Progress'?'gold':'gray'}">Graphic</span>`);
+    if (r.hasMarketing) out.push(`<span class="pill ${r.marketingStatus==='Completed'?'green':r.marketingStatus==='In Progress'?'gold':'gray'}">Marketing</span>`);
+    return out.join('');
+  }
+
+  function renderList(items){
+    const el = document.getElementById('viewList');
+    if (view !== 'list') { el.innerHTML = ''; return; }
+    if (!items.length) { el.innerHTML = '<div class="empty"><b>Nothing here right now</b>No requests match these filters.</div>'; return; }
+    const dirv = listSort.dir;
+    const rows = items.slice().sort((a,b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      if (listSort.key === 'title') return dirv * titleOf(a).localeCompare(titleOf(b));
+      if (listSort.key === 'dept') return dirv * (a.department||[]).join().localeCompare((b.department||[]).join());
+      const da = a.keyDate ? +a.keyDate : Infinity, db_ = b.keyDate ? +b.keyDate : Infinity;
+      return dirv * (da - db_) || titleOf(a).localeCompare(titleOf(b));
+    });
+    const head = (k, label) => `<button type="button" data-sort="${k}" class="${listSort.key===k?'on':''}">${label}${listSort.key===k ? (listSort.dir>0?' ↑':' ↓') : ''}</button>`;
+    el.innerHTML = `<div class="list">
+      <div class="lrow lhead">${head('date','Due')}${head('title','Request')}<span>Needs</span>${head('dept','Department')}<span></span></div>
+      ${rows.map(r => {
+        const u = urgencyOf(r.urgencyKey), d = r.keyDate, ev = parseISO(r.eventDate);
+        return `<button type="button" class="lrow ${r.completed?'done':''}" data-open="${r.id}">
+          <div class="ld"><b style="color:${u.tone}">${d ? d.toLocaleDateString('en-US',{month:'short', day:'numeric'}) : 'No date'}</b><small>${d ? d.toLocaleDateString('en-US',{weekday:'long'}) : ''}${r.dueApprox ? ' · event' : ''}</small></div>
+          <div class="ltitle"><b>${escHtml(titleOf(r))}</b><small>${escHtml(r.requesterName||'')}${ev ? ' · event ' + fmtDate(ev) : ''}</small></div>
+          <div class="needs">${needsPills(r)}</div>
+          <div class="lcell">${escHtml((r.department||[]).join(', ') || '—')}</div>
+          <div><span class="pill ${u.pill}">${escHtml(u.label)}</span></div>
+        </button>`;
+      }).join('')}</div>`;
+  }
+
+  /* ---------- timeline (gantt) ---------- */
   function renderGantt(items){
     const el = document.getElementById('gantt');
+    if (view !== 'timeline') { el.innerHTML = ''; return; }
+    const shown = items.filter(r => !r.completed).sort((a,b) => (a.keyDate?+a.keyDate:Infinity) - (b.keyDate?+b.keyDate:Infinity));
     const dates = [];
-    items.forEach(r => { const d=parseISO(r.dueDate), e=parseISO(r.eventDate); if(d) dates.push(d); if(e) dates.push(e); });
+    shown.forEach(r => { const d=parseISO(r.dueDate), e=parseISO(r.eventDate); if(d) dates.push(d); if(e) dates.push(e); });
     const minD = new Date(Math.min(+TODAY - 10*DAY, ...(dates.length ? dates.map(d=>+d-5*DAY) : [+TODAY])));
     const maxD = new Date(Math.max(+TODAY + 30*DAY, ...(dates.length ? dates.map(d=>+d+10*DAY) : [+TODAY+30*DAY])));
     const span = maxD - minD;
     const pct = d => Math.min(100, Math.max(0, ((d-minD)/span)*100));
 
-    let axisHtml = '<div class="gantt-axis"><div></div><div class="months">';
-    let cursor = new Date(minD.getFullYear(), minD.getMonth(), 1);
+    const todayPct = pct(TODAY);
+    let axis = '<div class="gantt-axis"><div></div><div class="months">';
+    let cursor = new Date(minD.getFullYear(), minD.getMonth() + 1, 1);   // first month start inside the range
     while (cursor <= maxD) {
-      axisHtml += `<span style="left:${pct(cursor)}%">${cursor.toLocaleDateString("en-US",{month:"short", year:"2-digit"})}</span>`;
+      const p = pct(cursor);
+      if (Math.abs(p - todayPct) > 6) axis += `<span style="left:${p}%">${cursor.toLocaleDateString("en-US",{month:"short", year:"2-digit"})}</span>`;   // keep clear of the TODAY tag
       cursor = new Date(cursor.getFullYear(), cursor.getMonth()+1, 1);
     }
-    axisHtml += '</div></div>';
+    axis += '</div></div>';
+    const rows = shown.map(r => {
+      const u = urgencyOf(r.urgencyKey), due = parseISO(r.dueDate), ev = parseISO(r.eventDate);
+      let bar = '';
+      if (due) { const a = Math.min(+TODAY, +due), b = Math.max(+TODAY, +due); const l = pct(new Date(a)), rr = pct(new Date(b)); bar += `<div class="gantt-bar" style="left:${l}%; width:${Math.max(rr-l,0.6)}%; background:${u.tone}; opacity:.85"></div>`; }
+      if (ev && (!due || +ev !== +due)) bar += `<div class="gantt-marker" style="left:${pct(ev)}%; background:${u.tone}"></div>`;
+      return `<div class="gantt-row" data-open="${r.id}"><div class="label" title="${escAttr(titleOf(r))}">${escHtml(titleOf(r))}<span class="dept">${escHtml((r.department||[]).join(', '))}</span></div><div class="gantt-track">${bar}</div></div>`;
+    }).join('');
 
-    const todayPct = pct(TODAY);
-    let rows = '';
-    items.forEach(r => {
-      const urgency = urgencyOf(r.urgencyKey);
-      const due = parseISO(r.dueDate), ev = parseISO(r.eventDate);
-      let barHtml = '';
-      if (due) {
-        const a = Math.min(+TODAY, +due), b = Math.max(+TODAY, +due);
-        const left = pct(new Date(a)), right = pct(new Date(b));
-        barHtml += `<div class="gantt-bar" style="left:${left}%; width:${Math.max(right-left,0.6)}%; background:${urgency.color}; opacity:${r.completed?0.4:0.85}"></div>`;
-      }
-      if (ev && (!due || +ev !== +due)) barHtml += `<div class="gantt-marker" style="left:${pct(ev)}%; background:${urgency.color}"></div>`;
-      const title = escHtml(r.eventTitle || r.projectTitle || 'Untitled request');
-      rows += `<div class="gantt-row"><div class="label" title="${title}">${title}<span class="dept">${escHtml((r.department||[]).join(', '))}</span></div><div class="gantt-track">${barHtml}</div></div>`;
-    });
-
-    el.innerHTML = axisHtml + `<div style="position:relative">
-        <div class="gantt-today" style="left:${todayPct}%"></div>
-        <div class="gantt-today-label" style="left:${todayPct}%">TODAY</div>
-        ${rows || '<p class="empty-note">Nothing matches those filters.</p>'}
-      </div>`;
+    el.innerHTML = axis + `<div style="position:relative;">
+        <div style="position:absolute; left:244px; right:0; top:0; bottom:0; pointer-events:none;">
+          <div class="gantt-today" style="left:${todayPct}%; top:0;"></div><div class="gantt-today-label" style="left:${todayPct}%; top:-22px;">TODAY</div></div>
+        ${rows || '<div class="empty"><b>Nothing to plot</b>No open requests match these filters.</div>'}</div>
+      <p style="font-size:12px; color:var(--ink-3); margin-top:14px;">The bar runs from today to the due date · the thin marker is the event date.</p>`;
   }
 
-  /* ---------- writes ---------- */
-  let noteTimers = {};
-  function debounce(id, fn, ms){ clearTimeout(noteTimers[id]); noteTimers[id] = setTimeout(fn, ms); }
-
-  document.getElementById('lanes').addEventListener('click', e => {
-    const btn = e.target.closest('[data-action="status"]');
-    if (btn) {
-      db.collection('eventRequests').doc(btn.dataset.id).update({ [btn.dataset.field]: btn.dataset.value });
-      return;
-    }
-    // Same write shape as admin.html's setEventStatus, so approvals from
-    // either page behave identically and show up the same way everywhere.
-    const approve = e.target.closest('[data-action="approve"]');
-    if (approve) {
-      const id = approve.dataset.id;
-      const req = allRequests.find(x => x.id === id);
-      // Approving leaves the room as a TBD hold until an admin confirms it (Admin → Event Requests).
-      RoomLogic.checkApprovalConflicts(db, Object.assign({}, req || {}, { status: 'approved', roomConfirmed: false }), id).then(c => {
-        if (c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
-        db.collection('eventRequests').doc(id).update({ status: 'approved', statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid });
-      });
-      return;
-    }
-    const deny = e.target.closest('[data-action="deny"]');
-    if (deny) {
-      if (!confirm('Deny this request?')) return;
-      const id = deny.dataset.id;
-      db.collection('eventRequests').doc(id).update({ status: 'denied', statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid });
-      return;
-    }
-    const del = e.target.closest('[data-action="delete"]');
-    if (del) {
-      if (!confirm('Permanently delete "' + del.dataset.title + '"? This cannot be undone.')) return;
-      db.collection('eventRequests').doc(del.dataset.id).delete();
-      return;
-    }
-    const complAll = e.target.closest('[data-action="complete-all"]');
-    if (complAll) {
-      // Only ever set the fields this viewer's role is allowed to write —
-      // data-fields was already computed against myRoles when the card was
-      // rendered, so this can't attempt a write the security rules would
-      // reject as a whole (Firestore update() is all-or-nothing per call).
-      const fieldList = (complAll.dataset.fields || '').split(',').filter(Boolean);
-      const update = {};
-      fieldList.forEach(f => { update[f] = f === 'calendarAdded' ? true : 'Completed'; });
-      if (Object.keys(update).length) db.collection('eventRequests').doc(complAll.dataset.id).update(update);
-      return;
-    }
-    const edit = e.target.closest('[data-action="edit"]');
-    if (edit) { editingId = edit.dataset.id; render(); return; }
-    const cancelEdit = e.target.closest('[data-action="cancel-edit"]');
-    if (cancelEdit) { editingId = null; render(); return; }
-    const saveDetails = e.target.closest('[data-action="save-details"]');
-    if (saveDetails) {
-      const block = saveDetails.closest('[data-edit-card]');
-      const update = {};
-      block.querySelectorAll('[data-edit-field]').forEach(input => {
-        update[input.dataset.editField] = input.value.trim();
-      });
-      db.collection('eventRequests').doc(saveDetails.dataset.id).update(update)
-        .catch(err => alert('Could not save: ' + err.message));
-      editingId = null;
-      render();
-    }
-  });
-
-  document.getElementById('duplicatesList').addEventListener('click', e => {
-    const del = e.target.closest('[data-action="delete"]');
-    if (!del) return;
-    if (!confirm('Permanently delete this duplicate copy of "' + del.dataset.title + '"? This cannot be undone.')) return;
-    db.collection('eventRequests').doc(del.dataset.id).delete();
-  });
-
-  document.getElementById('lanes').addEventListener('change', e => {
-    const cal = e.target.closest('[data-action="calendar"]');
-    if (cal) { db.collection('eventRequests').doc(cal.dataset.id).update({ calendarAdded: cal.checked }); return; }
-    const due = e.target.closest('[data-action="due"]');
-    if (due) { db.collection('eventRequests').doc(due.dataset.id).update({ [due.dataset.field]: due.value }); return; }
-    const link = e.target.closest('[data-action="link"]');
-    if (link) { db.collection('eventRequests').doc(link.dataset.id).update({ graphicLink: link.value.trim() }); return; }
-  });
-
-  document.getElementById('lanes').addEventListener('input', e => {
-    const note = e.target.closest('[data-action="note"]');
-    if (note) {
-      const id = note.dataset.id, val = note.value;
-      debounce(id, () => db.collection('eventRequests').doc(id).update({ internalNote: val }), 900);
-    }
-  });
-
-  /* ---------- filters (re-render only, no writes) ---------- */
-  document.getElementById('search').addEventListener('input', render);
-  document.getElementById('deptFilter').addEventListener('change', render);
-  document.getElementById('hideDone').addEventListener('change', render);
-
-  /* ---------- Cards / Timeline / Duplicates view tabs ---------- */
-  document.querySelectorAll('.view-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.view-tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
-      tab.classList.add('active');
-      tab.setAttribute('aria-selected', 'true');
-      document.getElementById('cardsView').style.display = tab.dataset.view === 'cards' ? 'block' : 'none';
-      document.getElementById('timelineView').style.display = tab.dataset.view === 'timeline' ? 'block' : 'none';
-      document.getElementById('duplicatesView').style.display = tab.dataset.view === 'duplicates' ? 'block' : 'none';
-    });
-  });
-
-  /* ---------- Duplicate detection (admin only) ----------
-     Same requester + title + date + department, submitted at the exact
-     same moment, is essentially never a coincidence — this catches
-     accidental double-submits (or, once, a one-time data-import that
-     ran twice) so an admin can clean them up with the existing per-card
-     delete button, grouped together instead of hunting for them one by
-     one via search. */
+  /* ---------- duplicates (admin) ---------- */
   function findDuplicateGroups(){
-    const norm = s => String(s||'').trim().toLowerCase();
-    const groups = {};
-    allRequests.forEach(r => {
-      const key = [norm(r.requesterName), norm(r.eventTitle), norm(r.projectTitle), norm(r.eventDate), norm((r.department||[]).join(','))].join('|');
-      (groups[key] = groups[key] || []).push(r);
-    });
+    const norm = s => String(s||'').trim().toLowerCase(); const groups = {};
+    allRequests.forEach(r => { const key = [norm(r.requesterName), norm(r.eventTitle), norm(r.projectTitle), norm(r.eventDate), norm((r.department||[]).join(','))].join('|'); (groups[key] = groups[key] || []).push(r); });
     return Object.values(groups).filter(g => g.length > 1);
   }
-
   function progressScore(r){
-    // Rough "how much work is already recorded on this copy" score, so
-    // the more-complete copy of a diverged pair is easy to spot.
-    let n = 0;
-    if (r.status === 'approved') n++;
-    if (r.calendarAdded) n++;
+    let n = 0; if (r.status === 'approved') n++; if (r.calendarAdded) n++;
     if (r.graphicStatus === 'Completed') n += 2; else if (r.graphicStatus === 'In Progress') n++;
     if (r.marketingStatus === 'Completed') n += 2; else if (r.marketingStatus === 'In Progress') n++;
-    if (r.internalNote) n++;
-    if (r.graphicLink) n++;
-    return n;
+    if (r.internalNote) n++; if (r.graphicLink) n++; return n;
   }
-
   function duplicateGroupHtml(group){
     const sorted = group.slice().sort((a,b)=>progressScore(b)-progressScore(a));
     const title = escHtml(sorted[0].eventTitle || sorted[0].projectTitle || 'Untitled request');
     const rows = sorted.map((r,i) => {
-      const isBest = i===0 && progressScore(sorted[0]) > progressScore(sorted[sorted.length-1]);
-      const fields = [
-        ['Status', r.status||'new'],
-        ['Calendar', r.calendarAdded ? 'Added' : 'Not added'],
-        ['Graphic', r.graphicStatus || 'Not started'],
-        ['Marketing', r.marketingStatus || 'Not started'],
-      ];
-      return `<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:10px 0; border-top:1px solid var(--border); ${isBest?'border-left:3px solid var(--green); padding-left:9px;':''}">
-        <div>
-          ${isBest ? '<div style="font-size:11px; color:var(--green); font-weight:700; text-transform:uppercase; margin-bottom:3px;">Most progress — probably keep this one</div>' : ''}
-          <div style="font-size:12px; color:var(--text-soft);">${fields.map(([k,v])=>`${k}: <b style="color:var(--text-mid); font-weight:600;">${escHtml(v)}</b>`).join(' &nbsp;·&nbsp; ')}</div>
-        </div>
-        <button type="button" class="btn-deny" data-action="delete" data-id="${r.id}" data-title="${title}" style="flex-shrink:0;">Delete this copy</button>
-      </div>`;
+      const best = i===0 && progressScore(sorted[0]) > progressScore(sorted[sorted.length-1]);
+      const f = [['Status', r.status||'new'], ['Calendar', r.calendarAdded ? 'Added' : 'Not added'], ['Graphic', r.graphicStatus || 'Not started'], ['Marketing', r.marketingStatus || 'Not started']];
+      return `<div class="duprow ${best?'best':''}"><div>${best ? '<span class="pill green" style="margin-bottom:5px">Most progress — probably keep this one</span><br>' : ''}<small style="color:var(--ink-2)">${f.map(([k,v])=>`${k}: <b>${escHtml(v)}</b>`).join(' &nbsp;·&nbsp; ')}</small></div>
+        <button type="button" class="btn small bad" data-action="delete" data-id="${r.id}" data-title="${escAttr(titleOf(sorted[0]))}">Delete this copy</button></div>`;
     }).join('');
-    return `<div class="card" style="margin-bottom:14px;"><h4 style="margin-bottom:8px;">${title}</h4>${rows}</div>`;
+    return `<div class="dup"><h3>${title}</h3>${rows}</div>`;
+  }
+  function renderDuplicates(){
+    const tab = document.getElementById('dupTab');
+    if (!myRoles.isAdmin) { tab.hidden = true; return; }
+    tab.hidden = false;
+    const groups = findDuplicateGroups();
+    document.getElementById('dupCount').textContent = groups.length ? `(${groups.length})` : '';
+    document.getElementById('duplicatesList').innerHTML = groups.length ? groups.map(duplicateGroupHtml).join('') : '<div class="empty"><b>No duplicates</b>Nice and clean.</div>';
   }
 
-  function renderDuplicates(){
-    const tab = document.getElementById('duplicatesTab');
-    if (!myRoles.isAdmin) { tab.style.display = 'none'; return; }
-    const groups = findDuplicateGroups();
-    tab.style.display = 'inline-block';
-    document.getElementById('dupCountBadge').textContent = groups.length ? `(${groups.length})` : '';
-    document.getElementById('duplicatesList').innerHTML = groups.length
-      ? groups.map(duplicateGroupHtml).join('')
-      : '<p class="empty-note">No duplicates found — nice and clean.</p>';
+  /* ---------- side panel (calendar / list / timeline open the full card here) ---------- */
+  function openPanel(state){ panelState = state; renderPanel(); document.getElementById('panel').classList.add('show'); document.getElementById('scrim').classList.add('show'); document.getElementById('panel').setAttribute('aria-hidden','false'); document.body.style.overflow = 'hidden'; }
+  function closePanel(){ panelState = null; editingId = null; document.getElementById('panel').classList.remove('show'); document.getElementById('scrim').classList.remove('show'); document.getElementById('panel').setAttribute('aria-hidden','true'); document.body.style.overflow = ''; }
+
+  function renderPanel(){
+    const body = document.getElementById('panelBody'), kind = document.getElementById('panelKind');
+    if (!panelState) { body.innerHTML = ''; return; }
+    const { items, list } = baseVisible();
+    if (panelState.type === 'day') {
+      const d = parseISO(panelState.date);
+      const day = (itemsByDay(list)[panelState.date] || []);
+      kind.textContent = 'Day';
+      body.innerHTML = `<div class="daylist"><h3>${escHtml(fmtLong(d))}</h3>${day.length ? day.map(o => `<button type="button" class="dli" data-open="${o.r.id}" data-from-day="${panelState.date}"><b>${escHtml(titleOf(o.r))}</b><small>${o.kind === 'event' ? 'Event' + (timeRange(o.r) ? ' · ' + escHtml(timeRange(o.r)) : '') : escHtml(o.what)} · ${escHtml((o.r.department||[]).join(', ') || '—')}</small></button>`).join('') : '<p class="empty" style="padding:30px 0">Nothing on this day.</p>'}</div>`;
+      return;
+    }
+    const r = items.find(x => x.id === panelState.id);
+    kind.textContent = 'Request';
+    if (!r) { body.innerHTML = '<div class="empty"><b>This request is no longer in the queue</b></div>'; return; }
+    body.innerHTML = (panelState.from ? `<button type="button" class="backlink" data-day="${panelState.from}">‹ Back to the day</button>` : '') + cardHtml(r, true);
   }
+
+  /* ---------- clicks, edits and writes ---------- */
+  let noteTimers = {};
+  function debounce(id, fn, ms){ clearTimeout(noteTimers[id]); noteTimers[id] = setTimeout(fn, ms); }
+  const upd = (id, data) => db.collection('eventRequests').doc(id).update(data);
+
+  document.addEventListener('click', e => {
+    const t = e.target;
+    const v = t.closest('[data-view]');
+    if (v && v.closest('#viewSwitch')) { view = v.dataset.view; try { localStorage.setItem('ctView', view); } catch (err) {} render(); return; }
+    const f = t.closest('[data-focus]'); if (f) { focus = f.dataset.focus; render(); return; }
+    const tog = t.closest('[data-toggle]');
+    if (tog) { const id = tog.dataset.toggle; expanded.has(id) ? expanded.delete(id) : expanded.add(id); render(); return; }
+    const cal = t.closest('[data-cal]');
+    if (cal) {
+      if (!calMonth) calMonth = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+      calMonth = cal.dataset.cal === 'today' ? new Date(TODAY.getFullYear(), TODAY.getMonth(), 1) : new Date(calMonth.getFullYear(), calMonth.getMonth() + Number(cal.dataset.cal), 1);
+      render(); return;
+    }
+    const sort = t.closest('[data-sort]');
+    if (sort) { const k = sort.dataset.sort; listSort = listSort.key === k ? { key: k, dir: -listSort.dir } : { key: k, dir: 1 }; render(); return; }
+    const open = t.closest('[data-open]');
+    if (open) { openPanel({ type: 'card', id: open.dataset.open, from: open.dataset.fromDay || (panelState && panelState.type === 'day' ? panelState.date : null) }); return; }
+    const day = t.closest('[data-day]');
+    if (day) { openPanel({ type: 'day', date: day.dataset.day }); return; }
+    if (t.closest('#panelClose') || t.id === 'scrim') { closePanel(); return; }
+
+    // ---- actions on a request (deck cards and the side panel share these) ----
+    const btn = t.closest('[data-action="status"]');
+    if (btn) { upd(btn.dataset.id, { [btn.dataset.field]: btn.dataset.value }); return; }
+    const approve = t.closest('[data-action="approve"]');
+    if (approve) {
+      const id = approve.dataset.id, req = allRequests.find(x => x.id === id);
+      // Approving leaves the room as a TBD hold until an admin confirms it (Admin → Event requests).
+      RoomLogic.checkApprovalConflicts(db, Object.assign({}, req || {}, { status: 'approved', roomConfirmed: false }), id).then(c => {
+        if (c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
+        upd(id, { status: 'approved', statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid });
+      });
+      return;
+    }
+    const deny = t.closest('[data-action="deny"]');
+    if (deny) { if (!confirm('Deny this request?')) return; upd(deny.dataset.id, { status: 'denied', statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid }); return; }
+    const del = t.closest('[data-action="delete"]');
+    if (del) { if (!confirm('Permanently delete "' + del.dataset.title + '"? This cannot be undone.')) return; db.collection('eventRequests').doc(del.dataset.id).delete(); if (panelState && panelState.id === del.dataset.id) closePanel(); return; }
+    const complAll = t.closest('[data-action="complete-all"]');
+    if (complAll) {
+      // Only the fields this viewer's role may write (computed when the card was drawn), so the
+      // all-or-nothing update can't be rejected by the security rules.
+      const update = {}; (complAll.dataset.fields || '').split(',').filter(Boolean).forEach(f => { update[f] = f === 'calendarAdded' ? true : 'Completed'; });
+      if (Object.keys(update).length) upd(complAll.dataset.id, update);
+      return;
+    }
+    const edit = t.closest('[data-action="edit"]'); if (edit) { editingId = edit.dataset.id; render(); return; }
+    const cancelEdit = t.closest('[data-action="cancel-edit"]'); if (cancelEdit) { editingId = null; render(); return; }
+    const save = t.closest('[data-action="save-details"]');
+    if (save) {
+      const block = save.closest('[data-edit-card]'), update = {};
+      block.querySelectorAll('[data-edit-field]').forEach(input => { update[input.dataset.editField] = input.value.trim(); });
+      upd(save.dataset.id, update).catch(err => alert('Could not save: ' + err.message));
+      editingId = null; render();
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && panelState) closePanel();
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.day[data-day]')) { e.preventDefault(); openPanel({ type: 'day', date: e.target.dataset.day }); }
+  });
+
+  document.addEventListener('change', e => {
+    const cal = e.target.closest('[data-action="calendar"]'); if (cal) { upd(cal.dataset.id, { calendarAdded: cal.checked }); return; }
+    const due = e.target.closest('[data-action="due"]'); if (due) { upd(due.dataset.id, { [due.dataset.field]: due.value }); return; }
+    const link = e.target.closest('[data-action="link"]'); if (link) { upd(link.dataset.id, { graphicLink: link.value.trim() }); return; }
+  });
+  document.addEventListener('input', e => {
+    const note = e.target.closest('[data-action="note"]');
+    if (note) { const id = note.dataset.id, val = note.value; debounce(id, () => upd(id, { internalNote: val }), 900); }
+  });
+  document.addEventListener('focusout', () => { if (renderPending) setTimeout(() => { if (renderPending && !isTyping()) render(); }, 0); });
+
+  document.getElementById('search').addEventListener('input', render);
+  document.getElementById('deptFilter').addEventListener('change', render);
+  document.getElementById('hideDone').addEventListener('change', render);
 
   function escHtml(str){ return (str==null?'':String(str)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function escAttr(str){ return escHtml(str).replace(/'/g,'&#39;'); }
