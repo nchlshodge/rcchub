@@ -648,19 +648,6 @@
   }
 
   /* ---------- writes ---------- */
-  // Same Apps Script web app + token the Event Request form already uses.
-  // After an approve/deny is saved, this tells that script so the Google
-  // Sheet's Status updates and the requester gets their approved/denied
-  // email. Best-effort: a failure here never blocks or undoes the approval.
-  const EVENT_SHEET_URL = "https://script.google.com/a/macros/rochesterchristian.church/s/AKfycbzwXpIevD_atUcIZbGd5ywvMRXClT0Ca9HDynFL1X0K1LNPnK2KhwnbJOUXEwsngQk/exec";
-  const EVENT_SHEET_TOKEN = "9PGTdz8dCn_9DV0brhR67k0-DoodYyyviwimrC-0R3g";
-  function syncEventDecisionToSheet(id, status) {
-    fetch(EVENT_SHEET_URL, {
-      method: 'POST', mode: 'no-cors', headers: {'Content-Type':'text/plain'},
-      body: JSON.stringify({ action: 'statusChanged', id, status, token: EVENT_SHEET_TOKEN })
-    }).catch(() => {});
-  }
-
   let noteTimers = {};
   function debounce(id, fn, ms){ clearTimeout(noteTimers[id]); noteTimers[id] = setTimeout(fn, ms); }
 
@@ -675,16 +662,14 @@
     const approve = e.target.closest('[data-action="approve"]');
     if (approve) {
       const id = approve.dataset.id;
-      db.collection('eventRequests').doc(id).update({ status: 'approved', statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid })
-        .then(() => syncEventDecisionToSheet(id, 'approved'));
+      db.collection('eventRequests').doc(id).update({ status: 'approved', statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid });
       return;
     }
     const deny = e.target.closest('[data-action="deny"]');
     if (deny) {
       if (!confirm('Deny this request?')) return;
       const id = deny.dataset.id;
-      db.collection('eventRequests').doc(id).update({ status: 'denied', statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid })
-        .then(() => syncEventDecisionToSheet(id, 'denied'));
+      db.collection('eventRequests').doc(id).update({ status: 'denied', statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid });
       return;
     }
     const del = e.target.closest('[data-action="delete"]');

@@ -256,15 +256,6 @@
   var auth = firebase.auth();
   var db = firebase.firestore();
 
-  // 🔧 Paste your Apps Script Web App URL here once deployed (see
-  // apps-script-event-requests.gs / SETUP notes) — this is what pushes
-  // each new request into your Google Sheet automatically.
-  var SHEET_SYNC_URL = "https://script.google.com/a/macros/rochesterchristian.church/s/AKfycbzwXpIevD_atUcIZbGd5ywvMRXClT0Ca9HDynFL1X0K1LNPnK2KhwnbJOUXEwsngQk/exec";
-  // Must match WEBHOOK_TOKEN in apps-script-merged.gs — the web app is
-  // deployed "Anyone" access, so this is what stops a stranger from
-  // spamming staff emails / junk rows by POSTing to the URL directly.
-  var SHEET_SYNC_TOKEN = "9PGTdz8dCn_9DV0brhR67k0-DoodYyyviwimrC-0R3g";
-
   auth.onAuthStateChanged(function(user){
     // Admins get a shortcut to the full Event Request admin in the portal.
     if(user){
@@ -408,16 +399,10 @@
       uid: auth.currentUser ? auth.currentUser.uid : null,
     };
 
-    db.collection('eventRequests').add(request).then(function(docRef){
-      // Fire-and-forget sync to Google Sheet — don't block success on this.
-      if(SHEET_SYNC_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL'){
-        fetch(SHEET_SYNC_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: {'Content-Type':'text/plain'},
-          body: JSON.stringify(Object.assign({}, request, {id: docRef.id, submittedAt: new Date().toISOString(), token: SHEET_SYNC_TOKEN}))
-        }).catch(function(){ /* sheet sync is best-effort, don't block the user on it */ });
-      }
+    db.collection('eventRequests').add(request).then(function(){
+      // The Google Sheet row and the staff notification emails are sent
+      // from the server the moment this document is created (Cloud
+      // Function notifyEventRequestCreated) — nothing to call from here.
       document.getElementById('ev-form').style.display = 'none';
       document.getElementById('ev-success').style.display = 'block';
     }).catch(function(err){

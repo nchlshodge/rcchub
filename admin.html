@@ -793,23 +793,10 @@
     }).join('');
   }
 
-  // Same Apps Script web app + token the Event Request form already uses
-  // to add new rows. After an approve/deny is saved here, this tells that
-  // script so the Google Sheet's Status updates and the requester gets
-  // their approved/denied email. Best-effort: a failure here never blocks
-  // or undoes the approval itself.
-  const EVENT_SHEET_URL = "https://script.google.com/a/macros/rochesterchristian.church/s/AKfycbzwXpIevD_atUcIZbGd5ywvMRXClT0Ca9HDynFL1X0K1LNPnK2KhwnbJOUXEwsngQk/exec";
-  const EVENT_SHEET_TOKEN = "9PGTdz8dCn_9DV0brhR67k0-DoodYyyviwimrC-0R3g";
-  function syncEventDecisionToSheet(id, status) {
-    fetch(EVENT_SHEET_URL, {
-      method: 'POST', mode: 'no-cors', headers: {'Content-Type':'text/plain'},
-      body: JSON.stringify({ action: 'statusChanged', id, status, token: EVENT_SHEET_TOKEN })
-    }).catch(() => {});
-  }
-
+  // The Google Sheet's Status cell and the requester's email are updated from
+  // the server when the status changes (Cloud Function notifyEventRequestStatus).
   window.setEventStatus = async (id, status) => {
     await db.collection('eventRequests').doc(id).update({status, statusChangedAt:new Date().toISOString(), statusChangedBy: currentUser.uid});
-    syncEventDecisionToSheet(id, status);
     showBanner('Request updated.');
   };
   window.toggleEventField = async (id, field, val) => {
@@ -863,35 +850,14 @@
   }
 
   window.setTimeOffStatus = async (id, status) => {
-    const req = allTimeOffRequests.find(r=>r.id===id);
     await db.collection('timeOffRequests').doc(id).update({
       status, approvedBy: status==='approved' ? currentUser.uid : null,
       statusChangedAt: new Date().toISOString(),
     });
-    // Notify the requester via the same Apps Script webhook — this is
-    // a separate call from the initial submission sync, fired the
-    // moment an admin approves/denies from inside the app.
-    if (req && TIME_OFF_WEBHOOK_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
-      fetch(TIME_OFF_WEBHOOK_URL, {
-        method: 'POST', mode: 'no-cors', headers: {'Content-Type':'text/plain'},
-        body: JSON.stringify({
-          action: 'statusChanged', requestId: id, status,
-          requesterEmail: req.email, requesterName: req.name,
-          startDate: req.startDate, endDate: req.endDate,
-          token: TIME_OFF_WEBHOOK_TOKEN,
-        })
-      }).catch(() => {});
-    }
+    // The requester's approved/denied email is sent from the server when the
+    // status changes (Cloud Function notifyTimeOffStatus).
     showBanner('Request updated.');
   };
-  // 🔧 Same Apps Script Web App URL as time-off.html's SHEET_SYNC_URL
-  // — paste it here too once deployed, so approve/deny actions taken
-  // in the admin screen can trigger the requester notification email.
-  const TIME_OFF_WEBHOOK_URL = "https://script.google.com/a/macros/rochesterchristian.church/s/AKfycbxEHcWBEEfyo0JSXmMGmRMMjJBgK0JUAgym74NKTwjMoMdTWyzMc9mb7fe0PWfHfqlb/exec";
-  // Must match WEBHOOK_TOKEN in timeoffscript.gs (same value as
-  // time-off.html's SHEET_SYNC_TOKEN).
-  const TIME_OFF_WEBHOOK_TOKEN = "HUqViYLennbD70-P00k8webHob2c3BAGCUyE_Eu-IKA";
-
   // ── Notification Email Settings ──
   // Stored in a single small doc so the Apps Script webhook can read
   // it fresh on every submission, without needing code changes here

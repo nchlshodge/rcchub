@@ -170,13 +170,6 @@
   var db = firebase.firestore();
   var currentUser = null;
 
-  // 🔧 Paste your Apps Script Web App URL here once deployed — this
-  // is what sends the new-submission notification email and syncs
-  // each request into your Google Sheet.
-  var SHEET_SYNC_URL = "https://script.google.com/a/macros/rochesterchristian.church/s/AKfycbxEHcWBEEfyo0JSXmMGmRMMjJBgK0JUAgym74NKTwjMoMdTWyzMc9mb7fe0PWfHfqlb/exec";
-  // Must match WEBHOOK_TOKEN in timeoffscript.gs.
-  var SHEET_SYNC_TOKEN = "HUqViYLennbD70-P00k8webHob2c3BAGCUyE_Eu-IKA";
-
   document.getElementById('googleSignInBtn').addEventListener('click', function(){
     var provider = new firebase.auth.GoogleAuthProvider();
     auth.signInWithPopup(provider).catch(function(err){ alert('Sign-in failed: ' + err.message); });
@@ -243,27 +236,9 @@
       email: currentUser.email,
     };
 
-    db.collection('timeOffRequests').add(request).then(function(docRef){
-      // Fetch the currently-configured notification emails, then
-      // fire the webhook — best-effort, doesn't block the success
-      // screen if the Sheet/email sync has an issue.
-      db.collection('settings').doc('timeOffNotifications').get().then(function(settingsDoc){
-        var settings = settingsDoc.exists ? settingsDoc.data() : {};
-        if(SHEET_SYNC_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL'){
-          fetch(SHEET_SYNC_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: {'Content-Type':'text/plain'},
-            body: JSON.stringify(Object.assign({}, request, {
-              id: docRef.id,
-              submittedAt: new Date().toISOString(),
-              notifyEmail1: settings.email1 || '',
-              notifyEmail2: settings.email2 || '',
-              token: SHEET_SYNC_TOKEN,
-            }))
-          }).catch(function(){ /* best-effort, don't block the user on it */ });
-        }
-      });
+    db.collection('timeOffRequests').add(request).then(function(){
+      // The Sheet row and the notification emails are sent from the server
+      // when this document is created (Cloud Function notifyTimeOffCreated).
       document.getElementById('lv-form').style.display = 'none';
       document.getElementById('lv-success').style.display = 'block';
     }).catch(function(err){
