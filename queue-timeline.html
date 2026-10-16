@@ -9,6 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="room-logic.js"></script>
 
 <style>
   :root {
@@ -662,7 +663,12 @@
     const approve = e.target.closest('[data-action="approve"]');
     if (approve) {
       const id = approve.dataset.id;
-      db.collection('eventRequests').doc(id).update({ status: 'approved', statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid });
+      const req = allRequests.find(x => x.id === id);
+      // Approving leaves the room as a TBD hold until an admin confirms it (Admin → Event Requests).
+      RoomLogic.checkApprovalConflicts(db, Object.assign({}, req || {}, { status: 'approved', roomConfirmed: false }), id).then(c => {
+        if (c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
+        db.collection('eventRequests').doc(id).update({ status: 'approved', statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid });
+      });
       return;
     }
     const deny = e.target.closest('[data-action="deny"]');

@@ -9,6 +9,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="room-logic.js"></script>
 
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500;600&display=swap');
@@ -245,6 +246,13 @@
           <span>
             <span class="card-title" style="font-size:15px; display:block;">📅 See All Event Requests</span>
             <span class="card-text">See every request by event date as cards or a list, check how each one is progressing, and add notes.</span>
+          </span>
+          <span style="color:var(--blue); font-size:18px;">→</span>
+        </a>
+        <a href="rooms.html" class="card" style="display:flex; align-items:center; justify-content:space-between; gap:12px; text-decoration:none; margin-bottom:16px;">
+          <span>
+            <span class="card-title" style="font-size:15px; display:block;">🗺️ Room Map</span>
+            <span class="card-text">See which rooms are in use at any date and time, and add weekly or one-off room bookings. Approved events with a room appear here automatically.</span>
           </span>
           <span style="color:var(--blue); font-size:18px;">→</span>
         </a>
@@ -783,6 +791,7 @@
 
           ${eventFilter==='approved' ? `
             <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:8px;">
+              ${RoomLogic.roomsForRequest(r).length ? `<button class="btn ${r.roomConfirmed?'btn-approve':'btn-unhide'}" onclick="confirmRoom('${r.id}',${!r.roomConfirmed})">Room: ${r.roomConfirmed?'Confirmed ✓ (tap to make TBD)':'TBD hold — tap to confirm'}</button>` : ''}
               <button class="btn ${r.calendarAdded?'btn-approve':'btn-unhide'}" onclick="toggleEventField('${r.id}','calendarAdded',${!r.calendarAdded})">Calendar Added: ${r.calendarAdded?'Yes':'No'}</button>
               ${isMedia ? `<button class="btn ${r.graphicStatus==='Completed'?'btn-approve':'btn-unhide'}" onclick="cycleGraphicStatus('${r.id}','${escJsAttr(r.graphicStatus||'')}')">Graphic Status: ${escHtml(r.graphicStatus||'Not started')}</button>` : ''}
               ${isMedia ? `<button class="btn ${r.marketingStatus==='Completed'?'btn-approve':'btn-unhide'}" onclick="cycleMarketingStatus('${r.id}','${escJsAttr(r.marketingStatus||'')}')">Marketing Status: ${escHtml(r.marketingStatus||'Not started')}</button>` : ''}
@@ -796,8 +805,27 @@
   // The Google Sheet's Status cell and the requester's email are updated from
   // the server when the status changes (Cloud Function notifyEventRequestStatus).
   window.setEventStatus = async (id, status) => {
+    // Approving does NOT firm up the room — it stays a TBD hold until an admin confirms it
+    // (see "Room" on the card). Just mention any overlaps so they can be sorted out.
+    if (status === 'approved') {
+      const req = allEventRequests.find(x => x.id === id);
+      const c = req ? await RoomLogic.checkApprovalConflicts(db, Object.assign({}, req, { status: 'approved', roomConfirmed: false }), id) : { hard: [], soft: [] };
+      if (c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
+    }
     await db.collection('eventRequests').doc(id).update({status, statusChangedAt:new Date().toISOString(), statusChangedBy: currentUser.uid});
     showBanner('Request updated.');
+  };
+  // An approved event's room stays a TBD hold until an admin confirms it here. Confirming is
+  // refused if the room is already firmly booked at that time.
+  window.confirmRoom = async (id, confirmed) => {
+    const req = allEventRequests.find(x => x.id === id);
+    if (confirmed && req) {
+      const c = await RoomLogic.checkApprovalConflicts(db, Object.assign({}, req, { status: 'approved', roomConfirmed: true }), id);
+      if (c.hard.length) { alert('Can\'t confirm this room — it is already firmly booked then:\n\n' + c.hard.join('\n') + '\n\nChange the room or time first.'); return; }
+      if (c.soft.length && !confirm('Heads up — this overlaps with a TBD hold:\n\n' + c.soft.join('\n') + '\n\nConfirm the room anyway?')) return;
+    }
+    await db.collection('eventRequests').doc(id).update({ roomConfirmed: confirmed, roomConfirmedBy: confirmed ? currentUser.uid : null, roomConfirmedAt: confirmed ? new Date().toISOString() : null });
+    showBanner(confirmed ? 'Room confirmed.' : 'Room is back to a TBD hold.');
   };
   window.toggleEventField = async (id, field, val) => {
     await db.collection('eventRequests').doc(id).update({[field]: val});
