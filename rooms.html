@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="room-logic.js"></script>
+<script src="rcc-audit.js"></script>
 <script src="rcc-shell.js"></script>
 <link rel="stylesheet" href="rcc-ui.css">
 
@@ -369,7 +370,7 @@
       const c = await RL.checkApprovalConflicts(db, Object.assign({}, r, { status: 'approved', roomConfirmed: true }), r.id);
       if (c.hard.length) { alert('Can\'t confirm this room — it is already firmly booked then:\n\n' + c.hard.join('\n') + '\n\nChange the room or time first (Admin → Event Requests).'); b.disabled = false; return; }
       if (c.soft.length && !confirm('Heads up — this overlaps with a TBD hold:\n\n' + c.soft.join('\n') + '\n\nConfirm the room anyway?')) { b.disabled = false; return; }
-      try { await db.collection('eventRequests').doc(r.id).update({ roomConfirmed: true, roomConfirmedBy: currentUser.uid, roomConfirmedAt: new Date().toISOString() }); }
+      try { await db.collection('eventRequests').doc(r.id).update({ roomConfirmed: true, roomConfirmedBy: currentUser.uid, roomConfirmedAt: new Date().toISOString() }); RccAudit.log('room.confirm', 'eventRequest', r.id, 'Confirmed the room for "' + (r.eventTitle || r.projectTitle || r.id) + '"'); }
       catch (err) { alert('Could not confirm: ' + err.message); b.disabled = false; }
     });
   }
@@ -394,7 +395,7 @@
     document.getElementById('bkSave').onclick = saveBooking;
     document.getElementById('bkList').addEventListener('click', async e => {
       const b = e.target.closest('[data-del]'); if (!b) return;
-      if (confirm('Remove this booking?')) db.collection('roomBookings').doc(b.dataset.del).delete().catch(err => alert('Could not remove: ' + err.message));
+      if (confirm('Remove this booking?')) { const gone = bookingDocs.find(x => x.id === b.dataset.del) || {}; db.collection('roomBookings').doc(b.dataset.del).delete().then(() => RccAudit.log('room.booking.remove', 'roomBooking', b.dataset.del, 'Removed the standing booking "' + (gone.title || b.dataset.del) + '"')).catch(err => alert('Could not remove: ' + err.message)); }
     });
   }
   async function saveBooking() {
@@ -427,7 +428,7 @@
     }
     if (hard.length) { msg.textContent = 'Not added — those rooms are already firmly booked then: ' + [...new Set(hard)].slice(0, 4).join('; ') + '. Change the room or time, or mark this one TBD.'; return; }
     if (soft.length && !confirm('This overlaps with a TBD hold or is itself a TBD hold:\n\n' + [...new Set(soft)].slice(0, 6).join('\n') + '\n\nAdd it anyway?')) return;
-    try { await db.collection('roomBookings').add(doc); msg.style.color = 'var(--green)'; msg.textContent = 'Added.'; document.getElementById('bkTitle').value = ''; }
+    try { const ref = await db.collection('roomBookings').add(doc); RccAudit.log('room.booking.add', 'roomBooking', ref.id, 'Added the ' + (type === 'weekly' ? 'weekly' : 'one-time') + ' booking "' + title + '" (' + roomIds.map(i => (roomById[i] || {}).name || i).join(', ') + ')'); msg.style.color = 'var(--green)'; msg.textContent = 'Added.'; document.getElementById('bkTitle').value = ''; }
     catch (err) { msg.textContent = 'Could not save: ' + err.message; }
   }
   function renderBookingList() {

@@ -11,6 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-functions-compat.js"></script>
 <script src="room-logic.js"></script>
+<script src="rcc-audit.js"></script>
 <script src="rcc-shell.js"></script>
 <script>if(/[?&]embed=1(&|$)/.test(location.search))document.documentElement.classList.add('embedded');</script>
 <link rel="stylesheet" href="rcc-ui.css">
@@ -793,6 +794,7 @@
     btn.textContent = 'Saving…';
     try { await db.collection('eventRequests').doc(r.id).update(changes); }
     catch (ex) { done(); return fail('Could not save: ' + ex.message); }
+    RccAudit.log('event.edit', 'eventRequest', r.id, '"' + titleOf(r) + '" edited — ' + lines.map(l => l.label + ': ' + l.from + ' → ' + l.to).join('; '));
 
     // A running record, so everyone can see what was changed and by whom.
     const who = currentUser.displayName || currentUser.email || 'An admin';

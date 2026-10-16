@@ -10,6 +10,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="room-logic.js"></script>
+<script src="rcc-audit.js"></script>
 
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap');
@@ -250,6 +251,14 @@
     #googleSignInBtn:hover { transform: translateY(-1px); box-shadow: var(--shadow-2); }
     .banner { border-radius: 0 0 16px 16px; }
 
+    .log-tools { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .log-tools input { flex: 1 1 220px; padding: 10px 14px; }
+    .log-tools select { padding: 10px 14px; }
+    .log-row { display: grid; grid-template-columns: 150px 1fr; gap: 4px 16px; padding: 12px 18px; }
+    .log-when { font-size: 12.5px; color: var(--text-soft); }
+    .log-what { font-size: 14.5px; color: var(--text); }
+    .log-who { font-size: 12.5px; color: var(--text-mid); margin-top: 2px; }
+    @media (max-width: 640px) { .log-row { grid-template-columns: 1fr; } }
     @media (max-width: 640px) {
       header { padding: 0 14px; }
       .header-right { gap: 8px; }
@@ -299,6 +308,7 @@
       <div class="section-tab" data-section="access">App Access</div>
       <div class="section-tab" data-section="requests">Access Requests <span class="badge-count" id="requestsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="admins">Manage Admins</div>
+      <div class="section-tab" data-section="activity">Activity</div>
     </nav>
 
     <main>
@@ -378,6 +388,19 @@
       <div class="section" id="section-timeline">
         <div class="embed-bar"><span>Creative Timeline</span><a id="open-timeline" href="queue-timeline.html?embed=1" target="_blank" rel="noopener">Open on its own page ↗</a></div>
         <iframe class="embed-frame" id="frame-timeline" title="Creative Timeline" data-src="queue-timeline.html?embed=1"></iframe>
+      </div>
+
+      <!-- ACTIVITY (the audit trail) -->
+      <div class="section" id="section-activity">
+        <h2 class="section-title">Activity</h2>
+        <div class="card" style="background:var(--blue-dim); border-color:var(--blue-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">A permanent record of what staff did in the admin tools — approvals, denials, access changes, room confirmations and edits. Entries can't be changed or deleted. Shows the most recent 300.</div>
+        </div>
+        <div class="log-tools">
+          <input type="text" id="logSearch" placeholder="Search who or what…" aria-label="Search the activity log">
+          <select id="logKind" aria-label="Filter by kind"><option value="">Everything</option><option value="event">Event requests</option><option value="room">Rooms</option><option value="timeoff">Time off</option><option value="access">Access &amp; admins</option><option value="graphic">Graphics &amp; marketing</option><option value="incident">Incident reports</option><option value="van">Van Usage</option><option value="settings">Settings</option></select>
+        </div>
+        <div id="activityList"><div class="loading">Loading...</div></div>
       </div>
 
       <!-- APP ACCESS -->
@@ -470,7 +493,7 @@
         const tabVisibility = {
           overview: canOverview, bedside: canBedside, incidents: isFullAdmin, vans: canVan,
           events: isFullAdmin, timeline: canGraphics || canMarketing, timeoff: isFullAdmin, access: isFullAdmin,
-          requests: isFullAdmin, admins: isFullAdmin,
+          requests: isFullAdmin, admins: isFullAdmin, activity: isFullAdmin,
         };
         document.querySelectorAll('.section-tab').forEach(tab => {
           const key = tab.dataset.section;
@@ -495,7 +518,7 @@
         if (canOverview) { loadOverview({canBedside, canVan, isFullAdmin, canOverview}); }
         if (isFullAdmin) { loadIncidentsBadgeOnly(); }
         if (isFullAdmin) { loadEventRequests(); loadTimeOffRequests(); loadNotificationEmails(); }
-        if (isFullAdmin) { loadModuleManagement(); loadAccessRequests(); loadAdminManagement(); }
+        if (isFullAdmin) { loadModuleManagement(); loadAccessRequests(); loadAdminManagement(); loadActivity(); }
       } else {
         document.getElementById('accessDenied').style.display = 'block';
       }
@@ -528,7 +551,7 @@
     { key: 'requests', label: 'Requests',        pages: ['events', 'timeline', 'timeoff'] },
     { key: 'care',     label: 'Care & Safety',   pages: ['bedside', 'incidents'] },
     { key: 'vans',     label: 'Van Usage',       pages: ['vans'] },
-    { key: 'people',   label: 'People & Access', pages: ['access', 'requests', 'admins'] },
+    { key: 'people',   label: 'People & Access', pages: ['access', 'requests', 'admins', 'activity'] },
   ];
   function flatTab(key) { return document.querySelector('.section-tab[data-section="' + key + '"]'); }
   function tabShown(key) { const t = flatTab(key); return !!t && t.style.display !== 'none'; }
@@ -689,6 +712,7 @@
   function loadModuleManagement() {
     db.collection('users').onSnapshot(snap => {
       const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+      window.__userNames = Object.assign(window.__userNames || {}, Object.fromEntries(users.map(u => [u.id, u.name || u.email || u.id])));
       const c = document.getElementById('moduleManageList');
       if (!users.length) { c.innerHTML = '<div class="empty-state">No users found yet.</div>'; return; }
       c.innerHTML = users.map(u => {
@@ -708,14 +732,47 @@
       }).join('');
     });
   }
+  const whoIs = uid => (window.__userNames && window.__userNames[uid]) || uid;
+  const evTitle = id => { const r = (typeof allEventRequests !== 'undefined' && allEventRequests.find(x => x.id === id)) || {}; return r.eventTitle || r.projectTitle || id; };
   window.toggleModule = async (uid, key, val) => {
     await db.collection('users').doc(uid).set({modules:{[key]:val}}, {merge:true});
+    RccAudit.log('access.app', 'user', uid, `${whoIs(uid)}: ${MODULE_LABELS[key] || key} ${val ? 'turned ON' : 'turned OFF'}`);
     showBanner(`${MODULE_LABELS[key]} ${val?'enabled':'disabled'}.`);
   };
   window.toggleRole = async (uid, key, val) => {
     await db.collection('users').doc(uid).set({roles:{[key]:val}}, {merge:true});
+    RccAudit.log('access.role', 'user', uid, `${whoIs(uid)}: ${ROLE_LABELS[key] || key} ${val ? 'turned ON' : 'turned OFF'}`);
     showBanner(`${ROLE_LABELS[key]} ${val?'enabled':'disabled'}.`);
   };
+
+  // ── Activity (audit trail) ──
+  let activityRows = [];
+  function loadActivity() {
+    db.collection('auditLog').orderBy('at', 'desc').limit(300).onSnapshot(snap => {
+      activityRows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderActivity();
+    }, err => { document.getElementById('activityList').innerHTML = '<div class="empty-state">Could not load the activity log.</div>'; console.error(err); });
+    document.getElementById('logSearch').addEventListener('input', renderActivity);
+    document.getElementById('logKind').addEventListener('change', renderActivity);
+  }
+  function renderActivity() {
+    const q = document.getElementById('logSearch').value.trim().toLowerCase(), kind = document.getElementById('logKind').value;
+    const rows = activityRows.filter(r => {
+      if (kind) {
+        const a = r.action || '';
+        const ok = kind === 'access' ? /^(access|admin|owner)\./.test(a) : kind === 'graphic' ? /^(graphic|marketing)\./.test(a) : a.indexOf(kind) === 0;
+        if (!ok) return false;
+      }
+      return !q || [r.summary, r.actorName, r.actorEmail, r.action].join(' ').toLowerCase().includes(q);
+    });
+    const el = document.getElementById('activityList');
+    if (!rows.length) { el.innerHTML = '<div class="empty-state">' + (activityRows.length ? 'Nothing matches that.' : 'Nothing has been recorded yet — entries appear here as staff approve, deny, confirm and change things.') + '</div>'; return; }
+    el.innerHTML = rows.map(r => {
+      const d = r.at && r.at.toDate ? r.at.toDate() : null;
+      const when = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '…';
+      return `<div class="card log-row"><div class="log-when">${escHtml(when)}</div><div><div class="log-what">${escHtml(r.summary || r.action)}</div><div class="log-who">${escHtml(r.actorName || r.actorEmail || 'Someone')}${r.actorEmail && r.actorName ? ' · ' + escHtml(r.actorEmail) : ''}</div></div></div>`;
+    }).join('');
+  }
 
   // ── Access Requests ──
   let allAccessRequests = [];
@@ -770,11 +827,14 @@
       }, {merge:true});
     }
     await db.collection('accessRequests').doc(reqId).update({status:'approved', resolvedAt:new Date().toISOString(), resolvedBy: currentUser.uid});
+    RccAudit.log('access.request.approve', 'accessRequest', reqId, `Approved access for ${req.name} (${req.email}): ${(req.modulesRequested || []).map(k => MODULE_LABELS[k] || k).join(', ')}`);
     showBanner('Access granted.');
   };
 
   window.dismissAccessRequest = async (reqId) => {
     await db.collection('accessRequests').doc(reqId).update({status:'dismissed', resolvedAt:new Date().toISOString(), resolvedBy: currentUser.uid});
+    const dr = allAccessRequests.find(r => r.id === reqId) || {};
+    RccAudit.log('access.request.dismiss', 'accessRequest', reqId, `Dismissed the access request from ${dr.name || 'someone'} (${dr.email || ''})`);
     showBanner('Request dismissed.');
   };
 
@@ -814,6 +874,7 @@
     if (!makeAdmin && !confirm('Remove admin access for this person?')) return;
     try {
       await db.collection('users').doc(uid).set({isAdmin: makeAdmin}, {merge:true});
+      RccAudit.log(makeAdmin ? 'admin.grant' : 'admin.revoke', 'user', uid, `${whoIs(uid)}: full admin ${makeAdmin ? 'GRANTED' : 'REMOVED'}`);
     } catch (e) {
       showBanner('Could not update — this account may be Owner-protected: ' + e.message, true);
     }
@@ -823,6 +884,7 @@
     if (!makeOwner && !confirm('Remove Owner status from this person?')) return;
     try {
       await db.collection('users').doc(uid).set({isOwner: makeOwner}, {merge:true});
+      RccAudit.log(makeOwner ? 'owner.grant' : 'owner.revoke', 'user', uid, `${whoIs(uid)}: Owner status ${makeOwner ? 'GRANTED' : 'REMOVED'}`);
       showBanner(`Owner status ${makeOwner ? 'granted' : 'removed'}.`);
     } catch (e) {
       showBanner('Could not update: ' + e.message, true);
@@ -920,6 +982,7 @@
       if (c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
     }
     await db.collection('eventRequests').doc(id).update({status, statusChangedAt:new Date().toISOString(), statusChangedBy: currentUser.uid});
+    RccAudit.log('event.' + status, 'eventRequest', id, `${status === 'approved' ? 'Approved' : status === 'denied' ? 'Denied' : 'Moved back to New'}: "${evTitle(id)}"`);
     showBanner('Request updated.');
   };
   // An approved event's room stays a TBD hold until an admin confirms it here. Confirming is
@@ -932,10 +995,12 @@
       if (c.soft.length && !confirm('Heads up — this overlaps with a TBD hold:\n\n' + c.soft.join('\n') + '\n\nConfirm the room anyway?')) return;
     }
     await db.collection('eventRequests').doc(id).update({ roomConfirmed: confirmed, roomConfirmedBy: confirmed ? currentUser.uid : null, roomConfirmedAt: confirmed ? new Date().toISOString() : null });
+    RccAudit.log(confirmed ? 'room.confirm' : 'room.unconfirm', 'eventRequest', id, `${confirmed ? 'Confirmed the room for' : 'Put the room back to a TBD hold for'} "${evTitle(id)}"`);
     showBanner(confirmed ? 'Room confirmed.' : 'Room is back to a TBD hold.');
   };
   window.toggleEventField = async (id, field, val) => {
     await db.collection('eventRequests').doc(id).update({[field]: val});
+    RccAudit.log('event.field', 'eventRequest', id, `"${evTitle(id)}": ${field} set to ${val}`);
   };
 
   // ── Time Off Requests ──
@@ -991,6 +1056,8 @@
     });
     // The requester's approved/denied email is sent from the server when the
     // status changes (Cloud Function notifyTimeOffStatus).
+    const tr = allTimeOffRequests.find(x => x.id === id) || {};
+    RccAudit.log('timeoff.' + status, 'timeOffRequest', id, `${status === 'approved' ? 'Approved' : status === 'denied' ? 'Denied' : 'Moved back to pending'}: ${tr.name || 'someone'}'s time off (${[tr.startDate, tr.endDate].filter(Boolean).join(' → ')})`);
     showBanner('Request updated.');
   };
   // ── Notification Email Settings ──
@@ -1010,6 +1077,7 @@
     const email1 = document.getElementById('notifyEmail1').value.trim();
     const email2 = document.getElementById('notifyEmail2').value.trim();
     await db.collection('settings').doc('timeOffNotifications').set({ email1, email2 }, { merge: true });
+    RccAudit.log('settings.timeoff.emails', 'settings', 'timeOffNotifications', `Time-off notification emails set to ${email1 || '(none)'}${email2 ? ', ' + email2 : ''}`);
     showBanner('Notification emails saved.');
   };
 
@@ -1017,11 +1085,13 @@
     const order = ['', 'In Progress', 'Completed'];
     const next = order[(order.indexOf(current)+1) % order.length];
     await db.collection('eventRequests').doc(id).update({graphicStatus: next});
+    RccAudit.log('graphic.status', 'eventRequest', id, `"${evTitle(id)}": graphic → ${next || 'Not started'}`);
   };
   window.cycleMarketingStatus = async (id, current) => {
     const order = ['', 'In Progress', 'Completed'];
     const next = order[(order.indexOf(current)+1) % order.length];
     await db.collection('eventRequests').doc(id).update({marketingStatus: next});
+    RccAudit.log('marketing.status', 'eventRequest', id, `"${evTitle(id)}": marketing → ${next || 'Not started'}`);
   };
 
   function escHtml(str) { return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

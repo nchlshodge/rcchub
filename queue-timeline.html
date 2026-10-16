@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="room-logic.js"></script>
+<script src="rcc-audit.js"></script>
 <script src="rcc-shell.js"></script>
 <script>if(/[?&]embed=1(&|$)/.test(location.search))document.documentElement.classList.add('embedded');</script>
 <link rel="stylesheet" href="rcc-ui.css">
@@ -809,7 +810,21 @@
   /* ---------- clicks, edits and writes ---------- */
   let noteTimers = {};
   function debounce(id, fn, ms){ clearTimeout(noteTimers[id]); noteTimers[id] = setTimeout(fn, ms); }
-  const upd = (id, data) => db.collection('eventRequests').doc(id).update(data);
+  const upd = (id, data) => db.collection('eventRequests').doc(id).update(data).then(res => { try { auditChange(id, data); } catch (e) {} return res; });
+  // Write what just changed to the audit trail (notes and the note box are left out — they're chatty).
+  function auditChange(id, data) {
+    const r = allRequests.find(x => x.id === id) || {}, t = '"' + titleOf(r) + '"';
+    if (data.status) { RccAudit.log('event.' + data.status, 'eventRequest', id, (data.status === 'approved' ? 'Approved ' : data.status === 'denied' ? 'Denied ' : 'Changed status of ') + t); return; }
+    const bits = [];
+    if ('graphicStatus' in data) bits.push('graphic → ' + (data.graphicStatus || 'Not started'));
+    if ('marketingStatus' in data) bits.push('marketing → ' + (data.marketingStatus || 'Not started'));
+    if ('calendarAdded' in data) bits.push('calendar ' + (data.calendarAdded ? 'added' : 'not added'));
+    if ('graphicDueDate' in data) bits.push('graphic due ' + (data.graphicDueDate || 'cleared'));
+    if ('marketingDueDate' in data) bits.push('marketing due ' + (data.marketingDueDate || 'cleared'));
+    if ('graphicLink' in data) bits.push('graphic link ' + (data.graphicLink ? 'set' : 'cleared'));
+    ['eventTitle', 'projectTitle', 'requesterName', 'eventDate', 'startTime', 'endTime', 'location'].forEach(k => { if (k in data) bits.push(k + ' → ' + (data[k] || '(none)')); });
+    if (bits.length) RccAudit.log('event.update', 'eventRequest', id, t + ': ' + bits.join('; '));
+  }
 
   document.addEventListener('click', e => {
     const t = e.target;
@@ -848,7 +863,7 @@
     const deny = t.closest('[data-action="deny"]');
     if (deny) { if (!confirm('Deny this request?')) return; upd(deny.dataset.id, { status: 'denied', statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid }); return; }
     const del = t.closest('[data-action="delete"]');
-    if (del) { if (!confirm('Permanently delete "' + del.dataset.title + '"? This cannot be undone.')) return; db.collection('eventRequests').doc(del.dataset.id).delete(); if (panelState && panelState.id === del.dataset.id) closePanel(); return; }
+    if (del) { if (!confirm('Permanently delete "' + del.dataset.title + '"? This cannot be undone.')) return; db.collection('eventRequests').doc(del.dataset.id).delete().then(() => RccAudit.log('event.delete', 'eventRequest', del.dataset.id, 'DELETED "' + del.dataset.title + '"')); if (panelState && panelState.id === del.dataset.id) closePanel(); return; }
     const complAll = t.closest('[data-action="complete-all"]');
     if (complAll) {
       // Only the fields this viewer's role may write (computed when the card was drawn), so the

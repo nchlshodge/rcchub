@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-functions-compat.js"></script>
+<script src="../rcc-audit.js"></script>
 
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -210,6 +211,7 @@
   }
   window.setIncidentStatus = async (id, status) => {
     await db.collection('incidentReports').doc(id).update({reviewStatus:status, reviewedAt:new Date().toISOString(), reviewedBy: currentUser.uid});
+    RccAudit.log('incident.' + status, 'incidentReport', id, 'Incident report marked "' + (status === 'followup' ? 'needs follow-up' : status === 'reviewed' ? 'reviewed' : 'new') + '"');
   };
 
   // ── Insurance emailing (canEmailInsurance accounts only) ──

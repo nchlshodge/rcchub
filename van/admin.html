@@ -16,6 +16,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+<script src="../rcc-audit.js"></script>
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
@@ -553,8 +554,10 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
   const openAlerts = alerts.filter(a=>!a.resolved);
   const recurringPendingCount = recurringRequests.filter(r=>r.status==='pending'||r.status==='renewal_requested').length;
 
-  async function approve(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'approved'}); }
-  async function deny(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'denied'}); }
+  const driverName = uid_ => ((allUsers||[]).find(u=>u.id===uid_)||{}).name || uid_;
+  const vanLabel = id => ((vans||[]).find(v=>v.id===id)||{}).name || id;
+  async function approve(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'approved'}); RccAudit.log('van.driver.approve','user',uid_,'Approved '+driverName(uid_)+' as a van driver'); }
+  async function deny(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'denied'}); RccAudit.log('van.driver.deny','user',uid_,'Denied '+driverName(uid_)+"'s van driver application"); }
 
   // Generates individual weekly vanRentals docs across a 3-month
   // window for an approved recurring request, checking each week for
@@ -632,14 +635,14 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
     // Re-run the same generation logic against the new window.
     await approveRecurring(reqId);
   }
-  async function verifyLicenseInPerson(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.licenseVerifiedInPerson':true}); }
-  async function updateLicenseExp(uid_, newExp){ await db.collection('users').doc(uid_).update({'vanRentalProfile.licenseExp':newExp}); }
+  async function verifyLicenseInPerson(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.licenseVerifiedInPerson':true}); RccAudit.log('van.license.verify','user',uid_,'Marked '+driverName(uid_)+"'s license verified in person"); }
+  async function updateLicenseExp(uid_, newExp){ await db.collection('users').doc(uid_).update({'vanRentalProfile.licenseExp':newExp}); RccAudit.log('van.license.expiry','user',uid_,driverName(uid_)+"'s license expiration set to "+newExp); }
   async function resolveAlert(id){ await db.collection('vanAlerts').doc(id).update({resolved:true}); }
   async function addWarningLight(name,safety,feedback,vanId){
     await db.collection('vanWarningLights').add({name,safety,feedback: safety? null : feedback, van: vanId||null});
   }
   async function resolveMaint(id){ await db.collection('vanMaintenanceNotes').doc(id).update({resolved:true}); }
-  async function setVanStatus(vanId,status){ await db.collection('vans').doc(vanId).update({status}); }
+  async function setVanStatus(vanId,status){ await db.collection('vans').doc(vanId).update({status}); RccAudit.log('van.status','van',vanId,vanLabel(vanId)+' set to '+status); }
   async function addVan(name, isBorrowed, borrowedFrom, returnDate){
     await db.collection('vans').add({
       name, mileage:0, gas:100, status:'available', lowPriority:false,
@@ -649,7 +652,9 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
   }
   async function removeVan(vanId){
     if(!confirm('Remove this van from the system? This does not delete its rental history.')) return;
+    const gone = vanLabel(vanId);
     await db.collection('vans').doc(vanId).delete();
+    RccAudit.log('van.remove','van',vanId,'Removed the van "'+gone+'"');
   }
   async function addRepair(vanId,date,serviceType,notes,performedBy){
     await db.collection('vanRepairLog').add({vanId,date,serviceType,notes,performedBy,createdAt:Date.now()});
@@ -666,6 +671,7 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
     const rental = rentals.find(r=>r.id===rentalId);
     if(!rental) return;
     await db.collection('vanRentals').doc(rentalId).update({status:'cancelled'});
+    RccAudit.log('van.reservation.cancel','vanRental',rentalId,'Cancelled the reservation for '+vanLabel(rental.vanId)+' on '+(rental.date||'')+(rental.driverName?' ('+rental.driverName+')':''));
     const otherActive = rentals.some(r=>r.id!==rentalId && r.vanId===rental.vanId && r.status!=='completed' && r.status!=='cancelled' && r.checkout && !r.return);
     const van = vans.find(v=>v.id===rental.vanId);
     if(van && van.status!=='maintenance' && !otherActive){ await db.collection('vans').doc(rental.vanId).update({status:'available'}); }
