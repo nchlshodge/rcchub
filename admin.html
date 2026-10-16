@@ -91,6 +91,18 @@
     .embed-bar { display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:12.5px; color:var(--text-soft); margin-bottom:10px; }
     .embed-bar a { color:var(--blue); text-decoration:none; font-weight:500; }
     .embed-frame { display:block; width:100%; height:calc(100vh - 210px); min-height:560px; border:1px solid var(--border); border-radius:12px; background:#fff; }
+    /* The flat list below still drives everything (visibility, active tab, deep links); what people see
+       is the grouped bar built from it by syncNav(). */
+    nav#legacyNav { display: none; }
+    nav#groupNav { background: var(--bg); border-bottom: 1px solid var(--border); display: flex; padding: 0 16px; gap: 4px; overflow-x: auto; }
+    .gtab { padding: 14px 16px; font-size: 14px; color: var(--text-soft); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; font-weight: 600; background: none; border-top: 0; border-left: 0; border-right: 0; font-family: inherit; }
+    .gtab.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .gtab:hover:not(.active) { color: var(--text-mid); }
+    #subNav { display: none; background: #fff; border-bottom: 1px solid var(--border); padding: 0 16px; gap: 6px; overflow-x: auto; }
+    #subNav.show { display: flex; }
+    #subNav .stab { padding: 10px 14px; font-size: 13px; color: var(--text-soft); cursor: pointer; border: 0; background: none; font-family: inherit; font-weight: 600; white-space: nowrap; border-bottom: 2px solid transparent; }
+    #subNav .stab.active { color: var(--blue); border-bottom-color: var(--blue); }
+    #subNav .stab:hover:not(.active) { color: var(--text-mid); }
     .section-tab {
       padding: 14px 16px;
       font-size: 14px;
@@ -204,7 +216,9 @@
   <div id="accessCheck" style="padding:60px; text-align:center; color:var(--text-soft);">Checking access...</div>
 
   <div id="adminUI" style="display:none;">
-    <nav>
+    <nav id="groupNav" aria-label="Admin sections"></nav>
+    <nav id="subNav" aria-label="Section pages"></nav>
+    <nav id="legacyNav">
       <div class="section-tab active" data-section="overview">Overview</div>
       <div class="section-tab" data-section="bedside">Bedside</div>
       <div class="section-tab" data-section="incidents">Incident Reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></div>
@@ -432,6 +446,69 @@
       loadEmbed(tab.dataset.section);
     });
   });
+
+
+  // ── Grouped navigation ──
+  // The ten admin pages are shown as five groups with a second row of pages inside each group.
+  // The flat (hidden) tab list above still decides who sees what and which page is open; this
+  // just reads it and draws the friendlier two-level bar, so every deep link
+  // (admin.html?section=events etc.) and every "go to section" call works exactly as before.
+  const NAV_GROUPS = [
+    { key: 'overview', label: 'Overview',        pages: ['overview'] },
+    { key: 'requests', label: 'Requests',        pages: ['events', 'timeline', 'timeoff'] },
+    { key: 'care',     label: 'Care & Safety',   pages: ['bedside', 'incidents'] },
+    { key: 'vans',     label: 'Van Usage',       pages: ['vans'] },
+    { key: 'people',   label: 'People & Access', pages: ['access', 'requests', 'admins'] },
+  ];
+  function flatTab(key) { return document.querySelector('.section-tab[data-section="' + key + '"]'); }
+  function tabShown(key) { const t = flatTab(key); return !!t && t.style.display !== 'none'; }
+  function tabBadge(key) {
+    const b = flatTab(key) && flatTab(key).querySelector('.badge-count');
+    const n = b && b.style.display !== 'none' ? parseInt(b.textContent, 10) : 0;
+    return n > 0 ? n : 0;
+  }
+  function tabLabel(key) { const t = flatTab(key); return t ? t.firstChild.textContent.trim() : key; }
+  function makeBadge(n) { const s = document.createElement('span'); s.className = 'badge-count'; s.textContent = n; return s; }
+  const lastPageInGroup = {};
+  function syncNav() {
+    const activeTab = document.querySelector('.section-tab.active');
+    const activeKey = activeTab ? activeTab.dataset.section : null;
+    const gnav = document.getElementById('groupNav'), snav = document.getElementById('subNav');
+    gnav.replaceChildren(); snav.replaceChildren();
+    let activeGroup = null;
+    NAV_GROUPS.forEach(g => {
+      const pages = g.pages.filter(tabShown);
+      if (!pages.length) return;
+      const isActive = pages.includes(activeKey);
+      if (isActive) { activeGroup = { g, pages }; lastPageInGroup[g.key] = activeKey; }
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'gtab' + (isActive ? ' active' : '');
+      btn.appendChild(document.createTextNode(g.label));
+      const total = pages.reduce((s, k) => s + tabBadge(k), 0);
+      if (total) btn.appendChild(makeBadge(total));
+      btn.addEventListener('click', () => {
+        const target = pages.includes(lastPageInGroup[g.key]) ? lastPageInGroup[g.key] : pages[0];
+        flatTab(target).click();
+      });
+      gnav.appendChild(btn);
+    });
+    if (activeGroup && activeGroup.pages.length > 1) {
+      activeGroup.pages.forEach(k => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'stab' + (k === activeKey ? ' active' : '');
+        b.appendChild(document.createTextNode(tabLabel(k)));
+        if (tabBadge(k)) b.appendChild(makeBadge(tabBadge(k)));
+        b.addEventListener('click', () => flatTab(k).click());
+        snav.appendChild(b);
+      });
+      snav.classList.add('show');
+    } else { snav.classList.remove('show'); }
+  }
+  // Redraw whenever the flat list changes (active page, who can see what, badge counts).
+  let navQueued = false;
+  new MutationObserver(() => { if (navQueued) return; navQueued = true; queueMicrotask(() => { navQueued = false; syncNav(); }); })
+    .observe(document.getElementById('legacyNav'), { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'style'] });
+  syncNav();
 
   // ── Embedded module admin pages ──
   // Each module's full admin page is shown inside its tab (same page the
