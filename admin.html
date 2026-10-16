@@ -319,6 +319,7 @@
       <div class="section-tab" data-section="vans">Van Usage</div>
       <div class="section-tab" data-section="events">Event Requests <span class="badge-count" id="eventsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="timeline">Creative Timeline</div>
+      <div class="section-tab" data-section="workorders">Work Orders</div>
       <div class="section-tab" data-section="timeoff">Time Off <span class="badge-count" id="timeOffCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="access">App Access</div>
       <div class="section-tab" data-section="requests">Access Requests <span class="badge-count" id="requestsCount" style="display:none;"></span></div>
@@ -404,6 +405,12 @@
       <div class="section" id="section-timeline">
         <div class="embed-bar"><span>Creative Timeline</span><a id="open-timeline" href="queue-timeline.html?embed=1" target="_blank" rel="noopener">Open on its own page ↗</a></div>
         <iframe class="embed-frame" id="frame-timeline" title="Creative Timeline" data-src="queue-timeline.html?embed=1"></iframe>
+      </div>
+
+      <!-- FACILITIES WORK ORDERS (embedded) -->
+      <div class="section" id="section-workorders">
+        <div class="embed-bar"><span>Facilities Work Orders</span><a id="open-workorders" href="work-orders.html" target="_blank" rel="noopener">Open on its own page ↗</a></div>
+        <iframe class="embed-frame" id="frame-workorders" title="Facilities work orders" data-src="work-orders.html?embed=1"></iframe>
       </div>
 
       <!-- VOLUNTEER CLEARANCES (from Planning Center) -->
@@ -504,7 +511,8 @@
       const canMarketing = isFullAdmin || roles.marketing === true;
       const canOverview = isFullAdmin || roles.overview === true;
       const canClearances = isFullAdmin || roles.clearances === true;
-      const hasAnyAccess = isFullAdmin || canVan || canBedside || canGraphics || canMarketing || canOverview || canClearances;
+      const canFacilities = isFullAdmin || roles.facilities === true;
+      const hasAnyAccess = isFullAdmin || canVan || canBedside || canGraphics || canMarketing || canOverview || canClearances || canFacilities;
       window.currentUserIsFullAdmin = isFullAdmin;
       window.currentUserCanOverview = canOverview;
       window.currentUserIsOwner = userData.isOwner === true;
@@ -525,7 +533,7 @@
         const tabVisibility = {
           overview: canOverview, bedside: canBedside, incidents: isFullAdmin, vans: canVan,
           events: isFullAdmin, timeline: canGraphics || canMarketing, timeoff: isFullAdmin, access: isFullAdmin,
-          requests: isFullAdmin, admins: isFullAdmin, activity: isFullAdmin, clearances: canClearances,
+          requests: isFullAdmin, admins: isFullAdmin, activity: isFullAdmin, clearances: canClearances, workorders: canFacilities,
         };
         document.querySelectorAll('.section-tab').forEach(tab => {
           const key = tab.dataset.section;
@@ -581,7 +589,7 @@
   // (admin.html?section=events etc.) and every "go to section" call works exactly as before.
   const NAV_GROUPS = [
     { key: 'overview', label: 'Overview',        pages: ['overview'] },
-    { key: 'requests', label: 'Requests',        pages: ['events', 'timeline', 'timeoff'] },
+    { key: 'requests', label: 'Requests',        pages: ['events', 'timeline', 'workorders', 'timeoff'] },
     { key: 'care',     label: 'Care & Safety',   pages: ['bedside', 'incidents', 'clearances'] },
     { key: 'vans',     label: 'Van Usage',       pages: ['vans'] },
     { key: 'people',   label: 'People & Access', pages: ['access', 'requests', 'admins', 'activity'] },
@@ -741,7 +749,7 @@
 
   // ── App Access ──
   const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage', eventRequest: 'Event Request', timeOff: 'Time Off Request' };
-  const ROLE_LABELS = { overview: 'Overview', vanAdmin: 'Van Usage Admin (Department Head)', bedsideAdmin: 'Bedside Admin (Department Head)', graphics: 'Graphics Team (Department Head)', marketing: 'Marketing Team (Department Head)', clearances: 'Volunteer Clearances (view only)' };
+  const ROLE_LABELS = { overview: 'Overview', vanAdmin: 'Van Usage Admin (Department Head)', bedsideAdmin: 'Bedside Admin (Department Head)', graphics: 'Graphics Team (Department Head)', marketing: 'Marketing Team (Department Head)', clearances: 'Volunteer Clearances (view only)', facilities: 'Facilities Team (work orders)' };
   function loadModuleManagement() {
     db.collection('users').onSnapshot(snap => {
       const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));

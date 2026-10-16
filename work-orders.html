@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCC — Facilities Work Orders</title>
+<meta name="theme-color" content="#2557b8">
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+<script src="room-logic.js"></script>
+<script src="rcc-audit.js"></script>
+<script src="rcc-shell.js"></script>
+<script>if(/[?&]embed=1(&|$)/.test(location.search))document.documentElement.classList.add('embedded');</script>
+<link rel="stylesheet" href="rcc-ui.css">
+
+<style>
+  .embedded #rccNav { display: none !important; }
+  .embedded .page { padding-top: 16px; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: clamp(20px, 4vw, 44px) clamp(14px, 3vw, 24px) 90px; }
+  .embedded .wrap { padding-top: 14px; }
+
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .tabs button { font: inherit; font-size: 13.5px; font-weight: 600; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: #fff; color: var(--ink-2); cursor: pointer; }
+  .tabs button.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .tabs button .n { opacity: .75; font-weight: 500; margin-left: 4px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px clamp(16px, 3vw, 26px); margin-bottom: 18px; box-shadow: var(--shadow-1); }
+  .f { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .f > label, .lbl { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+  .f > label em, .lbl em { color: var(--red); font-style: normal; }
+  .f input[type=text], .f select, .f textarea { font-family: inherit; font-size: 16px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px 14px; width: 100%; box-sizing: border-box; }
+  .f textarea { min-height: 110px; resize: vertical; }
+  .f input:focus, .f select:focus, .f textarea:focus { outline: none; border-color: var(--blue); background: #fff; box-shadow: 0 0 0 4px rgba(37,87,184,.12); }
+  .f.err input, .f.err select, .f.err textarea { border-color: var(--red); background: #fff7f6; }
+  .f .msg { display: none; color: var(--red); font-size: 12.5px; }
+  .f.err .msg { display: block; }
+  .f .help { font-size: 13px; color: var(--ink-3); }
+  .opts { display: flex; flex-wrap: wrap; gap: 9px; }
+  .opts label { cursor: pointer; }
+  .opts input { position: absolute; opacity: 0; pointer-events: none; }
+  .opts span { display: inline-flex; padding: 9px 16px; border: 1px solid var(--line-2); border-radius: 999px; background: #fff; font-size: 14.5px; font-weight: 500; color: var(--ink-2); transition: all .2s var(--ease); user-select: none; }
+  .opts label:hover span { border-color: var(--blue); }
+  .opts input:checked + span { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .opts.urg input[value=urgent]:checked + span { background: var(--red); border-color: var(--red); }
+  .opts input:focus-visible + span { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; }
+  .urg-note { font-size: 13px; color: var(--ink-3); }
+  .urg-note.hot { color: var(--red-ink); background: var(--red-soft); padding: 8px 12px; border-radius: var(--radius-sm); }
+  .other-input { display: none; margin-top: 8px; } .other-input.show { display: block; }
+
+  .photos { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .photos .ph { position: relative; width: 84px; height: 84px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--line); background: var(--bg-soft); }
+  .photos .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .photos .ph button { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; border: none; background: rgba(0,0,0,.6); color: #fff; cursor: pointer; font-size: 13px; line-height: 1; }
+  .formerr { display: none; background: var(--red-soft); color: var(--red-ink); border-radius: var(--radius-md); padding: 12px 16px; font-size: 14px; margin-bottom: 16px; }
+  .formerr.show { display: block; }
+  .submit-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .submit-row .note { color: var(--ink-3); font-size: 13px; flex: 1 1 220px; }
+  .btn-submit { background: var(--blue); color: #fff; border: none; border-radius: 999px; padding: 14px 34px; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 6px 20px rgba(37,87,184,.3); }
+  .btn-submit:hover { background: var(--blue-ink); }
+  .btn-submit:disabled { opacity: .6; cursor: wait; }
+  .done { display: none; text-align: center; padding: 48px 20px; }
+  .done.show { display: block; }
+  .done .tick { width: 70px; height: 70px; border-radius: 50%; background: var(--green-soft); color: var(--green); display: inline-flex; align-items: center; justify-content: center; font-size: 34px; margin-bottom: 16px; }
+  .done h2 { font-size: 30px; margin-bottom: 8px; }
+  .done p { color: var(--ink-2); max-width: 46ch; margin: 0 auto 20px; }
+
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .wo { display: block; width: 100%; text-align: left; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--line-2); border-radius: var(--radius-md); padding: 14px 16px; cursor: pointer; transition: box-shadow .2s var(--ease), transform .2s var(--ease); }
+  .wo:hover { box-shadow: var(--shadow-1); transform: translateY(-1px); }
+  .wo.urgent { border-left-color: var(--red); }
+  .wo.normal { border-left-color: var(--gold); }
+  .wo.low { border-left-color: var(--blue); }
+  .wo.closed { opacity: .7; border-left-color: var(--green); }
+  .wo .top { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+  .wo h3 { font-size: 16.5px; margin: 0; font-family: inherit; font-weight: 600; }
+  .wo .meta { font-size: 13px; color: var(--ink-3); margin-top: 4px; }
+  .wo .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .detail .row2 { display: grid; grid-template-columns: 120px 1fr; gap: 6px 14px; font-size: 14.5px; margin: 14px 0; }
+  .detail .row2 dt { color: var(--ink-3); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding-top: 2px; }
+  .detail .row2 dd { margin: 0; }
+  .detail .desc { background: var(--bg); border-radius: var(--radius-md); padding: 12px 14px; white-space: pre-wrap; font-size: 14.5px; line-height: 1.55; margin: 10px 0; }
+  .detail .gal { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+  .detail .gal a img { height: 110px; border-radius: var(--radius-sm); border: 1px solid var(--line); display: block; }
+  .staffbox { background: var(--blue-soft); border-radius: var(--radius-md); padding: 14px 16px; margin: 16px 0; display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  .staffbox .f { margin: 0; } .staffbox .wide { grid-column: 1 / -1; }
+  .thread { margin: 16px 0 10px; }
+  .thread h4 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 8px; font-family: inherit; }
+  .msg-b { background: var(--bg); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 8px; font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; }
+  .msg-b.staff { background: var(--blue-soft); }
+  .msg-b .who { font-size: 12px; color: var(--ink-3); font-weight: 600; margin-bottom: 2px; white-space: normal; }
+  .reply { display: flex; gap: 8px; align-items: flex-end; }
+  .reply textarea { flex: 1; min-height: 56px; font: inherit; font-size: 15px; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 10px 12px; background: var(--bg); resize: vertical; }
+  .modal { position: fixed; inset: 0; background: rgba(20,18,12,.45); display: none; align-items: flex-start; justify-content: center; padding: 4vh 12px; overflow-y: auto; z-index: 50; }
+  .modal.show { display: flex; }
+  .modal .sheet { background: #fff; border-radius: var(--radius); max-width: 640px; width: 100%; padding: 22px clamp(16px, 3vw, 26px); box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  .modal .close { float: right; border: none; background: var(--bg-soft); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; }
+  @media (max-width: 560px) { .staffbox { grid-template-columns: 1fr; } .detail .row2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="rcc-login" style="display:none;">
+  <img src="assets/rcc-logo-plain.png" alt="">
+  <h1>Facilities Work Orders</h1>
+  <p>Sign in to report something that needs fixing.</p>
+  <button id="googleSignInBtn" type="button">
+    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+    Sign in with Google
+  </button>
+</div>
+
+<div id="appShell" style="display:none;">
+  <header id="rccNav"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="eyebrow">Facilities</span>
+      <h1>Work orders</h1>
+      <p>Something broken, dirty, or unsafe? Tell the facilities team here and you can follow it until it's fixed.</p>
+    </section>
+
+    <div class="tabs" id="tabs">
+      <button type="button" data-tab="report" class="active">Report a problem</button>
+      <button type="button" data-tab="mine">My requests <span class="n" id="nMine"></span></button>
+      <button type="button" data-tab="board" id="tabBoard" hidden>All work orders <span class="n" id="nBoard"></span></button>
+    </div>
+
+    <!-- REPORT -->
+    <div id="view-report">
+      <div class="card" id="formCard">
+        <div class="formerr" id="formErr"></div>
+        <div class="f" id="f-title"><label for="wo-title">What's the problem? <em>*</em></label><input type="text" id="wo-title" maxlength="150" placeholder="e.g. Projector won't turn on"><span class="msg">Please describe the problem in a few words.</span></div>
+        <div class="f" id="f-where">
+          <label for="wo-where">Where is it? <em>*</em></label>
+          <select id="wo-where"></select>
+          <input type="text" class="other-input" id="wo-where-other" maxlength="100" placeholder="Describe the location">
+          <span class="msg">Please choose where it is.</span>
+        </div>
+        <div class="f" id="f-cat"><span class="lbl">What kind of problem? <em>*</em></span><div class="opts" id="wo-cat"></div><span class="msg">Pick the closest type.</span></div>
+        <div class="f"><span class="lbl">How urgent?</span>
+          <div class="opts urg" id="wo-urg">
+            <label><input type="radio" name="urg" value="low"><span>Can wait</span></label>
+            <label><input type="radio" name="urg" value="normal" checked><span>Soon</span></label>
+            <label><input type="radio" name="urg" value="urgent"><span>Urgent</span></label>
+          </div>
+          <div class="urg-note" id="urgNote">Soon — we'll get to it in the next week or two.</div>
+        </div>
+        <div class="f"><label for="wo-desc">More detail <span style="text-transform:none;letter-spacing:0;font-weight:400;">(optional)</span></label><textarea id="wo-desc" maxlength="3000" placeholder="What happened? Anything that would help us find or fix it."></textarea></div>
+        <div class="f"><span class="lbl">Photos <span style="text-transform:none;letter-spacing:0;font-weight:400;">(optional, up to 3)</span></span>
+          <div class="photos" id="photoRow"><button type="button" class="btn small" id="addPhoto">+ Add a photo</button></div>
+          <input type="file" id="photoInput" accept="image/*" multiple hidden>
+        </div>
+        <div class="submit-row">
+          <div class="note">The facilities team is emailed right away. Urgent = a safety problem, or it's stopping something from happening.</div>
+          <button type="button" class="btn-submit" id="submitBtn">Send work order</button>
+        </div>
+      </div>
+      <div class="done card" id="doneCard">
+        <div class="tick">✓</div>
+        <h2>Sent — thank you!</h2>
+        <p>The facilities team has been notified. You can follow it under "My requests", and you'll get an email when work starts and when it's done.</p>
+        <button type="button" class="btn primary" id="againBtn">Report another problem</button>
+        <button type="button" class="btn soft" id="toMineBtn">See my requests</button>
+      </div>
+    </div>
+
+    <!-- MINE -->
+    <div id="view-mine" hidden><div class="list" id="mineList"></div></div>
+
+    <!-- BOARD -->
+    <div id="view-board" hidden>
+      <div class="toolbar" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;" id="boardFilters"></div>
+      <div class="list" id="boardList"></div>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true"><div class="sheet detail" id="sheet"></div></div>
+
+<script>
+(function(){
+  var firebaseConfig = {
+    apiKey: "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+    authDomain: "bedsidercc.firebaseapp.com",
+    projectId: "bedsidercc",
+    storageBucket: "bedsidercc.firebasestorage.app",
+    messagingSenderId: "950958384975",
+    appId: "1:950958384975:web:6f43dec5a7ba842c69c73a"
+  };
+  var fbApp; try { fbApp = firebase.app(); } catch(e) { fbApp = firebase.initializeApp(firebaseConfig); }
+  var auth = firebase.auth(), db = firebase.firestore(), storage = firebase.storage();
+  var $ = function(id){ return document.getElementById(id); };
+
+  var CATEGORIES = ['Plumbing', 'Electrical / lights', 'Heating & cooling', 'AV / sound / projector', 'Cleaning', 'Grounds & outdoors', 'Furniture & equipment', 'Doors, locks & keys', 'Safety hazard', 'Other'];
+  var URG = { low: 'Can wait', normal: 'Soon', urgent: 'Urgent' };
+  var URG_NOTE = { low: "Can wait — nothing is blocked; whenever there's time.", normal: "Soon — we'll get to it in the next week or two.", urgent: 'Urgent — this is a safety problem or it is stopping something from happening. The team is emailed with URGENT in the subject.' };
+  var STATUS = { new: 'New', in_progress: 'In progress', waiting: 'Waiting (parts / vendor)', done: 'Done', cancelled: 'Cancelled' };
+  var STATUS_PILL = { new: 'gold', in_progress: 'blue', waiting: 'gray', done: 'green', cancelled: 'gray' };
+  var PLACES = RoomLogic.ROOMS.map(function(r){ return r.name; }).concat(['Restrooms', 'Hallway / lobby / entrance', 'Office area', 'Parking lot / outside', 'Whole building', 'Somewhere else…']);
+
+  var me = null, isStaff = false, photos = [], mineDocs = [], boardDocs = [], unsubs = [], openId = null, commentsUnsub = null;
+  var boardFilter = 'open';
+
+  /* ---------- tiny DOM helper (no innerHTML, so nothing typed by a person is ever treated as markup) ---------- */
+  function h(tag, attrs, kids){
+    var el = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function(k){
+      if (k === 'text') el.textContent = attrs[k];
+      else if (k === 'class') el.className = attrs[k];
+      else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), attrs[k]);
+      else el.setAttribute(k, attrs[k]);
+    });
+    [].concat(kids || []).forEach(function(c){ if (c != null) el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return el;
+  }
+  function when(ts){ var d = ts && ts.toDate ? ts.toDate() : null; return d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) : 'just now'; }
+  function ageDays(ts){ var d = ts && ts.toDate ? ts.toDate() : null; return d ? Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000)) : 0; }
+  function isOpen(o){ return ['new', 'in_progress', 'waiting'].indexOf(o.status || 'new') >= 0; }
+
+  /* ---------- sign-in ---------- */
+  $('googleSignInBtn').addEventListener('click', function(){
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(err){ alert('Sign-in failed: ' + err.message); });
+  });
+  auth.onAuthStateChanged(function(user){
+    unsubs.forEach(function(u){ u(); }); unsubs = [];
+    if (!user) { me = null; $('loginScreen').style.display = 'flex'; $('appShell').style.display = 'none'; return; }
+    me = user;
+    $('loginScreen').style.display = 'none'; $('appShell').style.display = 'block';
+    db.collection('users').doc(user.uid).get().then(function(doc){
+      var data = doc.exists ? doc.data() : {}, roles = data.roles || {};
+      var isAdmin = data.isAdmin === true;
+      isStaff = isAdmin || roles.facilities === true;
+      RccShell.render($('rccNav'), { active: 'workorders', user: user, onSignOut: function(){ auth.signOut(); }, roles: Object.assign({}, roles, { isAdmin: isAdmin }) });
+      $('tabBoard').hidden = !isStaff;
+      watchMine();
+      if (isStaff) watchBoard();
+      var m = location.hash.match(/#open=([A-Za-z0-9]+)/);
+      if (m) { show(isStaff ? 'board' : 'mine'); openOrder(m[1]); }
+    }).catch(function(e){ console.error(e); });
+  });
+
+  /* ---------- tabs ---------- */
+  function show(tab){
+    ['report', 'mine', 'board'].forEach(function(t){ $('view-' + t).hidden = t !== tab; });
+    [].forEach.call($('tabs').querySelectorAll('button'), function(b){ b.classList.toggle('active', b.dataset.tab === tab); });
+  }
+  $('tabs').addEventListener('click', function(e){ var b = e.target.closest('button[data-tab]'); if (b) show(b.dataset.tab); });
+
+  /* ---------- the report form ---------- */
+  PLACES.forEach(function(p, i){ $('wo-where').appendChild(h('option', { value: i === 0 ? '' : p, text: p })); });
+  $('wo-where').firstChild.textContent = 'Choose a place…';
+  CATEGORIES.forEach(function(c){ $('wo-cat').appendChild(h('label', {}, [h('input', { type: 'radio', name: 'cat', value: c }), h('span', { text: c })])); });
+  $('wo-where').addEventListener('change', function(){ $('wo-where-other').classList.toggle('show', $('wo-where').value === 'Somewhere else…'); $('f-where').classList.remove('err'); });
+  $('wo-title').addEventListener('input', function(){ $('f-title').classList.remove('err'); });
+  $('wo-cat').addEventListener('change', function(){ $('f-cat').classList.remove('err'); });
+  $('wo-urg').addEventListener('change', function(){
+    var v = document.querySelector('input[name=urg]:checked').value;
+    $('urgNote').textContent = URG_NOTE[v]; $('urgNote').classList.toggle('hot', v === 'urgent');
+  });
+
+  // photos: shrink to a sensible size in the browser so phone pictures upload quickly
+  var addBtn = $('addPhoto');
+  addBtn.addEventListener('click', function(){ $('photoInput').click(); });
+  $('photoInput').addEventListener('change', function(){
+    var files = [].slice.call($('photoInput').files); $('photoInput').value = '';
+    files.slice(0, 3 - photos.length).forEach(function(f){
+      shrink(f).then(function(blob){ photos.push({ blob: blob, url: URL.createObjectURL(blob) }); drawPhotos(); }).catch(function(){ showErr("That photo couldn't be read — try a different one."); });
+    });
+  });
+  function shrink(file){
+    return new Promise(function(resolve, reject){
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function(){
+        var max = 1280, s = Math.min(1, max / Math.max(img.width, img.height));
+        var c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        c.toBlob(function(b){ b ? resolve(b) : reject(new Error('no blob')); }, 'image/jpeg', 0.8);
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('bad image')); };
+      img.src = url;
+    });
+  }
+  function drawPhotos(){
+    var row = $('photoRow'); row.replaceChildren();
+    photos.forEach(function(p, i){
+      row.appendChild(h('div', { class: 'ph' }, [h('img', { src: p.url, alt: 'Photo ' + (i + 1) }), h('button', { type: 'button', 'aria-label': 'Remove photo', text: '×', onclick: function(){ photos.splice(i, 1); drawPhotos(); } })]));
+    });
+    if (photos.length < 3) row.appendChild(addBtn);
+  }
+  function showErr(t){ $('formErr').textContent = t; $('formErr').classList.add('show'); }
+
+  $('submitBtn').addEventListener('click', function(){
+    $('formErr').classList.remove('show');
+    var title = $('wo-title').value.trim(), place = $('wo-where').value, other = $('wo-where-other').value.trim();
+    var cat = (document.querySelector('input[name=cat]:checked') || {}).value, urg = document.querySelector('input[name=urg]:checked').value;
+    var bad = false;
+    if (title.length < 3) { $('f-title').classList.add('err'); bad = true; }
+    if (!place || (place === 'Somewhere else…' && !other)) { $('f-where').classList.add('err'); bad = true; }
+    if (!cat) { $('f-cat').classList.add('err'); bad = true; }
+    if (bad) return;
+    var btn = $('submitBtn'); btn.disabled = true; btn.textContent = 'Sending…';
+    var ref = db.collection('workOrders').doc();
+    Promise.all(photos.map(function(p, i){
+      var r = storage.ref('workOrderPhotos/' + ref.id + '/' + Date.now() + '_' + i + '.jpg');
+      return r.put(p.blob, { contentType: 'image/jpeg' }).then(function(){ return r.getDownloadURL(); });
+    })).then(function(urls){
+      return ref.set({
+        title: title, category: cat, location: place === 'Somewhere else…' ? other : place,
+        roomId: '', urgency: urg, description: $('wo-desc').value.trim(), photos: urls, status: 'new',
+        requesterUid: me.uid, requesterName: me.displayName || me.email || '', requesterEmail: me.email || '',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }).then(function(){
+      $('formCard').hidden = true; $('doneCard').classList.add('show');
+    }).catch(function(e){
+      console.error(e); showErr("That didn't go through: " + (e && e.message ? e.message : 'please try again.'));
+    }).then(function(){ btn.disabled = false; btn.textContent = 'Send work order'; });
+  });
+  function resetForm(){
+    ['wo-title', 'wo-desc', 'wo-where-other'].forEach(function(id){ $(id).value = ''; });
+    $('wo-where').value = ''; $('wo-where-other').classList.remove('show');
+    [].forEach.call(document.querySelectorAll('input[name=cat]'), function(r){ r.checked = false; });
+    document.querySelector('input[name=urg][value=normal]').checked = true; $('urgNote').textContent = URG_NOTE.normal; $('urgNote').classList.remove('hot');
+    photos = []; drawPhotos();
+    $('formCard').hidden = false; $('doneCard').classList.remove('show');
+  }
+  $('againBtn').addEventListener('click', resetForm);
+  $('toMineBtn').addEventListener('click', function(){ resetForm(); show('mine'); });
+
+  /* ---------- lists ---------- */
+  function card(o){
+    var st = o.status || 'new';
+    return h('button', { type: 'button', class: 'wo ' + (isOpen(o) ? (o.urgency || 'normal') : 'closed'), onclick: function(){ openOrder(o.id); } }, [
+      h('div', { class: 'top' }, [
+        h('h3', { text: o.title || '(untitled)' }),
+        h('div', { class: 'pills' }, [
+          o.urgency === 'urgent' && isOpen(o) ? h('span', { class: 'pill red', text: 'Urgent' }) : null,
+          h('span', { class: 'pill ' + STATUS_PILL[st], text: STATUS[st] }),
+        ]),
+      ]),
+      h('div', { class: 'meta', text: [o.location, o.category, (isStaff && o.requesterName ? 'from ' + o.requesterName : null), when(o.createdAt) + (isOpen(o) && ageDays(o.createdAt) >= 3 ? ' · ' + ageDays(o.createdAt) + ' days ago' : '')].filter(Boolean).join(' · ') }),
+    ]);
+  }
+  function sortOrders(list){
+    return list.slice().sort(function(a, b){
+      var oa = isOpen(a) ? 0 : 1, ob = isOpen(b) ? 0 : 1; if (oa !== ob) return oa - ob;
+      var ua = a.urgency === 'urgent' ? 0 : 1, ub = b.urgency === 'urgent' ? 0 : 1; if (isOpen(a) && ua !== ub) return ua - ub;
+      var ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : Infinity, tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : Infinity;
+      return isOpen(a) ? ta - tb : tb - ta;   // open: oldest first; finished: newest first
+    });
+  }
+  function snap(s){ return s.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); }); }
+  function watchMine(){
+    unsubs.push(db.collection('workOrders').where('requesterUid', '==', me.uid).onSnapshot(function(s){
+      mineDocs = snap(s); drawMine(); refreshOpen();
+    }, function(e){ console.error(e); $('mineList').replaceChildren(h('div', { class: 'empty', text: 'Could not load your requests — please refresh.' })); }));
+  }
+  function drawMine(){
+    var list = sortOrders(mineDocs), box = $('mineList'); box.replaceChildren();
+    $('nMine').textContent = list.filter(isOpen).length ? '(' + list.filter(isOpen).length + ' open)' : '';
+    if (!list.length) { box.appendChild(h('div', { class: 'empty' }, [h('b', { text: 'Nothing reported yet' }), 'When you report a problem it will show up here so you can follow it.'])); return; }
+    list.forEach(function(o){ box.appendChild(card(o)); });
+  }
+  function watchBoard(){
+    unsubs.push(db.collection('workOrders').onSnapshot(function(s){ boardDocs = snap(s); drawBoard(); refreshOpen(); },
+      function(e){ console.error(e); $('boardList').replaceChildren(h('div', { class: 'empty', text: 'Could not load work orders — please refresh.' })); }));
+  }
+  function drawBoard(){
+    var open = boardDocs.filter(isOpen), urgent = open.filter(function(o){ return o.urgency === 'urgent'; }), fresh = open.filter(function(o){ return (o.status || 'new') === 'new'; });
+    $('nBoard').textContent = open.length ? '(' + open.length + ' open)' : '';
+    var filters = [['open', 'Open', open.length], ['urgent', 'Urgent', urgent.length], ['new', 'Not started', fresh.length], ['done', 'Finished', boardDocs.length - open.length], ['all', 'All', boardDocs.length]];
+    var bar = $('boardFilters'); bar.replaceChildren();
+    filters.forEach(function(f){ bar.appendChild(h('button', { type: 'button', class: 'fchip' + (boardFilter === f[0] ? ' active' : ''), onclick: function(){ boardFilter = f[0]; drawBoard(); } }, [f[1] + ' ', h('b', { text: String(f[2]) })])); });
+    var pick = { open: open, urgent: urgent, 'new': fresh, done: boardDocs.filter(function(o){ return !isOpen(o); }), all: boardDocs }[boardFilter];
+    var box = $('boardList'); box.replaceChildren();
+    if (!pick.length) { box.appendChild(h('div', { class: 'empty' }, [h('b', { text: 'Nothing here' }), boardFilter === 'open' ? 'No open work orders — all caught up.' : 'No work orders match this filter.'])); return; }
+    sortOrders(pick).forEach(function(o){ box.appendChild(card(o)); });
+  }
+
+  /* ---------- one work order (detail + conversation) ---------- */
+  function find(id){ return boardDocs.filter(function(o){ return o.id === id; })[0] || mineDocs.filter(function(o){ return o.id === id; })[0]; }
+  function openOrder(id){
+    openId = id; $('modal').classList.add('show');
+    var o = find(id);
+    if (o) return drawSheet(o);
+    // deep link: the lists may not have arrived yet; fetch it directly
+    db.collection('workOrders').doc(id).get().then(function(d){
+      if (d.exists) { drawSheet(Object.assign({ id: d.id }, d.data())); } else { $('sheet').replaceChildren(closeBtn(), h('p', { text: "That work order couldn't be found, or you don't have access to it." })); }
+    }).catch(function(){ $('sheet').replaceChildren(closeBtn(), h('p', { text: "That work order couldn't be opened." })); });
+  }
+  function refreshOpen(){ if (openId && $('modal').classList.contains('show') && !document.activeElement.closest('#sheet')) { var o = find(openId); if (o) drawSheet(o); } }
+  function closeBtn(){ return h('button', { type: 'button', class: 'close', 'aria-label': 'Close', text: '✕', onclick: closeModal }); }
+  function closeModal(){ $('modal').classList.remove('show'); openId = null; if (commentsUnsub) { commentsUnsub(); commentsUnsub = null; } if (location.hash) history.replaceState(null, '', location.pathname + location.search); }
+  $('modal').addEventListener('click', function(e){ if (e.target === $('modal')) closeModal(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && $('modal').classList.contains('show')) closeModal(); });
+
+  function drawSheet(o){
+    if (commentsUnsub) { commentsUnsub(); commentsUnsub = null; }
+    var st = o.status || 'new', sheet = $('sheet'); sheet.replaceChildren();
+    sheet.appendChild(closeBtn());
+    sheet.appendChild(h('h2', { text: o.title || '(untitled)', style: 'margin:0 40px 6px 0;' }));
+    sheet.appendChild(h('div', { class: 'pills', style: 'display:flex;gap:6px;flex-wrap:wrap;' }, [
+      h('span', { class: 'pill ' + STATUS_PILL[st], text: STATUS[st] }),
+      h('span', { class: 'pill ' + (o.urgency === 'urgent' ? 'red' : 'gray'), text: URG[o.urgency] || 'Soon' }),
+    ]));
+    var dl = h('dl', { class: 'row2' });
+    [['Where', o.location], ['Type', o.category], ['Reported by', (o.requesterName || '') + (isStaff && o.requesterEmail ? ' (' + o.requesterEmail + ')' : '')], ['Reported', when(o.createdAt)], ['Assigned to', o.assignedToName || (isOpen(o) ? 'Not assigned yet' : '')]].forEach(function(r){
+      if (r[1]) { dl.appendChild(h('dt', { text: r[0] })); dl.appendChild(h('dd', { text: r[1] })); }
+    });
+    sheet.appendChild(dl);
+    if (o.description) sheet.appendChild(h('div', { class: 'desc', text: o.description }));
+    if ((o.photos || []).length) sheet.appendChild(h('div', { class: 'gal' }, o.photos.map(function(u, i){ return h('a', { href: u, target: '_blank', rel: 'noopener' }, [h('img', { src: u, alt: 'Photo ' + (i + 1) })]); })));
+    if (o.resolution) sheet.appendChild(h('div', { class: 'desc', style: 'background:var(--green-soft);', text: 'Facilities note: ' + o.resolution }));
+
+    if (isStaff) {
+      var sel = h('select', { id: 'st-status' }, Object.keys(STATUS).map(function(k){ var op = h('option', { value: k, text: STATUS[k] }); if (k === st) op.selected = true; return op; }));
+      var urgSel = h('select', { id: 'st-urg' }, Object.keys(URG).map(function(k){ var op = h('option', { value: k, text: URG[k] }); if (k === (o.urgency || 'normal')) op.selected = true; return op; }));
+      var who = h('input', { type: 'text', id: 'st-who', maxlength: '80', placeholder: 'Name of who is handling it', value: o.assignedToName || '' });
+      var note = h('input', { type: 'text', id: 'st-note', maxlength: '400', placeholder: 'What was done? (the requester sees this when you mark it done)', value: o.resolution || '' });
+      var saved = h('span', { class: 'help', style: 'align-self:center;' });
+      sheet.appendChild(h('div', { class: 'staffbox' }, [
+        h('div', { class: 'f' }, [h('label', { text: 'Status' }), sel]), h('div', { class: 'f' }, [h('label', { text: 'Urgency' }), urgSel]),
+        h('div', { class: 'f wide' }, [h('label', { text: 'Assigned to' }), who]),
+        h('div', { class: 'f wide' }, [h('label', { text: 'Note when finished' }), note]),
+        h('div', { class: 'wide', style: 'display:flex;gap:10px;' }, [h('button', { type: 'button', class: 'btn primary', text: 'Save changes', onclick: function(ev){
+          var btn = ev.target; btn.disabled = true;
+          var patch = { status: sel.value, urgency: urgSel.value, assignedToName: who.value.trim().slice(0, 80), resolution: note.value.trim().slice(0, 400), updatedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedByUid: me.uid, updatedByName: (me.displayName || me.email || '').slice(0, 80) };
+          if (sel.value !== st) patch.statusChangedAt = firebase.firestore.FieldValue.serverTimestamp();
+          db.collection('workOrders').doc(o.id).update(patch).then(function(){
+            saved.textContent = 'Saved ✓';
+            if (patch.status !== st) RccAudit.log('workorder.status', 'workOrder', o.id, 'Work order "' + (o.title || '') + '": ' + STATUS[st] + ' → ' + STATUS[patch.status]);
+            else RccAudit.log('workorder.edit', 'workOrder', o.id, 'Updated work order "' + (o.title || '') + '"');
+          }).catch(function(e){ saved.textContent = 'Could not save: ' + e.message; }).then(function(){ btn.disabled = false; });
+        } }), saved]),
+      ]));
+    }
+
+    var thread = h('div', { class: 'thread' }, [h('h4', { text: 'Conversation' })]), list = h('div', { id: 'cmList' }, [h('div', { class: 'help', text: 'Loading…' })]);
+    thread.appendChild(list);
+    var ta = h('textarea', { id: 'cmText', maxlength: '2000', placeholder: isStaff ? 'Write to the requester…' : 'Add a note or ask a question…' });
+    var send = h('button', { type: 'button', class: 'btn primary', text: 'Send', onclick: function(){
+      var text = ta.value.trim(); if (!text) return; send.disabled = true;
+      db.collection('workOrders').doc(o.id).collection('comments').add({ text: text, authorUid: me.uid, authorName: (me.displayName || me.email || '').slice(0, 80), staff: isStaff && me.uid !== o.requesterUid, createdAt: firebase.firestore.FieldValue.serverTimestamp() })
+        .then(function(){ ta.value = ''; }).catch(function(e){ alert("Couldn't send that: " + e.message); }).then(function(){ send.disabled = false; });
+    } });
+    thread.appendChild(h('div', { class: 'reply' }, [ta, send]));
+    sheet.appendChild(thread);
+    commentsUnsub = db.collection('workOrders').doc(o.id).collection('comments').orderBy('createdAt').onSnapshot(function(s){
+      list.replaceChildren();
+      if (s.empty) { list.appendChild(h('div', { class: 'help', text: 'No messages yet.' })); return; }
+      s.docs.forEach(function(d){ var c = d.data(); list.appendChild(h('div', { class: 'msg-b' + (c.staff ? ' staff' : '') }, [h('div', { class: 'who', text: (c.authorName || 'Someone') + (c.staff ? ' · Facilities' : '') + ' · ' + when(c.createdAt) }), c.text])); });
+    }, function(){ list.replaceChildren(h('div', { class: 'help', text: 'Could not load the conversation.' })); });
+  }
+})();
+</script>
+</body>
+</html>

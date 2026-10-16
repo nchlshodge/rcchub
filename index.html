@@ -215,6 +215,7 @@
     { group: 'plan',  key: 'timeOff', name: 'Time Off Request',       desc: 'Request vacation, leave, or time away',         icon: '🌴', href: 'time-off.html', hideIfLocked: true },
     { group: 'plan',  key: 'requests', staff: 'staff', name: 'All Event Requests', desc: 'Every request, its progress, and notes',   icon: '📬', href: 'event-requests.html' },
     { group: 'plan',  key: 'timeline', staff: 'staff', name: 'Creative Timeline', desc: 'What needs a graphic, a post, or the calendar — soonest first', icon: '🗂️', href: 'queue-timeline.html' },
+    { group: 'plan',  key: 'workOrders', always: true, name: 'Report a Problem', desc: 'Something broken or needs cleaning? Tell facilities and follow it', icon: '🔧', href: 'work-orders.html' },
     { group: 'care',  key: 'bedside', name: 'Bedside',                desc: 'Care visits, prayer requests, and the prayer wall', icon: '🕊️', href: 'bedside/index.html' },
     { group: 'care',  key: 'incidentReport', name: 'Incident Report', desc: 'Report an injury, near miss, or property issue', icon: '📋', href: 'incident/index.html' },
     { group: 'fleet', key: 'vanRental', name: 'Van Usage',            desc: 'Request a van, check one out, or manage the fleet', icon: '🚐', href: 'van/index.html' },
@@ -294,7 +295,7 @@
   function accessFor(m, modules, roles, isAdmin) {
     if (m.always) return 'open';
     if (m.staff === 'staff') return (isAdmin || roles.graphics || roles.marketing) ? 'open' : 'hidden';
-    if (m.staff === 'admin') return (isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview || roles.clearances) ? 'open' : 'hidden';
+    if (m.staff === 'admin') return (isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview || roles.clearances || roles.facilities) ? 'open' : 'hidden';
     if (modules[m.key] === true) return 'open';
     return m.hideIfLocked ? 'hidden' : 'locked';
   }

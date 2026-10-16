@@ -7,12 +7,13 @@
   function linksFor(roles) {
     roles = roles || {};
     const staff = roles.isAdmin || roles.graphics || roles.marketing;
-    const anyAdmin = roles.isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview || roles.clearances;
+    const anyAdmin = roles.isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview || roles.clearances || roles.facilities;
     return [
       { key: 'home',     label: 'Home',              href: 'index.html',          show: true },
       { key: 'requests', label: 'Event requests',    href: 'event-requests.html', show: staff },
       { key: 'timeline', label: 'Creative timeline', href: 'queue-timeline.html', show: staff },
       { key: 'rooms',    label: 'Room map',          href: 'rooms.html',          show: true },
+      { key: 'workorders', label: 'Work orders',     href: 'work-orders.html',    show: true },
       { key: 'admin',    label: 'Admin',             href: 'admin.html',          show: anyAdmin },
     ].filter(l => l.show);
   }
