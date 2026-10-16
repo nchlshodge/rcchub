@@ -12,17 +12,17 @@
 <script src="room-logic.js"></script>
 
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap');
 
     :root {
-      --bg:         #f7f6f3;
+      --bg:         #f6f2ea;
       --bg-card:    #ffffff;
-      --bg-raised:  #f0ece4;
-      --border:     #e8e4dc;
+      --bg-raised:  #efe9dd;
+      --border:     #e9e3d7;
       --border-mid: rgba(0,0,0,0.14);
       --text:       #1a1a1a;
-      --text-mid:   #5c5650;
-      --text-soft:  #9e9890;
+      --text-mid:   #57514a;
+      --text-soft:  #857e73;
       --blue:       #2557b8;
       --blue-dim:   rgba(37,87,184,0.08);
       --blue-glow:  rgba(37,87,184,0.20);
@@ -30,7 +30,7 @@
       --green-dim:  rgba(46,122,82,0.10);
       --red:        #a03030;
       --red-dim:    rgba(160,48,48,0.10);
-      --radius:     14px;
+      --radius:     18px;
       --radius-sm:  8px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -189,6 +189,76 @@
       position: fixed; top: 0; left: 0; right: 0; z-index: 300;
     }
     .banner.show { display: block; }
+  
+    /* ===== RCC shared look — layered over the admin styles above ===== */
+    :root {
+      --glass: rgba(246,242,234,.84);
+      --shadow-1: 0 1px 2px rgba(60,40,10,.06), 0 6px 18px rgba(60,40,10,.06);
+      --shadow-2: 0 2px 4px rgba(60,40,10,.08), 0 14px 34px rgba(60,40,10,.12);
+      --ease: cubic-bezier(.2,.8,.2,1);
+      --blue-dim: #e8eefb;
+      --blue-glow: #c9d7f4;
+    }
+    body { background: radial-gradient(1100px 420px at 50% -180px, #fff9ea 0%, rgba(255,249,234,0) 70%), var(--bg); }
+    h1, h2, h3, .card-title, .section-title, .login-title { font-weight: 500; letter-spacing: -.01em; }
+    :focus-visible { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; border-radius: 6px; }
+    header { background: var(--glass); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); height: 64px; }
+    .logo { font-size: 23px; font-weight: 500; }
+    .header-right a { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255,255,255,.6); font-weight: 500; transition: background .2s, color .2s; }
+    .header-right a:hover { background: #fff; color: var(--blue); }
+    #signOutBtn { border-radius: 999px; padding: 6px 14px; transition: background .2s, color .2s; }
+    #signOutBtn:hover { background: #fff; color: var(--text-mid); }
+
+    /* two-level navigation as soft pills */
+    nav#groupNav { background: transparent; border-bottom: none; padding: 14px 16px 0; gap: 6px; max-width: 960px; margin: 0 auto; scrollbar-width: none; }
+    nav#groupNav::-webkit-scrollbar { display: none; }
+    .gtab { border-bottom: none; border-radius: 999px; padding: 9px 18px; font-weight: 500; transition: background .2s var(--ease), color .2s; }
+    .gtab.active { background: var(--blue); color: #fff; box-shadow: 0 4px 14px rgba(37,87,184,.28); }
+    .gtab:hover:not(.active) { background: rgba(37,87,184,.08); color: var(--blue-ink, var(--blue)); }
+    .gtab .badge-count { background: rgba(255,255,255,.28); color: #fff; }
+    .gtab:not(.active) .badge-count { background: var(--red-dim); color: var(--red); }
+    #subNav { background: transparent; border-bottom: none; padding: 10px 16px 0; gap: 4px; max-width: 960px; margin: 0 auto; scrollbar-width: none; }
+    #subNav::-webkit-scrollbar { display: none; }
+    #subNav .stab { border-bottom: none; border-radius: 999px; padding: 7px 14px; font-weight: 500; }
+    #subNav .stab.active { background: #fff; color: var(--blue); box-shadow: 0 1px 3px rgba(60,40,10,.15); }
+    #subNav .stab:hover:not(.active) { background: rgba(255,255,255,.7); }
+
+    main { max-width: 960px; padding: 24px 16px 90px; }
+    .section-title { font-size: 26px; border-bottom: none; padding-bottom: 0; margin-bottom: 18px; }
+    .embed-bar { padding: 0 4px; margin-bottom: 12px; }
+    .embed-frame { border-radius: 18px; box-shadow: var(--shadow-1); border: 1px solid var(--border); }
+
+    .subnav { background: var(--bg-raised); border-bottom: none; border-radius: 999px; padding: 4px; gap: 4px; display: inline-flex; margin-bottom: 18px; }
+    .subtab { border-bottom: none; border-radius: 999px; padding: 8px 16px; font-weight: 500; transition: background .2s var(--ease), color .2s; }
+    .subtab.active { background: #fff; color: var(--blue); box-shadow: 0 1px 3px rgba(60,40,10,.15); }
+
+    .card { border-radius: 18px; padding: 18px 20px; box-shadow: var(--shadow-1); transition: box-shadow .3s var(--ease), border-color .2s; }
+    a.card { color: var(--text); }
+    a.card .card-title { color: var(--text); font-family: 'Playfair Display', serif; }
+    a.card:hover { box-shadow: var(--shadow-2); border-color: var(--blue); }
+    .card-title { font-size: 19px; }
+    .tag { border-radius: 999px; }
+    .badge-count { border-radius: 999px; }
+    .btn { border-radius: 999px; padding: 9px 16px; transition: transform .15s var(--ease), background .2s, box-shadow .2s; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-approve:hover { background: rgba(46,122,82,.18); }
+    .btn-hide:hover { background: rgba(160,48,48,.16); }
+    input[type=text], input[type=email], input[type=date], select, textarea { border-radius: 12px !important; border-color: var(--border-2, #d9d1c1) !important; background: #fcfbf8; transition: border-color .2s, box-shadow .2s, background .2s; }
+    input[type=text]:focus, input[type=email]:focus, input[type=date]:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue) !important; background: #fff; box-shadow: 0 0 0 4px rgba(37,87,184,.12); }
+    .empty-state { padding: 56px 20px; }
+    #googleSignInBtn { border-radius: 999px; box-shadow: var(--shadow-1); transition: transform .15s var(--ease), box-shadow .2s; }
+    #googleSignInBtn:hover { transform: translateY(-1px); box-shadow: var(--shadow-2); }
+    .banner { border-radius: 0 0 16px 16px; }
+
+    @media (max-width: 640px) {
+      header { padding: 0 14px; }
+      .header-right { gap: 8px; }
+      .header-right a { padding: 5px 10px; white-space: nowrap; }
+      .logo span { display: none; }
+      main { padding: 18px 12px 80px; }
+      .gtab { padding: 8px 14px; font-size: 13.5px; }
+      .section-title { font-size: 23px; }
+    }
   </style>
 </head>
 <body>
