@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RCC · Ministry Apps</title>
+  <title>RCC · Ministry Hub</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
@@ -13,414 +13,149 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="room-logic.js"></script>
+  <script src="rcc-shell.js"></script>
+  <link rel="stylesheet" href="rcc-ui.css">
 
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500;600&display=swap');
-
-    :root {
-      --bg:         #f7f6f3;
-      --bg-card:    #ffffff;
-      --bg-raised:  #f0ece4;
-      --border:     #e8e4dc;
-      --border-mid: rgba(0,0,0,0.14);
-      --text:       #1a1a1a;
-      --text-mid:   #5c5650;
-      --text-soft:  #9e9890;
-      --blue:       #2557b8;
-      --blue-dim:   rgba(37,87,184,0.08);
-      --blue-glow:  rgba(37,87,184,0.20);
-      --gold:       #b5892a;
-      --gold-dim:   rgba(181,137,42,0.10);
-      --gold-glow:  rgba(181,137,42,0.22);
-      --green:      #2e7a52;
-      --green-dim:  rgba(46,122,82,0.10);
-      --red:        #a03030;
-      --red-dim:    rgba(160,48,48,0.10);
-      --radius:     14px;
-      --radius-sm:  8px;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      font-size: 16px;
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ── HEADER ── */
-    header {
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
-      padding: 0 24px;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .logo {
-      font-family: 'Playfair Display', serif;
-      font-size: 22px;
-      font-weight: 400;
-      color: var(--blue);
-      letter-spacing: -0.2px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .logo img { height: 26px; width: auto; display: block; }
-    .logo span {
-      font-family: 'Inter', sans-serif;
-      font-size: 13px;
-      font-weight: 400;
-      color: var(--text-soft);
-      margin-left: 8px;
-    }
-    #userInfo { display: flex; align-items: center; gap: 10px; }
-    #userName { font-size: 14px; color: var(--text-mid); }
-    #signOutBtn {
-      background: transparent;
-      color: var(--text-soft);
-      border: 1px solid var(--border);
-      padding: 6px 14px;
-      border-radius: var(--radius-sm);
-      font-size: 13px;
-      cursor: pointer;
-      font-family: 'Inter', sans-serif;
-    }
-    #signOutBtn:hover { border-color: var(--border-mid); color: var(--text-mid); }
-
-    main {
-      max-width: 640px;
-      margin: 0 auto;
-      padding: 48px 20px 100px;
-    }
-
-    /* ── LOGIN ── */
-    #loginScreen {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      text-align: center;
-      padding: 40px 24px;
-    }
-    .login-mark {
-      width: 108px; height: 108px;
-      display: flex; align-items: center; justify-content: center;
-      margin: 0 auto 20px;
-    }
-    .login-mark img { width: 100%; height: 100%; object-fit: contain; }
-    .login-title {
-      font-family: 'Playfair Display', serif;
-      font-size: 34px;
-      font-weight: 400;
-      color: var(--text);
-      margin-bottom: 8px;
-    }
-    .login-title em { color: var(--blue); font-style: normal; }
-    .login-sub {
-      font-size: 15px;
-      color: var(--text-mid);
-      margin-bottom: 40px;
-      max-width: 300px;
-      line-height: 1.7;
-    }
-    .auth-buttons { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; }
-    #googleSignInBtn {
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      background: #fff;
-      color: #374151;
-      border: 1px solid #d1cdc4;
-      border-radius: var(--radius);
-      padding: 15px 24px;
-      font-size: 15px;
-      font-weight: 500;
-      font-family: 'Inter', sans-serif;
-      cursor: pointer;
-      transition: border-color .15s, box-shadow .15s;
-    }
-    #googleSignInBtn:hover { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-dim); }
-    .email-toggle {
-      background: none; border: none; color: var(--text-soft);
-      font-size: 13px; cursor: pointer; margin-top: 6px; text-decoration: underline;
-      font-family: 'Inter', sans-serif;
-    }
-    .email-form { display: none; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; margin-top: 4px; }
+    /* ---------- sign-in extras ---------- */
+    .rcc-login .login-card { display: flex; flex-direction: column; align-items: center; gap: 14px; width: min(360px, 100%); }
+    .rcc-login .sub-btn { background: none; border: none; box-shadow: none; padding: 4px; font-size: 13.5px; color: var(--ink-3); cursor: pointer; }
+    .rcc-login .sub-btn:hover { color: var(--blue); transform: none; box-shadow: none; }
+    .email-form { display: none; flex-direction: column; gap: 10px; width: 100%; animation: fade .3s var(--ease) both; }
     .email-form.open { display: flex; }
-    .email-form input {
-      width: 100%; padding: 13px 15px;
-      border: 1px solid #d1cdc4; border-radius: var(--radius-sm);
-      font-size: 15px; font-family: 'Inter', sans-serif;
-    }
-    .email-form input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-dim); }
-    .email-form button {
-      background: var(--blue); color: #fff; border: none; border-radius: var(--radius-sm);
-      padding: 13px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif;
-    }
-    .email-form-links { display: flex; justify-content: space-between; font-size: 12px; margin-top: 2px; }
-    .email-form-links button { background: none; border: none; color: var(--text-soft); cursor: pointer; text-decoration: underline; padding: 0; font-family: 'Inter', sans-serif; }
-    .auth-error { font-size: 13px; color: var(--red); max-width: 300px; display: none; }
+    .email-form input { font-family: inherit; font-size: 15px; padding: 12px 14px; border: 1px solid var(--line-2); border-radius: var(--radius-md); background: #fff; }
+    .email-form input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 4px rgba(37,87,184,.12); }
+    .email-form .go { justify-content: center; background: var(--blue); border-color: var(--blue); color: #fff; }
+    .email-form .links { display: flex; justify-content: space-between; }
+    .email-form .links button { background: none; border: none; box-shadow: none; padding: 2px; font-size: 13px; color: var(--blue); cursor: pointer; }
+    .auth-error { display: none; color: var(--red); font-size: 13.5px; max-width: 340px; }
+    .login-extra { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 6px; }
+    .login-extra a { color: var(--ink-2); font-size: 14px; text-decoration: none; padding: 9px 18px; border: 1px dashed var(--line-2); border-radius: 999px; }
+    .login-extra a:hover { background: #fff; color: var(--blue); }
 
-    .no-login-needed { width: 100%; max-width: 300px; margin-top: 8px; }
-    .no-login-divider {
-      display: flex; align-items: center; text-align: center;
-      color: var(--text-soft); font-size: 12px; margin: 18px 0;
-    }
-    .no-login-divider::before, .no-login-divider::after {
-      content: ''; flex: 1; border-bottom: 1px solid var(--border);
-    }
-    .no-login-divider span { padding: 0 12px; }
-    .incident-quick-link {
-      display: block;
-      width: 100%;
-      text-align: center;
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 20px;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text-mid);
-      text-decoration: none;
-      transition: border-color .15s, box-shadow .15s;
-    }
-    .incident-quick-link:hover { border-color: var(--red); box-shadow: 0 0 0 3px rgba(160,48,48,0.08); }
+    /* ---------- home ---------- */
+    .greet { animation: rise .5s var(--ease) both; margin-bottom: 26px; }
+    .greet h1 { font-size: clamp(32px, 5vw, 48px); margin-bottom: 8px; }
+    .greet p { color: var(--ink-2); font-size: 16.5px; }
 
-    .share-link-btn {
-      display: block;
-      width: 100%;
-      background: none;
-      border: none;
-      color: var(--blue);
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      text-align: center;
-      margin-top: 14px;
-      padding: 4px;
-      font-family: 'Inter', sans-serif;
-    }
-    .share-link-btn:hover { text-decoration: underline; }
+    .needs { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-bottom: 38px; animation: rise .5s .06s var(--ease) both; }
+    .need { --tone: var(--blue); display: flex; align-items: center; gap: 16px; padding: 16px 20px; text-decoration: none; color: var(--ink);
+      background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-1); transition: transform .25s var(--ease), box-shadow .25s; position: relative; overflow: hidden; }
+    .need::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--tone); }
+    .need:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); }
+    .need strong { font-family: 'Playfair Display', serif; font-weight: 500; font-size: 40px; line-height: 1; color: var(--tone); min-width: 44px; text-align: center; }
+    .need span { font-size: 14px; color: var(--ink-2); line-height: 1.35; }
+    .need span b { display: block; color: var(--ink); font-size: 15px; font-weight: 600; }
+    .need.red { --tone: var(--red); } .need.gold { --tone: var(--gold); }
+    .caught-up { grid-column: 1 / -1; display: inline-flex; align-items: center; gap: 8px; color: var(--green-ink); background: var(--green-soft); padding: 10px 18px; border-radius: 999px; font-size: 14px; font-weight: 600; width: fit-content; }
 
-    /* ── DASHBOARD ── */
-    .welcome {
-      margin-bottom: 32px;
+    .sect { margin-bottom: 36px; }
+    .sect-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+    .sect-head h2 { font-size: 24px; }
+    .sect-head p { color: var(--ink-3); font-size: 13.5px; }
+    .sect-head .rail { flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-2), transparent); }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 16px; }
+    .tile {
+      --tone: var(--blue); --soft: var(--blue-soft);
+      display: flex; align-items: center; gap: 16px; text-align: left; width: 100%; font-family: inherit; text-decoration: none; color: var(--ink); cursor: pointer;
+      background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-1);
+      transition: transform .28s var(--ease), box-shadow .28s var(--ease), border-color .2s; animation: rise .5s var(--ease) both;
     }
-    .welcome-title {
-      font-family: 'Playfair Display', serif;
-      font-size: 26px;
-      font-weight: 400;
-      margin-bottom: 4px;
-    }
-    .welcome-sub { font-size: 14px; color: var(--text-soft); }
+    .tile:hover { transform: translateY(-4px); box-shadow: var(--shadow-2); border-color: var(--tone); }
+    .tile .ico { width: 54px; height: 54px; border-radius: 16px; background: var(--soft); display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; transition: transform .3s var(--ease); }
+    .tile:hover .ico { transform: scale(1.08) rotate(-3deg); }
+    .tile .txt { flex: 1; min-width: 0; }
+    .tile .txt b { display: block; font-family: 'Playfair Display', serif; font-weight: 500; font-size: 19px; line-height: 1.25; }
+    .tile .txt small { display: block; margin-top: 3px; font-size: 13px; color: var(--ink-3); line-height: 1.4; }
+    .tile .go { color: var(--ink-3); font-size: 18px; transition: transform .25s var(--ease), color .2s; }
+    .tile:hover .go { transform: translateX(4px); color: var(--tone); }
+    .tile.locked { background: transparent; border-style: dashed; box-shadow: none; }
+    .tile.locked .ico { filter: grayscale(1); opacity: .5; }
+    .tile.locked .txt b { color: var(--ink-3); }
+    .tile.locked:hover { transform: none; box-shadow: none; border-color: var(--blue); }
+    .lock { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; color: var(--ink-3); background: var(--bg-soft); padding: 2px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 2px; }
+    .t-blue  { --tone: var(--blue);  --soft: var(--blue-soft); }
+    .t-gold  { --tone: var(--gold);  --soft: var(--gold-soft); }
+    .t-green { --tone: var(--green); --soft: var(--green-soft); }
+    .t-red   { --tone: var(--red);   --soft: var(--red-soft); }
+    .t-gray  { --tone: var(--ink-2); --soft: var(--bg-soft); }
 
-    .module-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
+    .foot { display: flex; flex-wrap: wrap; gap: 10px 22px; justify-content: center; padding-top: 14px; border-top: 1px solid var(--line); }
+    .foot button { background: none; border: none; color: var(--ink-3); font-size: 14px; cursor: pointer; padding: 6px 2px; transition: color .2s; }
+    .foot button:hover { color: var(--blue); }
 
-    .module-card {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px 20px;
-      text-decoration: none;
-      color: inherit;
-      transition: border-color .15s, transform .15s;
-      width: 100%;
-      text-align: left;
-      font-size: inherit;
-    }
-    .module-card:hover { border-color: var(--blue-glow); transform: translateY(-1px); }
-    .module-card-disabled {
-      font-family: inherit;
-      cursor: pointer;
-      opacity: 0.75;
-      border-style: dashed;
-    }
-    .module-card-disabled:hover { border-color: var(--text-soft); opacity: 1; transform: none; }
-    .locked-tag {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-soft);
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-      margin-left: 6px;
-    }
-
-    .module-icon {
-      width: 46px; height: 46px;
-      border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 21px;
-      flex-shrink: 0;
-    }
-    .module-icon.bedside      { background: var(--gold-dim); }
-    .module-icon.incident     { background: rgba(160,48,48,0.08); }
-    .module-icon.vanrental    { background: rgba(46,90,122,0.08); }
-
-    .module-info { flex: 1; min-width: 0; }
-    .module-name {
-      font-family: 'Playfair Display', serif;
-      font-size: 18px;
-      font-weight: 400;
-      margin-bottom: 2px;
-    }
-    .module-desc { font-size: 13px; color: var(--text-soft); }
-    .module-arrow { color: var(--text-soft); font-size: 18px; flex-shrink: 0; }
-
-    .request-access-link {
-      display: block;
-      width: 100%;
-      background: none;
-      border: none;
-      color: var(--text-soft);
-      font-size: 13px;
-      text-decoration: underline;
-      cursor: pointer;
-      text-align: center;
-      margin-top: 24px;
-      font-family: 'Inter', sans-serif;
-    }
-    .request-access-link:hover { color: var(--text-mid); }
-
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 200;
-      align-items: flex-end;
-      justify-content: center;
-    }
-    .modal-overlay.open { display: flex; }
-    .modal {
-      background: var(--bg-card);
-      border-radius: var(--radius) var(--radius) 0 0;
-      border: 1px solid var(--border-mid);
-      border-bottom: none;
-      padding: 24px 20px 40px;
-      width: 100%;
-      max-width: 480px;
-      max-height: 85vh;
-      overflow-y: auto;
-    }
-    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-    .modal-title { font-family: 'Playfair Display', serif; font-size: 19px; color: var(--text); }
-    .modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-soft); line-height: 1; padding: 4px; }
-    .modal-sub { font-size: 13px; color: var(--text-soft); margin-bottom: 18px; line-height: 1.6; }
-    .modal input, .modal textarea {
-      width: 100%; padding: 12px 14px; margin-bottom: 14px;
-      border: 1px solid #d1cdc4; border-radius: 8px; font-size: 15px; font-family: 'Inter', sans-serif;
-    }
-    .modal input:focus, .modal textarea:focus { outline: none; border-color: var(--blue); }
-    .modal label { display: block; font-size: 13px; font-weight: 500; color: var(--text-mid); margin-bottom: 6px; }
+    /* ---------- request-access modal ---------- */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(35,25,10,.4); backdrop-filter: blur(3px); z-index: 80; display: none; align-items: center; justify-content: center; padding: 20px; }
+    .modal-overlay.open { display: flex; animation: fade .25s both; }
+    .modal { background: var(--bg); border-radius: 22px; width: min(480px, 100%); max-height: 92vh; overflow-y: auto; padding: 26px; box-shadow: var(--shadow-3); display: flex; flex-direction: column; gap: 6px; animation: rise .35s var(--ease) both; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; }
+    .modal-title { font-family: 'Playfair Display', serif; font-size: 24px; }
+    .modal-close { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--bg-soft); font-size: 20px; cursor: pointer; }
+    .modal-sub { color: var(--ink-2); font-size: 14px; margin-bottom: 8px; }
+    .modal label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin-top: 8px; }
+    .modal input[type=text], .modal input[type=email], .modal textarea { font-family: inherit; font-size: 15px; padding: 11px 13px; border: 1px solid var(--line-2); border-radius: var(--radius-md); background: #fff; width: 100%; }
     .modal textarea { min-height: 70px; resize: vertical; }
-    .module-checks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-    .module-check { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 400; color: var(--text); cursor: pointer; }
-    .module-check input { width: auto; margin: 0; }
-    .btn-submit-request {
-      width: 100%; background: var(--blue); color: #fff; border: none; border-radius: 10px;
-      padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--text-soft);
-    }
-    .empty-icon {
-      width: 52px; height: 52px;
-      border-radius: 50%;
-      background: var(--bg-raised);
-      border: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px;
-      margin: 0 auto 16px;
-    }
-    .empty-text { font-size: 16px; color: var(--text-mid); margin-bottom: 6px; font-family: 'Playfair Display', serif; }
-    .empty-sub { font-size: 14px; color: var(--text-soft); }
-
-    .loading { text-align: center; padding: 60px; color: var(--text-soft); font-size: 15px; }
-
-    @media (max-width: 480px) {
-      .login-title { font-size: 28px; }
-      header { padding: 0 16px; }
-      #userName { display: none; }
-    }
+    .modal input:focus, .modal textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 4px rgba(37,87,184,.12); }
+    .module-checks { display: flex; flex-wrap: wrap; gap: 8px; }
+    .modal .module-check { display: inline-flex; align-items: center; gap: 7px; text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 500; color: var(--ink-2); margin: 0; background: #fff; border: 1px solid var(--line-2); padding: 8px 14px; border-radius: 999px; cursor: pointer; }
+    .btn-submit-request { margin-top: 14px; background: var(--blue); color: #fff; border: none; border-radius: 999px; padding: 13px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background .2s; }
+    .btn-submit-request:hover { background: var(--blue-ink); }
+    .btn-submit-request:disabled { opacity: .6; }
   </style>
 </head>
 <body>
 
 <!-- LOGIN -->
-<div id="loginScreen">
-  <div class="login-mark"><img src="assets/rcc-logo.png" alt="RCC — Love God. Love People."></div>
-  <div class="login-title">RCC <em>Ministry Apps</em></div>
-  <p class="login-sub">One sign-in for Bedside, incident reporting, and van scheduling.</p>
+<div id="loginScreen" class="rcc-login" style="display:none;">
+  <img src="assets/rcc-logo.png" alt="RCC — Love God. Love People.">
+  <h1>RCC Ministry Hub</h1>
+  <p>One sign-in for care, requests, rooms, and everything in between.</p>
 
-  <div class="auth-buttons">
-    <button id="googleSignInBtn">
+  <div class="login-card">
+    <button id="googleSignInBtn" type="button">
       <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
       Sign in with Google
     </button>
-    <button class="email-toggle" id="emailToggle">or use email &amp; password</button>
+    <button class="sub-btn" id="emailToggle" type="button">or use email &amp; password</button>
 
     <div class="email-form" id="emailForm">
       <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email">
       <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password">
-      <button id="emailSignInBtn">Sign in</button>
-      <div class="email-form-links">
-        <button id="emailSignUpBtn">Create an account</button>
-        <button id="emailResetBtn">Forgot password?</button>
+      <button id="emailSignInBtn" class="go" type="button">Sign in</button>
+      <div class="links">
+        <button id="emailSignUpBtn" type="button">Create an account</button>
+        <button id="emailResetBtn" type="button">Forgot password?</button>
       </div>
     </div>
     <div class="auth-error" id="authError"></div>
   </div>
 
-  <div class="no-login-needed">
-    <div class="no-login-divider"><span>or</span></div>
-    <a href="incident/index.html" class="incident-quick-link">
-      📋 Report an incident — no sign-in needed
-    </a>
-    <button id="shareLoginBtn" class="share-link-btn">📤 Share this app</button>
+  <div class="login-extra">
+    <a href="incident/index.html">📋 Report an incident — no sign-in needed</a>
+    <button id="shareLoginBtn" class="sub-btn" type="button">📤 Share this app</button>
   </div>
 </div>
 
 <!-- APP -->
 <div id="appShell" style="display:none;">
-  <header>
-    <div class="logo"><img src="assets/rcc-logo-plain.png" alt="RCC">RCC <span>· Ministry Apps</span></div>
-    <div id="userInfo">
-      <span id="userName"></span>
-      <button id="signOutBtn">Sign out</button>
-    </div>
-  </header>
+  <header id="rccNav"></header>
 
-  <main>
-    <div class="welcome">
-      <div class="welcome-title" id="welcomeTitle">Welcome</div>
-      <div class="welcome-sub">Choose where you'd like to go.</div>
-    </div>
+  <main class="page">
+    <section class="greet">
+      <span class="eyebrow" id="today"></span>
+      <h1 id="welcomeTitle">Welcome</h1>
+      <p id="welcomeSub">Pick up where you left off, or start something new.</p>
+    </section>
 
-    <div id="moduleGrid" class="module-grid">
-      <div class="loading">Loading your apps...</div>
-    </div>
+    <div id="needsRow" class="needs" hidden></div>
 
-    <button id="openRequestModal" class="request-access-link">Request access for someone else →</button>
-    <button id="shareHomeBtn" class="share-link-btn">📤 Share this app with someone</button>
+    <div id="moduleGrid"><div class="empty">Loading your apps…</div></div>
+
+    <div class="foot">
+      <button id="openRequestModal" type="button">Request access for someone else →</button>
+      <button id="shareHomeBtn" type="button">📤 Share this app</button>
+    </div>
   </main>
 </div>
 
@@ -428,7 +163,7 @@
   <div class="modal">
     <div class="modal-header">
       <div class="modal-title">Request App Access</div>
-      <button class="modal-close" id="closeRequestModal">×</button>
+      <button class="modal-close" id="closeRequestModal" type="button" aria-label="Close">×</button>
     </div>
     <p class="modal-sub">Know someone who needs access to one of these apps? Let an admin know and they'll set it up.</p>
 
@@ -442,12 +177,13 @@
       <label class="module-check"><input type="checkbox" value="bedside"> Bedside</label>
       <label class="module-check"><input type="checkbox" value="incidentReport"> Incident Report</label>
       <label class="module-check"><input type="checkbox" value="vanRental"> Van Usage</label>
+      <label class="module-check" id="intramuralCheck" hidden><input type="checkbox" value="intramural"> Intramural Sports</label>
     </div>
 
     <label>Note (optional)</label>
     <textarea id="reqNote" placeholder="Any context that would help — e.g. their role, why they need it"></textarea>
 
-    <button class="btn-submit-request" id="submitRequestBtn">Send Request</button>
+    <button class="btn-submit-request" id="submitRequestBtn" type="button">Send Request</button>
   </div>
 </div>
 
@@ -465,62 +201,44 @@
   const db   = firebase.firestore();
 
   // ── MODULE REGISTRY ──
-  // To add a module for another church/org later: extend this list and
-  // gate visibility off users/{uid}.modules the same way.
+  // Everything on the home page lives here. `key` gates on users/{uid}.modules;
+  // `staff: true` tiles are not module-gated — they follow the person's roles.
+  //   hideIfLocked  — staff-only tools stay invisible to people without access
+  //   probe         — the tile only appears once that page actually exists on the site
+  //                   (Intramural / Benevolence light up by themselves when they are published)
+  const GROUPS = [
+    { id: 'plan',   title: 'Plan & request',        sub: 'Events, rooms, and time away', tone: 't-blue' },
+    { id: 'care',   title: 'Care & safety',         sub: 'Look after people',            tone: 't-green' },
+    { id: 'fleet',  title: 'Vehicles & activities', sub: 'Get around, get together',     tone: 't-gold' },
+    { id: 'manage', title: 'Manage',                sub: 'For admins and team leads',    tone: 't-gray' },
+  ];
   const MODULES = [
-    {
-      key: 'bedside',
-      name: 'Bedside',
-      desc: 'Care visits, prayer requests, and the prayer wall',
-      icon: '🕊️',
-      iconClass: 'bedside',
-      href: 'bedside/index.html',
-    },
-    {
-      key: 'incidentReport',
-      name: 'Incident Report',
-      desc: 'Report an injury, near miss, or property issue',
-      icon: '📋',
-      iconClass: 'incident',
-      href: 'incident/index.html',
-    },
-    {
-      key: 'vanRental',
-      name: 'Van Usage',
-      desc: 'Request a van, check one out, or manage the fleet',
-      icon: '🚐',
-      iconClass: 'vanrental',
-      href: 'van/index.html',
-    },
-    {
-      key: 'eventRequest',
-      name: 'Event Request',
-      desc: 'Request an event, graphic, or facilities use',
-      icon: '🎨',
-      iconClass: 'incident',
-      href: 'event-request/index.html',
-    },
-    {
-      key: 'timeOff',
-      name: 'Time Off Request',
-      desc: 'Request vacation, leave, or time away from work',
-      icon: '🌴',
-      iconClass: 'vanrental',
-      href: 'time-off.html',
-      hideIfLocked: true, // staff-only tool — no reason for a random congregation member to even know this exists
-    },
+    { group: 'plan',  key: 'eventRequest', name: 'Event Request',     desc: 'Request an event, graphic, or facilities use', icon: '🎨', href: 'event-request/index.html' },
+    { group: 'plan',  key: 'rooms',  always: true, name: 'Room Map',  desc: 'See which rooms are free, held, or booked',    icon: '🗺️', href: 'rooms.html' },
+    { group: 'plan',  key: 'timeOff', name: 'Time Off Request',       desc: 'Request vacation, leave, or time away',         icon: '🌴', href: 'time-off.html', hideIfLocked: true },
+    { group: 'plan',  key: 'requests', staff: 'staff', name: 'All Event Requests', desc: 'Every request, its progress, and notes',   icon: '📬', href: 'event-requests.html' },
+    { group: 'plan',  key: 'timeline', staff: 'staff', name: 'Creative Timeline', desc: 'What needs a graphic, a post, or the calendar — soonest first', icon: '🗂️', href: 'queue-timeline.html' },
+    { group: 'care',  key: 'bedside', name: 'Bedside',                desc: 'Care visits, prayer requests, and the prayer wall', icon: '🕊️', href: 'bedside/index.html' },
+    { group: 'care',  key: 'incidentReport', name: 'Incident Report', desc: 'Report an injury, near miss, or property issue', icon: '📋', href: 'incident/index.html' },
+    { group: 'care',  key: 'benevolence', name: 'Benevolence Fund',   desc: 'Review benevolence fund applications',         icon: '🤝', href: 'admin.html?section=benevolence', hideIfLocked: true, probe: 'benevolence/admin.html' },
+    { group: 'fleet', key: 'vanRental', name: 'Van Usage',            desc: 'Request a van, check one out, or manage the fleet', icon: '🚐', href: 'van/index.html' },
+    { group: 'fleet', key: 'intramural', name: 'Intramural Sports',   desc: 'Sign up, see the schedule, and follow your team', icon: '🏐', href: 'intramural/index.html', probe: 'intramural/index.html' },
+    { group: 'manage', key: 'admin', staff: 'admin', name: 'Admin',    desc: 'Event requests, rooms, Bedside, vans, and access', icon: '🛠️', href: 'admin.html' },
   ];
 
   let currentUser = null;
+  let probeResults = {};      // page path -> true/false
+  let lastUserData = null;
 
   auth.onAuthStateChanged(async user => {
     if (user) {
       currentUser = user;
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('appShell').style.display = 'block';
-      document.getElementById('userName').textContent = user.displayName || user.email;
-      document.getElementById('welcomeTitle').textContent =
-        'Welcome' + (user.displayName ? ', ' + user.displayName.split(' ')[0] : '');
+      const first = user.displayName ? user.displayName.split(' ')[0] : '';
+      const h = new Date().getHours();
+      document.getElementById('welcomeTitle').textContent = (h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening') + (first ? ', ' + first : '');
+      document.getElementById('today').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
       await ensureUserDoc(user);
       loadModules(user.uid);
@@ -540,7 +258,7 @@
     const doc = await ref.get();
 
     if (!doc.exists) {
-      let modules = { bedside: false, incidentReport: true, vanRental: true, eventRequest: true };
+      let modules = { bedside: false, incidentReport: true, vanRental: true, eventRequest: true, intramural: true };
       if (user.email) {
         const inviteRef = db.collection('hubInvites').doc(user.email.toLowerCase());
         const inviteDoc = await inviteRef.get();
@@ -558,85 +276,114 @@
       }, { merge: true });
     } else if (!doc.data().modules) {
       // Existing user from before the hub existed — default them to the
-      // two modules that predate Van Rental so nobody loses access.
+      // modules that predate the newer ones so nobody loses access.
       await ref.set({
-        modules: { bedside: false, incidentReport: true, vanRental: true, eventRequest: true }
+        modules: { bedside: false, incidentReport: true, vanRental: true, eventRequest: true, intramural: true }
       }, { merge: true });
     }
   }
 
   function loadModules(uid) {
     db.collection('users').doc(uid).onSnapshot(doc => {
-      const data = doc.data() || {};
-      const modules = data.modules || {};
-      const roles = data.roles || {};
-      renderModules(modules, data.isAdmin === true, roles);
+      lastUserData = doc.data() || {};
+      const roles = Object.assign({}, lastUserData.roles || {}, { isAdmin: lastUserData.isAdmin === true });
+      RccShell.render(document.getElementById('rccNav'), { active: 'home', user: currentUser, roles, onSignOut: () => auth.signOut() });
+      renderModules();
+      watchNeeds(roles);
     }, err => {
       document.getElementById('moduleGrid').innerHTML =
-        '<div class="empty-state"><div class="empty-text">Could not load your apps.</div></div>';
+        '<div class="empty"><b>Could not load your apps</b>Please refresh and try again.</div>';
       console.error(err);
     });
   }
 
-  function renderModules(modules, isAdmin, roles) {
-    const hasWorkQueueAccess = roles && (roles.graphics || roles.marketing);
-    const container = document.getElementById('moduleGrid');
+  // Pages that may not be on the site yet (Intramural, Benevolence): look once, show the tile only if present.
+  function probePages() {
+    MODULES.filter(m => m.probe && !(m.probe in probeResults)).forEach(m => {
+      probeResults[m.probe] = false;
+      fetch(m.probe, { method: 'HEAD' }).then(r => { probeResults[m.probe] = r.ok; if (r.ok) renderModules(); }).catch(() => {});
+    });
+  }
 
-    // Every module always shows a tile — enabled ones link straight
-    // in, disabled ones render grayed out and, when clicked, send an
-    // access request to admins instead of navigating anywhere.
-    // EXCEPTION: modules flagged hideIfLocked (e.g. Time Off — a
-    // staff-only tool) are skipped entirely when the person doesn't
-    // have access, rather than showing as a discoverable locked tile.
-    let html = MODULES.filter(m => modules[m.key] === true || !m.hideIfLocked).map(m => {
-      const on = modules[m.key] === true;
-      if (on) {
-        return `
-        <a class="module-card" href="${m.href}">
-          <div class="module-icon ${m.iconClass}">${m.icon}</div>
-          <div class="module-info">
-            <div class="module-name">${m.name}</div>
-            <div class="module-desc">${m.desc}</div>
-          </div>
-          <div class="module-arrow">→</div>
-        </a>`;
-      }
-      return `
-      <button class="module-card module-card-disabled" onclick="requestAccessTo('${m.key}','${m.name}')">
-        <div class="module-icon ${m.iconClass}" style="opacity:0.4;">${m.icon}</div>
-        <div class="module-info">
-          <div class="module-name" style="color: var(--text-soft);">${m.name} <span class="locked-tag">🔒 Locked</span></div>
-          <div class="module-desc">Tap to request access from an admin</div>
-        </div>
-        <div class="module-arrow">→</div>
-      </button>`;
+  function accessFor(m, modules, roles, isAdmin) {
+    if (m.always) return 'open';
+    if (m.staff === 'staff') return (isAdmin || roles.graphics || roles.marketing) ? 'open' : 'hidden';
+    if (m.staff === 'admin') return (isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview || roles.commissioner || roles.benevolence) ? 'open' : 'hidden';
+    if (m.probe && probeResults[m.probe] !== true) return 'hidden';
+    if (modules[m.key] === true) return 'open';
+    return m.hideIfLocked ? 'hidden' : 'locked';
+  }
+
+  function renderModules() {
+    const data = lastUserData || {};
+    const modules = data.modules || {}, roles = data.roles || {}, isAdmin = data.isAdmin === true;
+    probePages();
+    document.getElementById('intramuralCheck').hidden = probeResults['intramural/index.html'] !== true;
+
+    // Every ordinary app always shows a tile: open ones go straight in; locked ones are dashed and,
+    // when tapped, send an access request to the admins. Staff-only tools simply stay out of sight.
+    let n = 0;
+    const html = GROUPS.map(g => {
+      const tiles = MODULES.filter(m => m.group === g.id).map(m => ({ m, a: accessFor(m, modules, roles, isAdmin) })).filter(x => x.a !== 'hidden');
+      if (!tiles.length) return '';
+      return `<section class="sect"><div class="sect-head"><h2>${g.title}</h2><p>${g.sub}</p><span class="rail"></span></div><div class="tiles">` +
+        tiles.map(({ m, a }) => {
+          const style = `style="animation-delay:${(n++) * 0.04}s"`;
+          const inner = `<div class="ico">${m.icon}</div><div class="txt"><b>${m.name}${a === 'locked' ? ' <span class="lock">🔒 Locked</span>' : ''}</b><small>${a === 'locked' ? 'Tap to request access from an admin' : m.desc}</small></div><span class="go">→</span>`;
+          return a === 'open'
+            ? `<a class="tile ${g.tone}" href="${m.href}" ${style}>${inner}</a>`
+            : `<button type="button" class="tile locked ${g.tone}" data-request="${m.key}" data-name="${m.name}" ${style}>${inner}</button>`;
+        }).join('') + `</div></section>`;
     }).join('');
+    document.getElementById('moduleGrid').innerHTML = html || '<div class="empty"><b>No apps yet</b>Ask an admin to add you.</div>';
+  }
 
-    if (hasWorkQueueAccess) {
-      html += `
-      <a class="module-card" href="queue-timeline.html">
-        <div class="module-icon" style="background: var(--blue-dim);">🗂️</div>
-        <div class="module-info">
-          <div class="module-name">Creative Timeline</div>
-          <div class="module-desc">Every open request — approval, calendar, graphic, marketing — sorted by due date</div>
-        </div>
-        <div class="module-arrow">→</div>
-      </a>`;
-    }
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-request]');
+    if (b) requestAccessTo(b.dataset.request, b.dataset.name);
+  });
 
-    if (isAdmin) {
-      html += `
-      <a class="module-card" href="admin.html">
-        <div class="module-icon" style="background: var(--blue-dim);">🛠️</div>
-        <div class="module-info">
-          <div class="module-name">Admin</div>
-          <div class="module-desc">Manage Bedside, Incident Reports, Van Usage, and access</div>
-        </div>
-        <div class="module-arrow">→</div>
-      </a>`;
-    }
+  // ── "WHAT NEEDS YOU" (staff only: counts from the live Event Requests) ──
+  let needsUnsub = null, needsFor = '';
+  function watchNeeds(roles) {
+    const staff = roles.isAdmin || roles.graphics || roles.marketing;
+    const sig = staff ? (roles.isAdmin ? 'admin' : 'staff') : '';
+    if (sig === needsFor) return;
+    needsFor = sig;
+    if (needsUnsub) { needsUnsub(); needsUnsub = null; }
+    const row = document.getElementById('needsRow');
+    row.hidden = true; row.innerHTML = '';
+    if (!staff) return;
+    needsUnsub = db.collection('eventRequests').onSnapshot(snap => drawNeeds(snap.docs.map(d => d.data()), roles), () => {});
+  }
 
-    container.innerHTML = html;
+  function drawNeeds(reqs, roles) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const t = iso(today);
+    const open = reqs.filter(r => r.status !== 'denied');
+    const awaiting = open.filter(r => r.status !== 'approved').length;
+    const rooms = open.filter(r => r.status === 'approved' && r.roomConfirmed !== true && (r.eventDate || '') >= t && RoomLogic.buildScheduleDoc('x', r)).length;
+    const overdue = open.filter(r => {
+      if (r.status !== 'approved') return false;
+      const hasCal = r.requestType === 'church_event', hasGfx = Array.isArray(r.mediaSizes) && r.mediaSizes.length > 0;
+      const hasMkt = Array.isArray(r.marketing) && r.marketing.length > 0 && !(r.marketing.length === 1 && r.marketing[0] === 'None');
+      if (!(hasCal || hasGfx || hasMkt)) return false;
+      const done = (!hasCal || r.calendarAdded === true) && (!hasGfx || r.graphicStatus === 'Completed') && (!hasMkt || r.marketingStatus === 'Completed');
+      if (done) return false;
+      const due = [hasGfx && r.graphicDueDate, hasMkt && r.marketingDueDate].filter(Boolean).sort()[0] || r.eventDate;
+      return !!due && due < t;
+    }).length;
+
+    const cards = [];
+    if (roles.isAdmin && awaiting) cards.push(['', 'admin.html?section=events', awaiting, 'Awaiting approval', 'Event requests to review']);
+    if (roles.isAdmin && rooms) cards.push(['gold', 'admin.html?section=events', rooms, 'Rooms to confirm', 'Approved, still held as TBD']);
+    if (overdue) cards.push(['red', 'queue-timeline.html', overdue, 'Creative work overdue', 'Open the timeline']);
+    const row = document.getElementById('needsRow');
+    row.hidden = false;
+    row.innerHTML = cards.length
+      ? cards.map(c => `<a class="need ${c[0]}" href="${c[1]}"><strong>${c[2]}</strong><span><b>${c[3]}</b>${c[4]}</span></a>`).join('')
+      : '<div class="caught-up">✓ You\'re all caught up</div>';
   }
 
   // Clicking a locked module tile submits an access request for
@@ -671,8 +418,6 @@
     const provider = new firebase.auth.GoogleAuthProvider();
     auth.signInWithPopup(provider).catch(err => showAuthError(err.message));
   });
-
-  document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
 
   document.getElementById('emailToggle').addEventListener('click', () => {
     document.getElementById('emailForm').classList.toggle('open');
@@ -712,8 +457,8 @@
 
   async function shareApp(){
     const shareData = {
-      title: 'RCC Ministry Apps',
-      text: 'Bedside, Incident Reports, and Van Usage — all in one place.',
+      title: 'RCC Ministry Hub',
+      text: 'Care, requests, rooms, and more — all in one place.',
       url: HUB_URL,
     };
     if (navigator.share) {
@@ -743,6 +488,9 @@
   });
   document.getElementById('closeRequestModal').addEventListener('click', () => {
     document.getElementById('requestModal').classList.remove('open');
+  });
+  document.getElementById('requestModal').addEventListener('click', e => {
+    if (e.target.id === 'requestModal') e.target.classList.remove('open');
   });
 
   document.getElementById('submitRequestBtn').addEventListener('click', async () => {
