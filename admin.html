@@ -415,6 +415,7 @@
         <div class="cl-chips" id="clChips" role="group" aria-label="Show"></div>
         <div class="log-tools">
           <input type="text" id="clSearch" placeholder="Search by name…" aria-label="Search by name">
+          <label class="cl-check" id="clListWrap" hidden><input type="checkbox" id="clOnlyList" checked> <span id="clListLabel">Only people on the volunteer list</span></label>
           <label class="cl-check"><input type="checkbox" id="clInactive"> Include people marked inactive</label>
         </div>
         <div id="clearanceList"><div class="loading">Loading...</div></div>
@@ -813,17 +814,23 @@
     }, err => { document.getElementById('clearanceList').innerHTML = '<div class="empty-state">Could not load clearances.</div>'; console.error(err); });
     db.collection('settings').doc('clearanceSync').onSnapshot(doc => {
       const at = doc.exists && doc.data().at && doc.data().at.toDate ? doc.data().at.toDate() : null;
+      window.__clListName = doc.exists ? (doc.data().listName || '') : '';
       document.getElementById('clSynced').textContent = at ? 'Last updated ' + at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' at ' + at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + '.' : '';
     }, () => {});
     document.getElementById('clSearch').addEventListener('input', renderClearances);
     document.getElementById('clInactive').addEventListener('change', renderClearances);
+    document.getElementById('clOnlyList').addEventListener('change', renderClearances);
     document.getElementById('clChips').addEventListener('click', e => { const b = e.target.closest('[data-cl]'); if (b) { clFilter = b.dataset.cl; renderClearances(); } });
   }
   function clDays(iso) { const t = new Date(); t.setHours(0, 0, 0, 0); const [y, m, d] = iso.split('-').map(Number); return Math.round((new Date(y, m - 1, d) - t) / 86400000); }
   function clPretty(iso) { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); }
   function renderClearances() {
     const year = new Date().getFullYear(), showInactive = document.getElementById('clInactive').checked, q = document.getElementById('clSearch').value.trim().toLowerCase();
-    const base = clearanceRows.filter(c => (showInactive || c.personStatus !== 'inactive') && (!q || (c.name || '').toLowerCase().includes(q)));
+    // When a Planning Center volunteer list is set (see settings), the page starts by showing only those people.
+    const hasList = clearanceRows.some(c => c.onList !== undefined), onlyList = hasList && document.getElementById('clOnlyList').checked;
+    document.getElementById('clListWrap').hidden = !hasList;
+    if (hasList) document.getElementById('clListLabel').textContent = 'Only people on the "' + (window.__clListName || 'volunteer') + '" list';
+    const base = clearanceRows.filter(c => (showInactive || c.personStatus !== 'inactive') && (!onlyList || c.onList === true) && (!q || (c.name || '').toLowerCase().includes(q)));
     const tests = {
       soon:    c => { const n = clDays(c.expiresOn); return n >= 0 && n <= 30; },
       year:    c => { const n = clDays(c.expiresOn); return n >= 0 && c.expiresOn.slice(0, 4) === String(year); },
