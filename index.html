@@ -294,7 +294,7 @@
   function accessFor(m, modules, roles, isAdmin) {
     if (m.always) return 'open';
     if (m.staff === 'staff') return (isAdmin || roles.graphics || roles.marketing) ? 'open' : 'hidden';
-    if (m.staff === 'admin') return (isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview) ? 'open' : 'hidden';
+    if (m.staff === 'admin') return (isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview || roles.clearances) ? 'open' : 'hidden';
     if (modules[m.key] === true) return 'open';
     return m.hideIfLocked ? 'hidden' : 'locked';
   }

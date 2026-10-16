@@ -7,7 +7,7 @@
   function linksFor(roles) {
     roles = roles || {};
     const staff = roles.isAdmin || roles.graphics || roles.marketing;
-    const anyAdmin = roles.isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview;
+    const anyAdmin = roles.isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview || roles.clearances;
     return [
       { key: 'home',     label: 'Home',              href: 'index.html',          show: true },
       { key: 'requests', label: 'Event requests',    href: 'event-requests.html', show: staff },

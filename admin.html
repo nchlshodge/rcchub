@@ -503,7 +503,8 @@
       const canGraphics = isFullAdmin || roles.graphics === true;
       const canMarketing = isFullAdmin || roles.marketing === true;
       const canOverview = isFullAdmin || roles.overview === true;
-      const hasAnyAccess = isFullAdmin || canVan || canBedside || canGraphics || canMarketing || canOverview;
+      const canClearances = isFullAdmin || roles.clearances === true;
+      const hasAnyAccess = isFullAdmin || canVan || canBedside || canGraphics || canMarketing || canOverview || canClearances;
       window.currentUserIsFullAdmin = isFullAdmin;
       window.currentUserCanOverview = canOverview;
       window.currentUserIsOwner = userData.isOwner === true;
@@ -524,7 +525,7 @@
         const tabVisibility = {
           overview: canOverview, bedside: canBedside, incidents: isFullAdmin, vans: canVan,
           events: isFullAdmin, timeline: canGraphics || canMarketing, timeoff: isFullAdmin, access: isFullAdmin,
-          requests: isFullAdmin, admins: isFullAdmin, activity: isFullAdmin, clearances: isFullAdmin,
+          requests: isFullAdmin, admins: isFullAdmin, activity: isFullAdmin, clearances: canClearances,
         };
         document.querySelectorAll('.section-tab').forEach(tab => {
           const key = tab.dataset.section;
@@ -549,7 +550,8 @@
         if (canOverview) { loadOverview({canBedside, canVan, isFullAdmin, canOverview}); }
         if (isFullAdmin) { loadIncidentsBadgeOnly(); }
         if (isFullAdmin) { loadEventRequests(); loadTimeOffRequests(); loadNotificationEmails(); }
-        if (isFullAdmin) { loadModuleManagement(); loadAccessRequests(); loadAdminManagement(); loadActivity(); loadClearances(); }
+        if (isFullAdmin) { loadModuleManagement(); loadAccessRequests(); loadAdminManagement(); loadActivity(); }
+        if (canClearances) { loadClearances(); }
       } else {
         document.getElementById('accessDenied').style.display = 'block';
       }
@@ -739,7 +741,7 @@
 
   // ── App Access ──
   const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage', eventRequest: 'Event Request', timeOff: 'Time Off Request' };
-  const ROLE_LABELS = { overview: 'Overview', vanAdmin: 'Van Usage Admin (Department Head)', bedsideAdmin: 'Bedside Admin (Department Head)', graphics: 'Graphics Team (Department Head)', marketing: 'Marketing Team (Department Head)' };
+  const ROLE_LABELS = { overview: 'Overview', vanAdmin: 'Van Usage Admin (Department Head)', bedsideAdmin: 'Bedside Admin (Department Head)', graphics: 'Graphics Team (Department Head)', marketing: 'Marketing Team (Department Head)', clearances: 'Volunteer Clearances (view only)' };
   function loadModuleManagement() {
     db.collection('users').onSnapshot(snap => {
       const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
