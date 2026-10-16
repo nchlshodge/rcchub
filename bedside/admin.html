@@ -14,18 +14,18 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;500;600&display=swap');
 
     :root {
-      --bg:         #f7f4f0;
+      --bg:         #f6f2ea;
       --bg-card:    #ffffff;
-      --bg-raised:  #f0ece6;
+      --bg-raised:  #efe9dd;
       --bg-input:   #ffffff;
       --border:     rgba(0,0,0,0.08);
       --border-mid: rgba(0,0,0,0.14);
       --text:       #1a1714;
-      --text-mid:   #5c5650;
-      --text-soft:  #9e9890;
+      --text-mid:   #57514a;
+      --text-soft:  #857e73;
       --gold:       #2557b8;
       --gold-dim:   rgba(37,87,184,0.08);
       --gold-glow:  rgba(37,87,184,0.20);
@@ -63,7 +63,7 @@
       z-index: 100;
     }
     .logo {
-      font-family: 'Lora', serif;
+      font-family: 'Playfair Display', Georgia, serif;
       font-size: 22px;
       font-weight: 500;
       color: var(--gold);
@@ -140,7 +140,7 @@
     }
     .login-mark img { width: 100%; height: 100%; object-fit: contain; }
     .login-title {
-      font-family: 'Lora', serif;
+      font-family: 'Playfair Display', Georgia, serif;
       font-size: 32px;
       font-weight: 500;
       color: var(--gold);
@@ -169,11 +169,11 @@
       text-align: center;
       padding: 60px 24px;
     }
-    .access-denied .title { font-family: 'Lora', serif; font-size: 22px; color: var(--red); margin-bottom: 10px; }
+    .access-denied .title { font-family: 'Playfair Display', Georgia, serif; font-size: 22px; color: var(--red); margin-bottom: 10px; }
     .access-denied .sub { color: var(--text-mid); font-size: 15px; }
 
     .section-title {
-      font-family: 'Lora', serif;
+      font-family: 'Playfair Display', Georgia, serif;
       font-size: 20px;
       font-weight: 500;
       margin-bottom: 20px;
@@ -189,7 +189,7 @@
       border: 1px solid var(--border);
     }
 
-    .card-title { font-family: 'Lora', serif; font-size: 17px; font-weight: 500; margin-bottom: 3px; }
+    .card-title { font-family: 'Playfair Display', Georgia, serif; font-size: 17px; font-weight: 500; margin-bottom: 3px; }
     .card-sub { font-size: 13px; color: var(--gold); margin-bottom: 4px; font-weight: 500; }
     .card-text { font-size: 14px; color: var(--text-mid); margin-bottom: 8px; }
     .card-meta { font-size: 12px; color: var(--text-soft); margin-bottom: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -292,8 +292,46 @@
       padding: 16px;
       text-align: center;
     }
-    .stat-num { font-family: 'Lora', serif; font-size: 28px; color: var(--gold); }
+    .stat-num { font-family: 'Playfair Display', Georgia, serif; font-size: 28px; color: var(--gold); }
     .stat-label { font-size: 12px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  
+    /* ===== RCC shared look — layered over the Bedside styles above (colors come from the variables) ===== */
+    :root {
+      --glass: rgba(246,242,234,.84);
+      --shadow-1: 0 1px 2px rgba(60,40,10,.06), 0 6px 18px rgba(60,40,10,.06);
+      --shadow-2: 0 2px 4px rgba(60,40,10,.08), 0 14px 34px rgba(60,40,10,.12);
+      --ease: cubic-bezier(.2,.8,.2,1);
+    }
+    [data-theme="dark"] {
+      --glass: rgba(15,15,15,.84);
+      --shadow-1: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
+      --shadow-2: 0 2px 4px rgba(0,0,0,.45), 0 14px 34px rgba(0,0,0,.5);
+    }
+    html:not([data-theme="dark"]) body { background: radial-gradient(1100px 420px at 50% -180px, #fff9ea 0%, rgba(255,249,234,0) 70%), var(--bg); }
+    :focus-visible { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; border-radius: 6px; }
+    header { background: var(--glass); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); height: 64px; }
+    .logo { font-size: 23px; }
+    nav { background: transparent; border-bottom: none; padding: 14px 16px 0; gap: 6px; }
+    .tab { border-bottom: none; border-radius: 999px; padding: 9px 16px; font-weight: 500; }
+    .tab.active { background: var(--bg-card); color: var(--gold); box-shadow: 0 1px 3px rgba(60,40,10,.14); }
+    .visit-card, .card, .form-card, .stat-card { border-radius: 18px; box-shadow: var(--shadow-1); transition: box-shadow .3s var(--ease), border-color .2s; }
+    .visit-card:hover, .card:hover { box-shadow: var(--shadow-2); }
+    [class*="btn"] { border-radius: 999px; }
+    .btn, .btn-primary, .btn-primary-full { transition: transform .15s var(--ease), opacity .15s, background .2s, box-shadow .2s; }
+    .btn-primary:hover, .btn-primary-full:hover { opacity: 1; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,87,184,.28); }
+    #googleSignInBtn { border-radius: 999px; box-shadow: 0 6px 20px rgba(37,87,184,.28); transition: transform .15s var(--ease), opacity .15s; }
+    #googleSignInBtn:hover { opacity: 1; transform: translateY(-1px); }
+    #signOutBtn, #themeBtn { border-radius: 999px; }
+    input:not([type=checkbox]):not([type=radio]), select, textarea { border-radius: 12px; transition: border-color .2s, box-shadow .2s, background .2s; }
+    input:not([type=checkbox]):not([type=radio]):focus, select:focus, textarea:focus { outline: none; box-shadow: 0 0 0 4px var(--gold-dim); }
+    .modal { border-radius: 22px; box-shadow: var(--shadow-2); }
+    .modal-overlay { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+    .section-title { font-size: 22px; }
+    nav { overflow-x: auto; scrollbar-width: none; }
+    nav::-webkit-scrollbar { display: none; }
+    header a, header button, .logo { white-space: nowrap; }
+    @media (max-width: 520px) { header a[href="../index.html"] { display: none; } header > div:last-child { gap: 8px !important; } }
+    @media (max-width: 520px) { #userName, .logo-dot, .logo-tag { display: none; } header { padding: 0 14px; } nav { padding: 12px 10px 0; gap: 2px; } .tab { padding: 8px 11px; font-size: 13.5px; } }
   </style>
 <script>if(/[?&]embed=1(&|$)/.test(location.search))document.documentElement.classList.add('embedded');</script>
 <style>.embedded #appShell>header,.embedded #appShell>nav.nav,.embedded .topbar{display:none!important}</style>
@@ -303,7 +341,7 @@
 <div class="banner" id="banner"></div>
 
 <div id="loginScreen">
-  <div class="login-mark"><img src="rcc-logo.png" alt="RCC — Love God. Love People."></div>
+  <div class="login-mark"><img src="../assets/rcc-logo.png" alt="RCC — Love God. Love People."></div>
   <div class="login-title">Bedside Admin</div>
   <p class="login-sub">Sign in to manage visits and prayer requests</p>
   <button id="googleSignInBtn">Sign in with Google</button>
@@ -312,7 +350,7 @@
 <div id="appShell" style="display:none;">
 
   <header>
-    <div class="logo"><img src="rcc-logo-plain.png" alt="RCC">Bedside <span class="logo-tag">Admin</span></div>
+    <div class="logo"><img src="../assets/rcc-logo-plain.png" alt="RCC">Bedside <span class="logo-tag">Admin</span></div>
     <div style="display:flex; align-items:center; gap:12px;">
       <a href="../index.html" style="font-size:13px; color:var(--text-soft); text-decoration:none;">← All apps</a>
       <a href="index.html" id="backToAppLink" style="font-size:13px; color:var(--text-soft); text-decoration:none;">← Back to Bedside</a>
@@ -744,7 +782,7 @@
             <div class="card-text">${escHtml(u.email || '')}</div>
             <div class="actions">${u.id === currentUser.uid ? '<span class="tag tag-public">You</span>' : `<button class="btn btn-hide" onclick="toggleBedsideAdmin('${u.id}', false)">Remove</button>`}</div>
           </div>`).join('') || '<p style="font-size:14px;color:var(--text-soft);">No one else has this yet.</p>'}
-        <h3 style="margin-top:20px; font-family:'Lora',serif; font-size:16px;">Add Someone</h3>
+        <h3 style="margin-top:20px; font-family:'Playfair Display',Georgia,serif; font-size:16px;">Add Someone</h3>
         <input type="text" id="bedsideTeamSearch" placeholder="Search name or email..." oninput="filterBedsideTeamSearch(this.value)" style="margin-top:8px;">
         <div id="bedsideTeamSearchResults"></div>
       `;
