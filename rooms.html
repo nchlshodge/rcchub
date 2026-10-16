@@ -4,12 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RCC — Room Map</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#2557b8">
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="room-logic.js"></script>
+<script src="rcc-shell.js"></script>
+<link rel="stylesheet" href="rcc-ui.css">
 
 <!-- Reads only roomSchedule (a privacy-safe copy of approved events: title,
      rooms, date, time — no names or emails) and roomBookings (standing
@@ -17,149 +19,169 @@
      change an Event Request. -->
 
 <style>
-  :root {
-    --bg:#f7f6f3; --bg-card:#fff; --bg-raised:#f0ece4; --border:#e8e4dc;
-    --text:#1a1a1a; --text-mid:#5c5650; --text-soft:#9e9890;
-    --blue:#2557b8; --blue-dim:rgba(37,87,184,0.08);
-    --green:#2e7a52; --green-fill:rgba(46,122,82,0.30); --green-dim:rgba(46,122,82,0.10);
-    --red:#b03030;   --red-fill:rgba(176,48,48,0.42);   --red-dim:rgba(176,48,48,0.10);
-    --amber:#b5892a; --amber-fill:rgba(181,137,42,0.38); --amber-dim:rgba(181,137,42,0.12);
-    --radius:14px; --radius-sm:8px;
+  :root { --free: #2e7a52; --busy: #b03030; --later: #b5892a; }
+  .page { max-width: 1240px; }
+
+  /* ---------- the "when" bar ---------- */
+  .when { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 18px; margin-bottom: 18px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-1); }
+  .when .day { display: flex; align-items: center; gap: 8px; }
+  .when .navbtn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line-2); background: #fff; cursor: pointer; font-size: 14px; color: var(--ink-2); transition: all .2s var(--ease); }
+  .when .navbtn:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .when input[type=date], .when input[type=time] { font-family: inherit; font-size: 15px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 9px 12px; }
+  .when input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 4px rgba(37,87,184,.12); background: #fff; }
+  .slider { flex: 1 1 220px; display: flex; align-items: center; gap: 10px; min-width: 200px; }
+  .slider small { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+  .slider input[type=range] { flex: 1; accent-color: var(--blue); height: 6px; cursor: pointer; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; width: 100%; font-size: 12.5px; color: var(--ink-2); align-items: center; padding-top: 10px; border-top: 1px dashed var(--line-2); }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 6px; vertical-align: -1px; }
+
+  /* ---------- map + detail ---------- */
+  .layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); gap: 20px; align-items: start; }
+  .map-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; box-shadow: var(--shadow-1); }
+  svg.plan { width: 100%; height: auto; display: block; border-radius: 10px; }
+  .room { cursor: pointer; stroke: rgba(40,30,10,0.5); stroke-width: 2; transition: fill .25s, stroke .2s, stroke-width .2s; }
+  .room.free { fill: rgba(46,122,82,0.30); } .room.busy { fill: rgba(176,48,48,0.42); } .room.later { fill: rgba(181,137,42,0.38); }
+  .room.tbd { fill: url(#hatch); stroke: var(--later); stroke-dasharray: 10 6; }
+  .room.off { fill: rgba(120,120,120,0.10); stroke: rgba(0,0,0,0.25); stroke-dasharray: 6 5; cursor: default; }
+  .room:hover:not(.off), .room.selected { stroke: var(--blue); stroke-width: 5; }
+  .rlabel { font-family: 'Inter', sans-serif; font-weight: 700; fill: #111; pointer-events: none; paint-order: stroke; stroke: rgba(255,255,255,0.85); stroke-width: 5px; text-anchor: middle; }
+  .rsub { font-family: 'Inter', sans-serif; font-weight: 500; fill: #333; pointer-events: none; paint-order: stroke; stroke: rgba(255,255,255,0.85); stroke-width: 4px; text-anchor: middle; }
+
+  .side { position: sticky; top: 84px; }
+  .rpanel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow-1); animation: fade .3s var(--ease) both; }
+  .rpanel h2 { font-size: 24px; margin-bottom: 2px; }
+  .rpanel .sub { font-size: 13px; color: var(--ink-3); margin-bottom: 14px; }
+  .glance { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 6px; }
+  .glance div { background: var(--bg); border-radius: var(--radius-md); padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); }
+  .glance b { font-family: 'Playfair Display', serif; font-weight: 500; font-size: 28px; line-height: 1; color: var(--ink); min-width: 28px; }
+  .glance i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .hintline { font-size: 14px; color: var(--ink-2); line-height: 1.55; }
+
+  .pill.free { background: var(--green-soft); color: var(--green-ink); }
+  .pill.busy { background: var(--red-soft); color: var(--red-ink); }
+  .pill.later { background: var(--gold-soft); color: var(--gold-ink); }
+  .pill.tbd { background: var(--gold-soft); color: var(--gold-ink); border: 1px dashed var(--gold); }
+  .pill { text-transform: uppercase; letter-spacing: .04em; font-size: 10.5px; font-weight: 700; }
+  .sched { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .sched li { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 10px 14px; font-size: 14px; background: #fff; }
+  .sched li b { display: block; font-weight: 600; }
+  .sched li small { color: var(--ink-3); font-size: 12.5px; }
+  .sched li.now { border-color: var(--red); background: var(--red-soft); }
+  .note-empty { color: var(--ink-3); font-size: 13.5px; padding: 8px 0; }
+
+  .section-title { font-size: 22px; margin: 34px 2px 6px; }
+  .section-sub { font-size: 14px; color: var(--ink-2); max-width: 70ch; line-height: 1.5; margin: 0 2px 12px; }
+  table.rooms { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-1); overflow: hidden; }
+  table.rooms th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); padding: 11px 16px; background: var(--bg-soft); }
+  table.rooms td { padding: 11px 16px; border-top: 1px solid var(--line); vertical-align: top; }
+  table.rooms tr.clickable { cursor: pointer; transition: background .2s; } table.rooms tr.clickable:hover { background: #fcfaf5; }
+
+  .booking-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .booking-row:first-child { border-top: none; }
+  .booking-row small { color: var(--ink-3); display: block; font-size: 12.5px; }
+  details.standing { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-1); }
+  details.standing > summary { cursor: pointer; list-style: none; padding: 16px 22px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-family: 'Playfair Display', serif; font-size: 19px; }
+  details.standing > summary::-webkit-details-marker { display: none; }
+  details.standing > summary small { display: block; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--ink-3); margin-top: 2px; }
+  details.standing > summary::after { content: "＋"; color: var(--blue); font-size: 20px; font-family: 'Inter', sans-serif; }
+  details.standing[open] > summary::after { content: "－"; }
+  details.standing .inner { padding: 4px 22px 22px; border-top: 1px dashed var(--line-2); padding-top: 18px; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 16px; margin: 4px 0 14px; }
+  .form-grid label { font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); display: flex; flex-direction: column; gap: 5px; }
+  .form-grid input[type=text], .form-grid input[type=date], .form-grid input[type=time], .form-grid select { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; font-family: inherit; font-size: 15px; background: var(--bg); text-transform: none; letter-spacing: 0; color: var(--ink); }
+  .form-grid input:focus, .form-grid select:focus { outline: none; border-color: var(--blue); background: #fff; box-shadow: 0 0 0 4px rgba(37,87,184,.12); }
+  .checks { display: flex; flex-wrap: wrap; gap: 8px; }
+  .checks label { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; font-size: 13.5px; color: var(--ink-2); background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; text-transform: none; letter-spacing: 0; }
+  .lbl-sm { font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 8px; }
+
+  @media (max-width: 900px) {
+    .map-card { overflow-x: auto; -webkit-overflow-scrolling: touch; } svg.plan { min-width: 720px; }
+    .layout { grid-template-columns: 1fr; } .side { position: static; }
   }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; -webkit-font-smoothing:antialiased; }
-  a { color:var(--blue); }
-  .nav { background:#fff; border-bottom:1px solid var(--border); padding:0 2rem; height:60px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10; }
-  .nav-brand { font-family:'Playfair Display',serif; font-size:22px; color:var(--blue); text-decoration:none; }
-  .nav-brand span { font-family:'Inter',sans-serif; font-size:13px; color:var(--text-soft); margin-left:6px; }
-  .nav-links { display:flex; align-items:center; gap:18px; }
-  .nav-user { font-size:13px; color:var(--text-mid); }
-  .nav-signout { background:none; border:none; font-size:13px; color:var(--text-soft); cursor:pointer; }
-  .page { max-width:1180px; margin:0 auto; padding:2rem 1.5rem 4rem; }
-  .page-title { font-family:'Playfair Display',serif; font-size:30px; font-weight:600; margin-bottom:6px; }
-  .page-sub { font-size:14px; color:var(--text-mid); max-width:66ch; line-height:1.5; margin-bottom:1.2rem; }
-
-  .controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:12px 14px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:1rem; }
-  .controls input[type=date], .controls input[type=time] { border:1px solid var(--border); background:var(--bg); border-radius:var(--radius-sm); padding:8px 10px; font-family:inherit; font-size:14px; color:var(--text); }
-  .btn { font-family:inherit; font-size:13px; font-weight:600; color:var(--text-mid); background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 12px; cursor:pointer; }
-  .btn:hover { background:var(--bg-raised); }
-  .btn.primary { background:var(--blue); color:#fff; border-color:var(--blue); }
-  .btn.danger { color:var(--red); }
-  .legend { display:flex; gap:14px; flex-wrap:wrap; margin-left:auto; font-size:12.5px; color:var(--text-mid); align-items:center; }
-  .legend i { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
-
-  .layout { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(300px,0.75fr); gap:18px; align-items:start; }
-  .map-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:10px; }
-  svg.plan { width:100%; height:auto; display:block; }
-  .room { cursor:pointer; stroke:rgba(0,0,0,0.55); stroke-width:2; transition:fill .15s; }
-  .room.free { fill:var(--green-fill); } .room.busy { fill:var(--red-fill); } .room.later { fill:var(--amber-fill); }
-  .room.tbd { fill:url(#hatch); stroke:var(--amber); stroke-dasharray:10 6; }
-  .room.off { fill:rgba(120,120,120,0.10); stroke:rgba(0,0,0,0.25); stroke-dasharray:6 5; cursor:default; }
-  .room:hover:not(.off), .room.selected { stroke:var(--blue); stroke-width:5; }
-  .rlabel { font-family:'Inter',sans-serif; font-weight:700; fill:#111; pointer-events:none; paint-order:stroke; stroke:rgba(255,255,255,0.85); stroke-width:5px; text-anchor:middle; }
-  .rsub { font-family:'Inter',sans-serif; font-weight:500; fill:#333; pointer-events:none; paint-order:stroke; stroke:rgba(255,255,255,0.85); stroke-width:4px; text-anchor:middle; }
-
-  .panel { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
-  .panel h2 { font-family:'Playfair Display',serif; font-size:20px; font-weight:600; margin-bottom:4px; }
-  .panel .sub { font-size:12.5px; color:var(--text-soft); margin-bottom:12px; }
-  .pill { display:inline-block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; padding:3px 9px; border-radius:999px; }
-  .pill.free { background:var(--green-dim); color:var(--green); } .pill.busy { background:var(--red-dim); color:var(--red); } .pill.later { background:var(--amber-dim); color:var(--amber); } .pill.tbd { background:var(--amber-dim); color:var(--amber); border:1px dashed var(--amber); }
-  .sched { list-style:none; display:flex; flex-direction:column; gap:8px; margin-top:12px; }
-  .sched li { border:1px solid var(--border); border-radius:10px; padding:9px 12px; font-size:13.5px; }
-  .sched li b { display:block; }
-  .sched li small { color:var(--text-soft); font-size:12px; }
-  .sched li.now { border-color:var(--red); background:var(--red-dim); }
-  .empty { color:var(--text-soft); font-size:13.5px; font-style:italic; padding:8px 0; }
-
-  table.rooms { width:100%; border-collapse:collapse; font-size:13.5px; margin-top:10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); }
-  table.rooms th { text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-soft); padding:8px 10px; border-bottom:1px solid var(--border); }
-  table.rooms td { padding:9px 10px; border-bottom:1px solid var(--bg-raised); vertical-align:top; }
-  table.rooms tr.clickable { cursor:pointer; } table.rooms tr.clickable:hover { background:#fbfaf7; }
-  .section-title { font-family:'Playfair Display',serif; font-size:19px; font-weight:600; margin:1.6rem 0 6px; }
-
-  .admin { margin-top:1.6rem; }
-  .form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px 14px; margin:12px 0; }
-  .form-grid label { font-size:12px; font-weight:600; color:var(--text-mid); display:flex; flex-direction:column; gap:4px; }
-  .form-grid input[type=text], .form-grid input[type=date], .form-grid input[type=time], .form-grid select { border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 10px; font-family:inherit; font-size:14px; background:var(--bg); }
-  .checks { display:flex; flex-wrap:wrap; gap:6px 12px; }
-  .checks label { display:flex; flex-direction:row; align-items:center; gap:5px; font-weight:500; font-size:13px; }
-  .booking-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--bg-raised); font-size:13.5px; }
-  .booking-row small { color:var(--text-soft); display:block; }
-
-  #loginScreen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:40px; text-align:center; }
-  #googleSignInBtn { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #d1cdc4; border-radius:12px; padding:14px 24px; font-size:15px; cursor:pointer; }
-  .loading { color:var(--text-soft); font-style:italic; padding:20px 0; }
-  @media (max-width:900px) { .map-card { overflow-x:auto; -webkit-overflow-scrolling:touch; } svg.plan { min-width:720px; } .layout { grid-template-columns:1fr; } .nav { padding:0 1rem; } .page { padding:1.2rem 1rem 3rem; } .legend { margin-left:0; } }
+  @media (max-width: 600px) {
+    table.rooms { font-size: 13px; table-layout: fixed; }
+    table.rooms th, table.rooms td { padding: 10px 10px; overflow-wrap: anywhere; }
+    table.rooms th:nth-child(1) { width: 34%; } table.rooms th:nth-child(2) { width: 27%; }
+    .pill { white-space: normal; }
+  }
 </style>
 </head>
 <body>
 
-<div id="loginScreen">
-  <h1 style="font-family:'Playfair Display',serif; font-size:28px; margin-bottom:20px;">RCC Room Map</h1>
-  <button id="googleSignInBtn">
+<div id="loginScreen" class="rcc-login" style="display:none;">
+  <img src="assets/rcc-logo-plain.png" alt="">
+  <h1>Room Map</h1>
+  <p>Sign in to see which rooms are free, held, or in use.</p>
+  <button id="googleSignInBtn" type="button">
     <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
     Sign in with Google
   </button>
 </div>
 
 <div id="appShell" style="display:none;">
-  <nav class="nav">
-    <a href="index.html" class="nav-brand">RCC <span>· Room Map</span></a>
-    <div class="nav-links"><span class="nav-user" id="navUser"></span><button class="nav-signout" id="signOutBtn">Sign out</button></div>
-  </nav>
+  <header id="rccNav"></header>
 
-  <div class="page">
-    <h1 class="page-title">Room Map</h1>
-    <p class="page-sub">See which rooms are in use. Pick a date and time, and each room turns red (in use), amber (booked later that day) or green (free). Click a room for its schedule. Every event holds its room as a <b>TBD</b> (striped) until Stephanie or Nick confirms it; confirmed rooms show as in use.</p>
+  <main class="page">
+    <section class="hero">
+      <span class="eyebrow">Building</span>
+      <h1>Room map</h1>
+      <p>Pick a date and time and every room colors itself: green is free, gold is booked later that day, red is in use. Striped rooms are <b>TBD holds</b> — requested but not yet confirmed by Stephanie or Nick. Click a room to see its day.</p>
+    </section>
 
-    <div class="controls">
-      <button class="btn" id="prevDay" aria-label="Previous day">◀</button>
-      <input type="date" id="dateIn" aria-label="Date">
-      <button class="btn" id="nextDay" aria-label="Next day">▶</button>
+    <div class="when">
+      <div class="day">
+        <button class="navbtn" id="prevDay" type="button" aria-label="Previous day">◀</button>
+        <input type="date" id="dateIn" aria-label="Date">
+        <button class="navbtn" id="nextDay" type="button" aria-label="Next day">▶</button>
+      </div>
       <input type="time" id="timeIn" step="900" aria-label="Time">
-      <button class="btn primary" id="nowBtn">Now</button>
-      <div class="legend"><span><i style="background:var(--green-fill)"></i>Free</span><span><i style="background:var(--amber-fill)"></i>Booked later</span><span><i style="background:var(--red-fill)"></i>In use</span><span><i style="background:repeating-linear-gradient(45deg,var(--amber-fill) 0 3px,#fff 3px 6px);border:1px dashed var(--amber)"></i>TBD hold</span></div>
+      <div class="slider"><small>6 AM</small><input type="range" id="timeRange" min="360" max="1320" step="15" aria-label="Slide through the day"><small>10 PM</small></div>
+      <button class="btn primary small" id="nowBtn" type="button">Now</button>
+      <div class="legend"><span><i style="background:rgba(46,122,82,.45)"></i>Free</span><span><i style="background:rgba(181,137,42,.5)"></i>Booked later</span><span><i style="background:rgba(176,48,48,.55)"></i>In use</span><span><i style="background:repeating-linear-gradient(45deg,rgba(181,137,42,.55) 0 3px,#fff 3px 6px);border:1px dashed var(--later)"></i>TBD hold</span></div>
     </div>
 
     <div class="layout">
       <div class="map-card">
         <svg class="plan" id="plan" viewBox="0 0 1236 1600" role="img" aria-label="Floor plan of the RCC building with rooms colored by availability"></svg>
       </div>
-      <div>
-        <div class="panel" id="detail"><div class="loading">Loading…</div></div>
+      <div class="side">
+        <div class="rpanel" id="detail"><div class="note-empty">Loading…</div></div>
       </div>
     </div>
 
     <h2 class="section-title">All rooms</h2>
+    <p class="section-sub">The same information as the map, as a list — tap a row to open that room.</p>
     <table class="rooms" id="roomTable"></table>
 
     <div class="admin" id="adminBox" style="display:none;">
       <h2 class="section-title">Rooms waiting for confirmation</h2>
-      <p class="page-sub" style="margin-bottom:0;">Approved events stay a TBD hold until an admin confirms the room. Confirming is blocked if that room is already firmly booked at that time.</p>
-      <div class="panel" style="margin-top:12px;" id="confirmList"><div class="loading">Loading…</div></div>
+      <p class="section-sub">Approved events stay a TBD hold until an admin confirms the room. Confirming is blocked if that room is already firmly booked at that time.</p>
+      <div class="rpanel" id="confirmList"><div class="note-empty">Loading…</div></div>
 
-      <h2 class="section-title">Standing bookings (admins)</h2>
-      <p class="page-sub" style="margin-bottom:0;">For things that aren't Event Requests — a weekly Bible study, a recurring meeting, a one-off hold. Event Requests are added automatically when approved.</p>
-      <div class="panel" style="margin-top:12px;">
-        <div class="form-grid">
-          <label>What is it<input type="text" id="bkTitle" maxlength="200" placeholder="e.g. Wednesday Bible Study"></label>
-          <label>Repeats<select id="bkType"><option value="weekly">Every week</option><option value="once">One time</option></select></label>
-          <label id="bkDateWrap" style="display:none;">Date<input type="date" id="bkDate"></label>
-          <label>Status<select id="bkStatus"><option value="firm">Confirmed</option><option value="tbd">TBD (hold the room, not final)</option></select></label>
-          <label>Start<input type="time" id="bkStart" value="18:00"></label>
-          <label>End<input type="time" id="bkEnd" value="19:30"></label>
-          <label class="bk-weekly">Starting (optional)<input type="date" id="bkFrom"></label>
-          <label class="bk-weekly">Ending (optional)<input type="date" id="bkUntil"></label>
+      <h2 class="section-title">Standing bookings</h2>
+      <details class="standing" id="standing">
+        <summary><div>Add a standing booking<small>A weekly Bible study, a recurring meeting, a one-off hold — things that aren't Event Requests.</small></div></summary>
+        <div class="inner">
+          <div class="form-grid">
+            <label>What is it<input type="text" id="bkTitle" maxlength="200" placeholder="e.g. Wednesday Bible Study"></label>
+            <label>Repeats<select id="bkType"><option value="weekly">Every week</option><option value="once">One time</option></select></label>
+            <label id="bkDateWrap" style="display:none;">Date<input type="date" id="bkDate"></label>
+            <label>Status<select id="bkStatus"><option value="firm">Confirmed</option><option value="tbd">TBD (hold the room, not final)</option></select></label>
+            <label>Start<input type="time" id="bkStart" value="18:00"></label>
+            <label>End<input type="time" id="bkEnd" value="19:30"></label>
+            <label class="bk-weekly">Starting (optional)<input type="date" id="bkFrom"></label>
+            <label class="bk-weekly">Ending (optional)<input type="date" id="bkUntil"></label>
+          </div>
+          <div class="bk-weekly" style="margin-bottom:14px;"><div class="lbl-sm">On these days</div>
+            <div class="checks" id="bkDays"></div></div>
+          <div style="margin-bottom:14px;"><div class="lbl-sm">In these rooms</div>
+            <div class="checks" id="bkRooms"></div></div>
+          <button class="btn primary" id="bkSave" type="button">Add booking</button> <span id="bkMsg" style="font-size:13px;color:var(--ink-3);margin-left:8px;"></span>
         </div>
-        <div class="bk-weekly" style="margin-bottom:10px;"><div style="font-size:12px;font-weight:600;color:var(--text-mid);margin-bottom:6px;">On these days</div>
-          <div class="checks" id="bkDays"></div></div>
-        <div style="margin-bottom:10px;"><div style="font-size:12px;font-weight:600;color:var(--text-mid);margin-bottom:6px;">In these rooms</div>
-          <div class="checks" id="bkRooms"></div></div>
-        <button class="btn primary" id="bkSave">Add booking</button> <span id="bkMsg" style="font-size:13px;color:var(--text-soft);margin-left:8px;"></span>
-        <div id="bkList" style="margin-top:14px;"></div>
-      </div>
+      </details>
+      <div class="rpanel" style="margin-top:14px;"><div class="lbl-sm">Current standing bookings</div><div id="bkList"></div></div>
     </div>
-  </div>
+  </main>
 </div>
 
 <script>
@@ -214,27 +236,27 @@
 
   /* ---------- auth ---------- */
   document.getElementById('googleSignInBtn').addEventListener('click', () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => alert('Sign-in failed: ' + e.message)));
-  document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
   auth.onAuthStateChanged(async user => {
     currentUser = user || null;
     document.getElementById('loginScreen').style.display = user ? 'none' : 'flex';
     document.getElementById('appShell').style.display = user ? 'block' : 'none';
     if (!user) return;
-    document.getElementById('navUser').textContent = user.displayName || user.email;
-    try { const d = await db.collection('users').doc(user.uid).get(); isAdmin = d.exists && d.data().isAdmin === true; } catch (e) { isAdmin = false; }
+    let roles = {};
+    try { const d = await db.collection('users').doc(user.uid).get(); isAdmin = d.exists && d.data().isAdmin === true; roles = d.exists ? (d.data().roles || {}) : {}; } catch (e) { isAdmin = false; }
+    RccShell.render(document.getElementById('rccNav'), { active: 'rooms', user, onSignOut: () => auth.signOut(), roles: Object.assign({}, roles, { isAdmin }) });
     document.getElementById('adminBox').style.display = isAdmin ? 'block' : 'none';
     if (started) return; started = true;
     buildMap(); wireControls(); subscribe(); renderAll();
     if (isAdmin) subscribeConfirm();
     db.collection('roomBookings').onSnapshot(s => { bookingDocs = s.docs.map(d => ({ id: d.id, ...d.data() })); renderAll(); renderBookingList(); },
-      err => { document.getElementById('detail').innerHTML = '<div class="empty">Could not load bookings: ' + esc(err.message) + '</div>'; });
+      err => { document.getElementById('detail').innerHTML = '<div class="note-empty">Could not load bookings: ' + esc(err.message) + '</div>'; });
   });
 
   function subscribe() {
     if (unsubSchedule) unsubSchedule();
     unsubSchedule = db.collection('roomSchedule').where('date', '==', selectedDate).onSnapshot(s => {
       scheduleDocs = s.docs.map(d => ({ id: d.id, ...d.data() })); renderAll();
-    }, err => { document.getElementById('detail').innerHTML = '<div class="empty">Could not load the schedule: ' + esc(err.message) + '</div>'; });
+    }, err => { document.getElementById('detail').innerHTML = '<div class="note-empty">Could not load the schedule: ' + esc(err.message) + '</div>'; });
   }
 
   /* ---------- the map ---------- */
@@ -277,6 +299,7 @@
     if (!currentUser) return;
     document.getElementById('dateIn').value = selectedDate;
     document.getElementById('timeIn').value = minToInput(selectedMin);
+    document.getElementById('timeRange').value = Math.min(1320, Math.max(360, selectedMin));
     const occ = occupancies();
     document.querySelectorAll('#plan [data-room]').forEach(el => {
       const st = statusFor(el.dataset.room, occ);
@@ -286,8 +309,8 @@
     let t = '<thead><tr><th>Room</th><th>Status</th><th>Booked this day</th></tr></thead><tbody>';
     RL.ROOMS.forEach(r => {
       const st = statusFor(r.id, occ);
-      const items = st.items.map(o => esc(o.title) + (o.tentative ? ' <span class="pill tbd">TBD</span>' : '') + ' <span style="color:var(--text-soft)">(' + esc(rangeText(o)) + ')</span>').join('<br>');
-      t += `<tr class="clickable" data-row="${r.id}"><td><b>${esc(r.name)}</b></td><td><span class="pill ${st.key}">${st.label}</span></td><td>${items || '<span style="color:var(--text-soft)">—</span>'}</td></tr>`;
+      const items = st.items.map(o => esc(o.title) + (o.tentative ? ' <span class="pill tbd">TBD</span>' : '') + ' <span style="color:var(--ink-3)">(' + esc(rangeText(o)) + ')</span>').join('<br>');
+      t += `<tr class="clickable" data-row="${r.id}"><td><b>${esc(r.name)}</b></td><td><span class="pill ${st.key}">${st.label}</span></td><td>${items || '<span style="color:var(--ink-3)">—</span>'}</td></tr>`;
     });
     document.getElementById('roomTable').innerHTML = t + '</tbody>';
     renderDetail(occ);
@@ -296,17 +319,26 @@
   function renderDetail(occ) {
     const el = document.getElementById('detail');
     if (!selectedRoom) {
-      const busy = RL.ROOMS.filter(r => statusFor(r.id, occ).key === 'busy').length;
+      const n = { free: 0, busy: 0, later: 0, tbd: 0 };
+      RL.ROOMS.forEach(r => { n[statusFor(r.id, occ).key]++; });
       el.innerHTML = `<h2>${esc(prettyDate(selectedDate))}</h2><div class="sub">at ${esc(RL.fmtMinutes(selectedMin))}</div>
-        <p style="font-size:14px;line-height:1.5;">${busy} of ${RL.ROOMS.length} rooms in use at this time. Click a room on the map to see its schedule for the day.</p>`;
+        <div class="glance">
+          <div><i style="background:rgba(46,122,82,.55)"></i><b>${n.free}</b>free</div>
+          <div><i style="background:rgba(176,48,48,.6)"></i><b>${n.busy}</b>in use</div>
+          <div><i style="background:rgba(181,137,42,.6)"></i><b>${n.later}</b>booked later</div>
+          <div><i style="background:repeating-linear-gradient(45deg,rgba(181,137,42,.6) 0 3px,#fff 3px 6px)"></i><b>${n.tbd}</b>TBD hold</div>
+        </div>
+        <p class="hintline" style="margin-top:12px;">Click a room on the map to see its schedule for the day, or drag the slider to watch the day unfold.</p>`;
       return;
     }
     const r = roomById[selectedRoom], st = statusFor(selectedRoom, occ);
     const items = st.items.map(o => `<li class="${o === st.now && !o.tentative ? 'now' : ''}"><b>${esc(o.title)}${o.tentative ? ' <span class="pill tbd">TBD</span>' : ''}</b><small>${esc(rangeText(o))}${o.kind === 'weekly' ? ' · weekly' : ''}${o.kind === 'calendar' ? ' · from the staff calendar' : ''}${o.tentative ? ' · not final' : ''}</small></li>`).join('');
     el.innerHTML = `<h2>${esc(r.name)}</h2><div class="sub">${esc(prettyDate(selectedDate))}</div>
       <span class="pill ${st.key}">${st.label}</span>
-      <span style="font-size:13px;color:var(--text-mid);margin-left:8px;">${st.now ? 'until ' + esc(RL.fmtMinutes(st.now.endMin)) : (st.next ? 'next at ' + esc(RL.fmtMinutes(st.next.startMin)) : 'nothing booked')}</span>
-      ${items ? '<ul class="sched">' + items + '</ul>' : '<p class="empty">Nothing is booked in this room on this day.</p>'}`;
+      <span style="font-size:13px;color:var(--ink-2);margin-left:8px;">${st.now ? 'until ' + esc(RL.fmtMinutes(st.now.endMin)) : (st.next ? 'next at ' + esc(RL.fmtMinutes(st.next.startMin)) : 'nothing booked')}</span>
+      ${items ? '<ul class="sched">' + items + '</ul>' : '<p class="note-empty">Nothing is booked in this room on this day.</p>'}
+      <button type="button" class="btn small" id="clearRoom" style="margin-top:14px;">← Back to the whole building</button>`;
+    document.getElementById('clearRoom').onclick = () => { selectedRoom = null; renderAll(); };
   }
 
   /* ---------- controls ---------- */
@@ -318,6 +350,7 @@
     document.getElementById('nextDay').onclick = () => move(1);
     document.getElementById('dateIn').onchange = e => { if (e.target.value) { selectedDate = e.target.value; subscribe(); renderAll(); } };
     document.getElementById('timeIn').onchange = e => { const m = RL.toMinutes(e.target.value); if (m != null) { selectedMin = m; renderAll(); } };
+    document.getElementById('timeRange').oninput = e => { selectedMin = +e.target.value; renderAll(); };
     document.getElementById('nowBtn').onclick = () => { selectedDate = ymd(new Date()); selectedMin = nowMin(); subscribe(); renderAll(); };
     document.getElementById('roomTable').addEventListener('click', e => { const tr = e.target.closest('[data-row]'); if (tr) { selectedRoom = tr.dataset.row; renderAll(); document.getElementById('detail').scrollIntoView({behavior:'smooth', block:'nearest'}); } });
     wireAdmin();
@@ -328,7 +361,7 @@
   function subscribeConfirm() {
     db.collection('eventRequests').where('status', '==', 'approved').onSnapshot(snap => {
       approvedReqs = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderConfirmList();
-    }, err => { document.getElementById('confirmList').innerHTML = '<p class="empty">Could not load: ' + esc(err.message) + '</p>'; });
+    }, err => { document.getElementById('confirmList').innerHTML = '<p class="note-empty">Could not load: ' + esc(err.message) + '</p>'; });
     document.getElementById('confirmList').addEventListener('click', async e => {
       const b = e.target.closest('[data-confirm]'); if (!b) return;
       const r = approvedReqs.find(x => x.id === b.dataset.confirm); if (!r) return;
@@ -345,8 +378,8 @@
     const waiting = approvedReqs.map(r => ({ r, doc: RL.buildScheduleDoc(r.id, r) }))
       .filter(x => x.doc && x.r.roomConfirmed !== true && x.doc.date >= today)
       .sort((a, b) => (a.doc.date + String(a.doc.startMin).padStart(4, '0')).localeCompare(b.doc.date + String(b.doc.startMin).padStart(4, '0')));
-    if (!waiting.length) { el.innerHTML = '<p class="empty">Nothing is waiting — every approved room is confirmed. 🎉</p>'; return; }
-    el.innerHTML = waiting.map(({ r, doc }) => `<div class="booking-row"><div><b>${esc(doc.title)}</b><small>${esc(prettyDate(doc.date))} · ${esc(rangeText(doc))} · ${esc(doc.roomIds.map(i => roomById[i] ? roomById[i].name : i).join(', '))}</small></div><button class="btn primary" data-confirm="${esc(r.id)}">Confirm room</button></div>`).join('');
+    if (!waiting.length) { el.innerHTML = '<p class="note-empty">Nothing is waiting — every approved room is confirmed. 🎉</p>'; return; }
+    el.innerHTML = waiting.map(({ r, doc }) => `<div class="booking-row"><div><b>${esc(doc.title)}</b><small>${esc(prettyDate(doc.date))} · ${esc(rangeText(doc))} · ${esc(doc.roomIds.map(i => roomById[i] ? roomById[i].name : i).join(', '))}</small></div><button class="btn primary small" data-confirm="${esc(r.id)}">Confirm room</button></div>`).join('');
   }
 
   /* ---------- standing bookings (admins) ---------- */
@@ -399,10 +432,10 @@
   }
   function renderBookingList() {
     const el = document.getElementById('bkList'); if (!isAdmin) return;
-    if (!bookingDocs.length) { el.innerHTML = '<p class="empty">No standing bookings yet.</p>'; return; }
-    el.innerHTML = '<div style="font-size:12px;font-weight:600;color:var(--text-mid);">Current standing bookings</div>' + bookingDocs.slice().sort((a,b) => (a.title||'').localeCompare(b.title||'')).map(b => {
+    if (!bookingDocs.length) { el.innerHTML = '<p class="note-empty">No standing bookings yet.</p>'; return; }
+    el.innerHTML = bookingDocs.slice().sort((a,b) => (a.title||'').localeCompare(b.title||'')).map(b => {
       const when = b.type === 'weekly' ? 'Every ' + (b.days||[]).map(i => DAYS[i]).join(', ') + (b.from ? ' from ' + b.from : '') + (b.until ? ' until ' + b.until : '') : (b.date || '');
-      return `<div class="booking-row"><div><b>${esc(b.title)}${b.tentative ? ' <span class="pill tbd">TBD</span>' : ''}</b><small>${esc(when)} · ${esc(RL.fmtMinutes(b.startMin))} – ${esc(RL.fmtMinutes(b.endMin))} · ${esc((b.roomIds||[]).map(i => roomById[i] ? roomById[i].name : i).join(', '))}</small></div><button class="btn danger" data-del="${esc(b.id)}">Remove</button></div>`;
+      return `<div class="booking-row"><div><b>${esc(b.title)}${b.tentative ? ' <span class="pill tbd">TBD</span>' : ''}</b><small>${esc(when)} · ${esc(RL.fmtMinutes(b.startMin))} – ${esc(RL.fmtMinutes(b.endMin))} · ${esc((b.roomIds||[]).map(i => roomById[i] ? roomById[i].name : i).join(', '))}</small></div><button class="btn bad small" data-del="${esc(b.id)}">Remove</button></div>`;
     }).join('');
   }
 </script>
