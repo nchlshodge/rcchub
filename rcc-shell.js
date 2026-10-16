@@ -1,13 +1,13 @@
 // RCC Hub — shared header. One navigation for every page, built from who is signed in.
 //   RccShell.render(document.getElementById('rccNav'), { active: 'timeline', user, roles, onSignOut })
-// `roles` = { isAdmin, graphics, marketing, vanAdmin, bedsideAdmin, overview, commissioner, benevolence }
+// `roles` = { isAdmin, graphics, marketing, vanAdmin, bedsideAdmin, overview }
 (function () {
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
   function linksFor(roles) {
     roles = roles || {};
     const staff = roles.isAdmin || roles.graphics || roles.marketing;
-    const anyAdmin = roles.isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview || roles.commissioner || roles.benevolence;
+    const anyAdmin = roles.isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview;
     return [
       { key: 'home',     label: 'Home',              href: 'index.html',          show: true },
       { key: 'requests', label: 'Event requests',    href: 'event-requests.html', show: staff },

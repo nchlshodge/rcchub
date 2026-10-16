@@ -1,0 +1,14 @@
+{
+  "name": "RCC Ministry Hub",
+  "short_name": "RCC Hub",
+  "description": "Care, requests, rooms, and more for Rochester Christian Church.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f2ea",
+  "theme_color": "#2557b8",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

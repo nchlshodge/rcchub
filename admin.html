@@ -209,8 +209,6 @@
       <div class="section-tab" data-section="bedside">Bedside</div>
       <div class="section-tab" data-section="incidents">Incident Reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="vans">Van Usage</div>
-      <div class="section-tab" data-section="intramural" style="display:none;">Intramural</div>
-      <div class="section-tab" data-section="benevolence" style="display:none;">Benevolence</div>
       <div class="section-tab" data-section="events">Event Requests <span class="badge-count" id="eventsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="timeline">Creative Timeline</div>
       <div class="section-tab" data-section="timeoff">Time Off <span class="badge-count" id="timeOffCount" style="display:none;"></span></div>
@@ -292,17 +290,6 @@
         <iframe class="embed-frame" id="frame-vans" title="Van Usage admin" data-src="van/admin.html?embed=1"></iframe>
       </div>
 
-      <!-- INTRAMURAL + BENEVOLENCE: embedded once those pages are published (probed at load) -->
-      <div class="section" id="section-intramural">
-        <div class="embed-bar"><span>Intramural Sports admin</span><a id="open-intramural" href="#" target="_blank" rel="noopener">Open on its own page ↗</a></div>
-        <iframe class="embed-frame" id="frame-intramural" title="Intramural Sports admin"></iframe>
-      </div>
-
-      <div class="section" id="section-benevolence">
-        <div class="embed-bar"><span>Benevolence Fund admin</span><a id="open-benevolence" href="#" target="_blank" rel="noopener">Open on its own page ↗</a></div>
-        <iframe class="embed-frame" id="frame-benevolence" title="Benevolence Fund admin"></iframe>
-      </div>
-
       <!-- CREATIVE TIMELINE (graphics / marketing queue, embedded) -->
       <div class="section" id="section-timeline">
         <div class="embed-bar"><span>Creative Timeline</span><a id="open-timeline" href="queue-timeline.html?embed=1" target="_blank" rel="noopener">Open on its own page ↗</a></div>
@@ -378,9 +365,7 @@
       const canGraphics = isFullAdmin || roles.graphics === true;
       const canMarketing = isFullAdmin || roles.marketing === true;
       const canOverview = isFullAdmin || roles.overview === true;
-      const canIntramural = isFullAdmin || roles.commissioner === true;
-      const canBenevolence = isFullAdmin || roles.benevolence === true;
-      const hasAnyAccess = isFullAdmin || canVan || canBedside || canGraphics || canMarketing || canOverview || canIntramural || canBenevolence;
+      const hasAnyAccess = isFullAdmin || canVan || canBedside || canGraphics || canMarketing || canOverview;
       window.currentUserIsFullAdmin = isFullAdmin;
       window.currentUserCanOverview = canOverview;
       window.currentUserIsOwner = userData.isOwner === true;
@@ -398,18 +383,8 @@
         // Incident Reports, Event Requests, Time Off, App Access,
         // Access Requests, and Manage Admins stay full-admin-only,
         // since they sit outside any single department's scope.
-        // Intramural and Benevolence only get a tab once their admin page
-        // is actually published on the site (probed here), so there's never
-        // a tab pointing at a missing page.
-        const [intramuralSrc, benevolenceSrc] = await Promise.all([
-          probePage(['intramural/admin.html']),
-          probePage(['benevolence/admin.html', 'Benevolence/admin.html']),
-        ]);
-        setEmbedSource('intramural', intramuralSrc);
-        setEmbedSource('benevolence', benevolenceSrc);
         const tabVisibility = {
           overview: canOverview, bedside: canBedside, incidents: isFullAdmin, vans: canVan,
-          intramural: canIntramural && !!intramuralSrc, benevolence: canBenevolence && !!benevolenceSrc,
           events: isFullAdmin, timeline: canGraphics || canMarketing, timeoff: isFullAdmin, access: isFullAdmin,
           requests: isFullAdmin, admins: isFullAdmin,
         };
@@ -462,21 +437,6 @@
   // Each module's full admin page is shown inside its tab (same page the
   // module's own Admin button used to open), so the portal always has the
   // complete set of tools. Frames load the first time their tab is opened.
-  async function probePage(candidates) {
-    for (const path of candidates) {
-      try {
-        const r = await fetch(path, { method: 'HEAD', cache: 'no-store' });
-        if (r.ok) return path;
-      } catch (e) { /* try next */ }
-    }
-    return null;
-  }
-  function setEmbedSource(key, path) {
-    const frame = document.getElementById('frame-' + key);
-    if (!frame || !path) return;
-    frame.dataset.src = path + '?embed=1';
-    document.getElementById('open-' + key).href = path;
-  }
   function loadEmbed(key) {
     const frame = document.getElementById('frame-' + key);
     if (frame && !frame.getAttribute('src') && frame.dataset.src) frame.src = frame.dataset.src;

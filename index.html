@@ -177,7 +177,6 @@
       <label class="module-check"><input type="checkbox" value="bedside"> Bedside</label>
       <label class="module-check"><input type="checkbox" value="incidentReport"> Incident Report</label>
       <label class="module-check"><input type="checkbox" value="vanRental"> Van Usage</label>
-      <label class="module-check" id="intramuralCheck" hidden><input type="checkbox" value="intramural"> Intramural Sports</label>
     </div>
 
     <label>Note (optional)</label>
@@ -204,12 +203,10 @@
   // Everything on the home page lives here. `key` gates on users/{uid}.modules;
   // `staff: true` tiles are not module-gated — they follow the person's roles.
   //   hideIfLocked  — staff-only tools stay invisible to people without access
-  //   probe         — the tile only appears once that page actually exists on the site
-  //                   (Intramural / Benevolence light up by themselves when they are published)
   const GROUPS = [
     { id: 'plan',   title: 'Plan & request',        sub: 'Events, rooms, and time away', tone: 't-blue' },
     { id: 'care',   title: 'Care & safety',         sub: 'Look after people',            tone: 't-green' },
-    { id: 'fleet',  title: 'Vehicles & activities', sub: 'Get around, get together',     tone: 't-gold' },
+    { id: 'fleet',  title: 'Vehicles',              sub: 'Get around',                   tone: 't-gold' },
     { id: 'manage', title: 'Manage',                sub: 'For admins and team leads',    tone: 't-gray' },
   ];
   const MODULES = [
@@ -220,14 +217,11 @@
     { group: 'plan',  key: 'timeline', staff: 'staff', name: 'Creative Timeline', desc: 'What needs a graphic, a post, or the calendar — soonest first', icon: '🗂️', href: 'queue-timeline.html' },
     { group: 'care',  key: 'bedside', name: 'Bedside',                desc: 'Care visits, prayer requests, and the prayer wall', icon: '🕊️', href: 'bedside/index.html' },
     { group: 'care',  key: 'incidentReport', name: 'Incident Report', desc: 'Report an injury, near miss, or property issue', icon: '📋', href: 'incident/index.html' },
-    { group: 'care',  key: 'benevolence', name: 'Benevolence Fund',   desc: 'Review benevolence fund applications',         icon: '🤝', href: 'admin.html?section=benevolence', hideIfLocked: true, probe: 'benevolence/admin.html' },
     { group: 'fleet', key: 'vanRental', name: 'Van Usage',            desc: 'Request a van, check one out, or manage the fleet', icon: '🚐', href: 'van/index.html' },
-    { group: 'fleet', key: 'intramural', name: 'Intramural Sports',   desc: 'Sign up, see the schedule, and follow your team', icon: '🏐', href: 'intramural/index.html', probe: 'intramural/index.html' },
     { group: 'manage', key: 'admin', staff: 'admin', name: 'Admin',    desc: 'Event requests, rooms, Bedside, vans, and access', icon: '🛠️', href: 'admin.html' },
   ];
 
   let currentUser = null;
-  let probeResults = {};      // page path -> true/false
   let lastUserData = null;
 
   auth.onAuthStateChanged(async user => {
@@ -258,7 +252,7 @@
     const doc = await ref.get();
 
     if (!doc.exists) {
-      let modules = { bedside: false, incidentReport: true, vanRental: true, eventRequest: true, intramural: true };
+      let modules = { bedside: false, incidentReport: true, vanRental: true, eventRequest: true };
       if (user.email) {
         const inviteRef = db.collection('hubInvites').doc(user.email.toLowerCase());
         const inviteDoc = await inviteRef.get();
@@ -278,7 +272,7 @@
       // Existing user from before the hub existed — default them to the
       // modules that predate the newer ones so nobody loses access.
       await ref.set({
-        modules: { bedside: false, incidentReport: true, vanRental: true, eventRequest: true, intramural: true }
+        modules: { bedside: false, incidentReport: true, vanRental: true, eventRequest: true }
       }, { merge: true });
     }
   }
@@ -297,19 +291,10 @@
     });
   }
 
-  // Pages that may not be on the site yet (Intramural, Benevolence): look once, show the tile only if present.
-  function probePages() {
-    MODULES.filter(m => m.probe && !(m.probe in probeResults)).forEach(m => {
-      probeResults[m.probe] = false;
-      fetch(m.probe, { method: 'HEAD' }).then(r => { probeResults[m.probe] = r.ok; if (r.ok) renderModules(); }).catch(() => {});
-    });
-  }
-
   function accessFor(m, modules, roles, isAdmin) {
     if (m.always) return 'open';
     if (m.staff === 'staff') return (isAdmin || roles.graphics || roles.marketing) ? 'open' : 'hidden';
-    if (m.staff === 'admin') return (isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview || roles.commissioner || roles.benevolence) ? 'open' : 'hidden';
-    if (m.probe && probeResults[m.probe] !== true) return 'hidden';
+    if (m.staff === 'admin') return (isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview) ? 'open' : 'hidden';
     if (modules[m.key] === true) return 'open';
     return m.hideIfLocked ? 'hidden' : 'locked';
   }
@@ -317,8 +302,6 @@
   function renderModules() {
     const data = lastUserData || {};
     const modules = data.modules || {}, roles = data.roles || {}, isAdmin = data.isAdmin === true;
-    probePages();
-    document.getElementById('intramuralCheck').hidden = probeResults['intramural/index.html'] !== true;
 
     // Every ordinary app always shows a tile: open ones go straight in; locked ones are dashed and,
     // when tapped, send an access request to the admins. Staff-only tools simply stay out of sight.
