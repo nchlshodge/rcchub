@@ -251,6 +251,21 @@
     #googleSignInBtn:hover { transform: translateY(-1px); box-shadow: var(--shadow-2); }
     .banner { border-radius: 0 0 16px 16px; }
 
+    .cl-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .cl-chip { border: 1px solid var(--border-mid, #d9d1c1); background: #fff; color: var(--text-mid); border-radius: 999px; padding: 7px 14px; font-size: 13.5px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all .2s var(--ease); }
+    .cl-chip b { font-weight: 600; background: var(--bg-raised); border-radius: 999px; padding: 1px 8px; margin-left: 6px; font-size: 12px; }
+    .cl-chip:hover { border-color: var(--blue); color: var(--blue); }
+    .cl-chip.active { background: var(--blue); border-color: var(--blue); color: #fff; box-shadow: 0 4px 14px rgba(37,87,184,.25); }
+    .cl-chip.active b { background: rgba(255,255,255,.22); color: #fff; }
+    .cl-check { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--text-mid); white-space: nowrap; }
+    .cl-row { display: grid; grid-template-columns: minmax(0, 1.6fr) 150px 130px 120px; gap: 6px 16px; align-items: center; padding: 12px 18px; }
+    .cl-row .nm { font-size: 15px; font-weight: 500; }
+    .cl-row .nm a { color: var(--text); text-decoration: none; } .cl-row .nm a:hover { color: var(--blue); text-decoration: underline; }
+    .cl-row .nm small { color: var(--text-soft); font-weight: 400; margin-left: 6px; }
+    .cl-row .dt { font-size: 13.5px; color: var(--text-mid); }
+    .cl-row .bd { justify-self: start; }
+    .cl-head { padding: 0 18px 6px; font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-soft); font-weight: 600; display: grid; grid-template-columns: minmax(0, 1.6fr) 150px 130px 120px; gap: 6px 16px; }
+    @media (max-width: 640px) { .cl-row { grid-template-columns: 1fr auto; } .cl-row .dt.done { display: none; } .cl-head { display: none; } }
     .log-tools { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
     .log-tools input { flex: 1 1 220px; padding: 10px 14px; }
     .log-tools select { padding: 10px 14px; }
@@ -309,6 +324,7 @@
       <div class="section-tab" data-section="requests">Access Requests <span class="badge-count" id="requestsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="admins">Manage Admins</div>
       <div class="section-tab" data-section="activity">Activity</div>
+      <div class="section-tab" data-section="clearances">Clearances</div>
     </nav>
 
     <main>
@@ -388,6 +404,20 @@
       <div class="section" id="section-timeline">
         <div class="embed-bar"><span>Creative Timeline</span><a id="open-timeline" href="queue-timeline.html?embed=1" target="_blank" rel="noopener">Open on its own page ↗</a></div>
         <iframe class="embed-frame" id="frame-timeline" title="Creative Timeline" data-src="queue-timeline.html?embed=1"></iframe>
+      </div>
+
+      <!-- VOLUNTEER CLEARANCES (from Planning Center) -->
+      <div class="section" id="section-clearances">
+        <h2 class="section-title">Volunteer clearances</h2>
+        <div class="card" style="background:var(--blue-dim); border-color:var(--blue-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">Background-check expiration dates, copied from Planning Center every morning. Renewals are recorded in Planning Center — this page only shows them. You'll also get an email 30 days and 7 days before a clearance ends. <span id="clSynced"></span></div>
+        </div>
+        <div class="cl-chips" id="clChips" role="group" aria-label="Show"></div>
+        <div class="log-tools">
+          <input type="text" id="clSearch" placeholder="Search by name…" aria-label="Search by name">
+          <label class="cl-check"><input type="checkbox" id="clInactive"> Include people marked inactive</label>
+        </div>
+        <div id="clearanceList"><div class="loading">Loading...</div></div>
       </div>
 
       <!-- ACTIVITY (the audit trail) -->
@@ -493,7 +523,7 @@
         const tabVisibility = {
           overview: canOverview, bedside: canBedside, incidents: isFullAdmin, vans: canVan,
           events: isFullAdmin, timeline: canGraphics || canMarketing, timeoff: isFullAdmin, access: isFullAdmin,
-          requests: isFullAdmin, admins: isFullAdmin, activity: isFullAdmin,
+          requests: isFullAdmin, admins: isFullAdmin, activity: isFullAdmin, clearances: isFullAdmin,
         };
         document.querySelectorAll('.section-tab').forEach(tab => {
           const key = tab.dataset.section;
@@ -518,7 +548,7 @@
         if (canOverview) { loadOverview({canBedside, canVan, isFullAdmin, canOverview}); }
         if (isFullAdmin) { loadIncidentsBadgeOnly(); }
         if (isFullAdmin) { loadEventRequests(); loadTimeOffRequests(); loadNotificationEmails(); }
-        if (isFullAdmin) { loadModuleManagement(); loadAccessRequests(); loadAdminManagement(); loadActivity(); }
+        if (isFullAdmin) { loadModuleManagement(); loadAccessRequests(); loadAdminManagement(); loadActivity(); loadClearances(); }
       } else {
         document.getElementById('accessDenied').style.display = 'block';
       }
@@ -549,7 +579,7 @@
   const NAV_GROUPS = [
     { key: 'overview', label: 'Overview',        pages: ['overview'] },
     { key: 'requests', label: 'Requests',        pages: ['events', 'timeline', 'timeoff'] },
-    { key: 'care',     label: 'Care & Safety',   pages: ['bedside', 'incidents'] },
+    { key: 'care',     label: 'Care & Safety',   pages: ['bedside', 'incidents', 'clearances'] },
     { key: 'vans',     label: 'Van Usage',       pages: ['vans'] },
     { key: 'people',   label: 'People & Access', pages: ['access', 'requests', 'admins', 'activity'] },
   ];
@@ -771,6 +801,45 @@
       const d = r.at && r.at.toDate ? r.at.toDate() : null;
       const when = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '…';
       return `<div class="card log-row"><div class="log-when">${escHtml(when)}</div><div><div class="log-what">${escHtml(r.summary || r.action)}</div><div class="log-who">${escHtml(r.actorName || r.actorEmail || 'Someone')}${r.actorEmail && r.actorName ? ' · ' + escHtml(r.actorEmail) : ''}</div></div></div>`;
+    }).join('');
+  }
+
+  // ── Volunteer clearances (Planning Center, copied in each morning) ──
+  let clearanceRows = [], clFilter = 'year';
+  function loadClearances() {
+    db.collection('clearances').onSnapshot(snap => {
+      clearanceRows = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.expiresOn);
+      renderClearances();
+    }, err => { document.getElementById('clearanceList').innerHTML = '<div class="empty-state">Could not load clearances.</div>'; console.error(err); });
+    db.collection('settings').doc('clearanceSync').onSnapshot(doc => {
+      const at = doc.exists && doc.data().at && doc.data().at.toDate ? doc.data().at.toDate() : null;
+      document.getElementById('clSynced').textContent = at ? 'Last updated ' + at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' at ' + at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + '.' : '';
+    }, () => {});
+    document.getElementById('clSearch').addEventListener('input', renderClearances);
+    document.getElementById('clInactive').addEventListener('change', renderClearances);
+    document.getElementById('clChips').addEventListener('click', e => { const b = e.target.closest('[data-cl]'); if (b) { clFilter = b.dataset.cl; renderClearances(); } });
+  }
+  function clDays(iso) { const t = new Date(); t.setHours(0, 0, 0, 0); const [y, m, d] = iso.split('-').map(Number); return Math.round((new Date(y, m - 1, d) - t) / 86400000); }
+  function clPretty(iso) { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); }
+  function renderClearances() {
+    const year = new Date().getFullYear(), showInactive = document.getElementById('clInactive').checked, q = document.getElementById('clSearch').value.trim().toLowerCase();
+    const base = clearanceRows.filter(c => (showInactive || c.personStatus !== 'inactive') && (!q || (c.name || '').toLowerCase().includes(q)));
+    const tests = {
+      soon:    c => { const n = clDays(c.expiresOn); return n >= 0 && n <= 30; },
+      year:    c => { const n = clDays(c.expiresOn); return n >= 0 && c.expiresOn.slice(0, 4) === String(year); },
+      next:    c => { const n = clDays(c.expiresOn); return n >= 0 && c.expiresOn.slice(0, 4) === String(year + 1); },
+      current: c => clDays(c.expiresOn) >= 0,
+      expired: c => clDays(c.expiresOn) < 0,
+    };
+    const labels = [['soon', 'Next 30 days'], ['year', 'Ending this year'], ['next', 'Ending next year'], ['current', 'All current'], ['expired', 'Expired']];
+    document.getElementById('clChips').innerHTML = labels.map(([k, l]) => `<button type="button" class="cl-chip ${clFilter === k ? 'active' : ''}" data-cl="${k}">${l}<b>${base.filter(tests[k]).length}</b></button>`).join('');
+    const rows = base.filter(tests[clFilter]).sort((a, b) => clFilter === 'expired' ? b.expiresOn.localeCompare(a.expiresOn) : a.expiresOn.localeCompare(b.expiresOn) || (a.name || '').localeCompare(b.name || ''));
+    const el = document.getElementById('clearanceList');
+    if (!clearanceRows.length) { el.innerHTML = '<div class="empty-state">Nothing here yet — the list fills in after the first morning sync from Planning Center.</div>'; return; }
+    if (!rows.length) { el.innerHTML = '<div class="empty-state">' + (clFilter === 'soon' ? 'Nobody\'s clearance ends in the next 30 days. 🎉' : 'No one matches.') + '</div>'; return; }
+    el.innerHTML = '<div class="cl-head"><span>Name</span><span>Expires</span><span>Completed</span><span></span></div>' + rows.map(c => {
+      const n = clDays(c.expiresOn), badge = n < 0 ? `<span class="tag tag-pending">expired ${-n}d ago</span>` : n <= 30 ? `<span class="tag tag-pending">${n === 0 ? 'today' : n + ' day' + (n === 1 ? '' : 's')}</span>` : n <= 90 ? `<span class="tag tag-hospital">${n} days</span>` : `<span class="tag tag-hidden">${n} days</span>`;
+      return `<div class="card cl-row"><div class="nm"><a href="https://people.planningcenteronline.com/people/${encodeURIComponent(c.id)}" target="_blank" rel="noopener" title="Open in Planning Center">${escHtml(c.name || 'Unknown')}</a>${c.personStatus === 'inactive' ? '<small>(inactive)</small>' : ''}${c.child ? '<small>(student)</small>' : ''}</div><div class="dt">${escHtml(clPretty(c.expiresOn))}</div><div class="dt done">${c.completedOn ? escHtml(clPretty(c.completedOn)) : ''}</div><div class="bd">${badge}</div></div>`;
     }).join('');
   }
 
