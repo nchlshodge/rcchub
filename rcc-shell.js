@@ -6,6 +6,8 @@
 
   function linksFor(roles) {
     roles = roles || {};
+    // someone still waiting for approval only sees Home
+    if (roles.pending) return [{ key: 'home', label: 'Home', href: 'index.html', show: true }];
     const staff = roles.isAdmin || roles.graphics || roles.marketing;
     const anyAdmin = roles.isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview || roles.clearances || roles.facilities;
     return [

@@ -879,7 +879,8 @@
     const c = document.getElementById('accessRequestsList');
     if (!allAccessRequests.length) { c.innerHTML = '<div class="empty-state">No pending requests.</div>'; return; }
     c.innerHTML = allAccessRequests.map(r => {
-      const modLabels = (r.modulesRequested||[]).map(k => MODULE_LABELS[k] || k).join(', ');
+      const isSignup = r.kind === 'signup';
+      const modLabels = isSignup ? 'New sign-up — needs approval to use the hub' : ((r.modulesRequested||[]).map(k => MODULE_LABELS[k] || k).join(', ') || 'General access');
       return `
         <div class="card">
           <div class="card-title">${escHtml(r.name)}</div>
@@ -888,8 +889,8 @@
           ${r.note ? `<div class="card-text">"${escHtml(r.note)}"</div>` : ''}
           <div class="card-meta"><span>Requested by ${escHtml(r.requestedBy?.name||'unknown')}</span></div>
           <div class="actions">
-            <button class="btn btn-approve" onclick="approveAccessRequest('${r.id}')">Approve &amp; grant access</button>
-            <button class="btn btn-delete" onclick="dismissAccessRequest('${r.id}')">Dismiss</button>
+            <button class="btn btn-approve" onclick="approveAccessRequest('${r.id}')">${isSignup ? 'Approve this person' : 'Approve &amp; grant access'}</button>
+            <button class="btn btn-delete" onclick="dismissAccessRequest('${r.id}')">${isSignup ? 'Decline' : 'Dismiss'}</button>
           </div>
         </div>`;
     }).join('');
@@ -901,10 +902,15 @@
     const moduleUpdates = {};
     (req.modulesRequested||[]).forEach(k => moduleUpdates[k] = true);
 
-    // If someone with this email already has an account, update it directly.
-    const existing = await db.collection('users').where('email','==',req.email).limit(1).get();
-    if (!existing.empty) {
-      await db.collection('users').doc(existing.docs[0].id).set({modules: moduleUpdates}, {merge:true});
+    // If someone with this email already has an account, approve it directly (and add any modules they asked for).
+    const approval = { approved: true, approvalDeclined: false, approvedAt: Date.now(), approvedBy: currentUser.uid };
+    let targetUid = req.requestedBy && req.requestedBy.uid ? req.requestedBy.uid : null;
+    if (!targetUid) {
+      const existing = await db.collection('users').where('email','==',req.email).limit(1).get();
+      if (!existing.empty) targetUid = existing.docs[0].id;
+    }
+    if (targetUid) {
+      await db.collection('users').doc(targetUid).set(Object.assign({}, approval, Object.keys(moduleUpdates).length ? {modules: moduleUpdates} : {}), {merge:true});
     } else {
       // Otherwise, stash the requested modules so they're applied
       // automatically the first time this email signs in.
@@ -918,8 +924,11 @@
   };
 
   window.dismissAccessRequest = async (reqId) => {
-    await db.collection('accessRequests').doc(reqId).update({status:'dismissed', resolvedAt:new Date().toISOString(), resolvedBy: currentUser.uid});
     const dr = allAccessRequests.find(r => r.id === reqId) || {};
+    if (dr.kind === 'signup' && dr.requestedBy && dr.requestedBy.uid) {
+      await db.collection('users').doc(dr.requestedBy.uid).set({ approved: false, approvalDeclined: true }, {merge:true});
+    }
+    await db.collection('accessRequests').doc(reqId).update({status:'dismissed', resolvedAt:new Date().toISOString(), resolvedBy: currentUser.uid});
     RccAudit.log('access.request.dismiss', 'accessRequest', reqId, `Dismissed the access request from ${dr.name || 'someone'} (${dr.email || ''})`);
     showBanner('Request dismissed.');
   };

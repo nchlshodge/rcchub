@@ -224,6 +224,7 @@
 
   let currentUser = null;
   let lastUserData = null;
+  let isMember = true;
 
   auth.onAuthStateChanged(async user => {
     if (user) {
@@ -278,11 +279,68 @@
     }
   }
 
+  // A member is an admin, someone an admin approved, anyone with a confirmed church email address, or someone
+  // an admin invited by email. Everyone else sees a "waiting for approval" screen until an admin approves them.
+  // (The database rules enforce the same thing — this is only so the page can explain what is going on.)
+  async function computeMember(user, data) {
+    const email = (user.email || '').toLowerCase();
+    if (data.isAdmin === true || data.approved === true) return true;
+    if (user.emailVerified && /@rochesterchristian\.church$/.test(email)) return true;
+    if (user.emailVerified && email) {
+      try { if ((await db.collection('hubInvites').doc(email).get()).exists) return true; } catch (e) { /* not invited */ }
+    }
+    return false;
+  }
+
+  // Tell the admins this person is waiting. One request per person; if it already exists the write is refused, which is fine.
+  async function fileSignupRequest(user) {
+    const key = 'rcc-signup-filed-' + user.uid;
+    try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (e) { /* storage may be blocked */ }
+    try {
+      await db.collection('accessRequests').doc('signup_' + user.uid).set({
+        kind: 'signup',
+        name: user.displayName || user.email || 'New person',
+        email: (user.email || '').toLowerCase(),
+        note: 'New sign-up — waiting for approval to use the hub.',
+        modulesRequested: [],
+        status: 'pending',
+        requestedBy: { uid: user.uid, name: user.displayName || user.email || '' },
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (e) { /* already filed */ }
+  }
+
+  function renderWaiting(data) {
+    const first = currentUser.displayName ? currentUser.displayName.split(' ')[0] : 'there';
+    const declined = data.approvalDeclined === true;
+    document.getElementById('welcomeSub').textContent = declined ? 'Your account was not approved.' : 'Your account is waiting for approval.';
+    const box = document.getElementById('moduleGrid');
+    box.replaceChildren();
+    const card = document.createElement('div'); card.className = 'empty';
+    const b = document.createElement('b'); b.textContent = declined ? 'Not approved' : 'Waiting for approval';
+    card.appendChild(b);
+    card.appendChild(document.createTextNode(declined
+      ? 'An admin did not approve this account. If you think that is a mistake, please contact the church office.'
+      : 'Thanks for signing in, ' + first + '. An admin needs to approve your account before you can use the hub. We have let them know — you will get access as soon as they do.'));
+    const who = document.createElement('div'); who.style.cssText = 'margin-top:10px;font-size:13px;color:var(--ink-3)'; who.textContent = 'Signed in as ' + (currentUser.email || '');
+    card.appendChild(who);
+    if (!declined) {
+      const row = document.createElement('div'); row.style.marginTop = '16px';
+      const again = document.createElement('button'); again.type = 'button'; again.className = 'btn soft'; again.textContent = 'Check again'; again.addEventListener('click', () => location.reload());
+      row.appendChild(again); card.appendChild(row);
+    }
+    box.appendChild(card);
+  }
+
   function loadModules(uid) {
-    db.collection('users').doc(uid).onSnapshot(doc => {
+    db.collection('users').doc(uid).onSnapshot(async doc => {
       lastUserData = doc.data() || {};
+      isMember = await computeMember(currentUser, lastUserData);
       const roles = Object.assign({}, lastUserData.roles || {}, { isAdmin: lastUserData.isAdmin === true });
-      RccShell.render(document.getElementById('rccNav'), { active: 'home', user: currentUser, roles, onSignOut: () => auth.signOut() });
+      RccShell.render(document.getElementById('rccNav'), { active: 'home', user: currentUser, roles: Object.assign({}, roles, { pending: !isMember }), onSignOut: () => auth.signOut() });
+      document.querySelector('.foot').hidden = !isMember;
+      if (!isMember) { watchNeeds({}); renderWaiting(lastUserData); if (lastUserData.approvalDeclined !== true) fileSignupRequest(currentUser); return; }
+      document.getElementById('welcomeSub').textContent = 'Pick up where you left off, or start something new.';
       renderModules();
       watchNeeds(roles);
     }, err => {
@@ -376,12 +434,12 @@
   // and one click, instead of filling out the modal.
   window.requestAccessTo = async (moduleKey, moduleName) => {
     if (!currentUser) return;
-    const already = await db.collection('accessRequests')
-      .where('email','==',(currentUser.email||'').toLowerCase())
-      .where('modulesRequested','array-contains', moduleKey)
+    const mine = await db.collection('accessRequests')
+      .where('requestedBy.uid','==',currentUser.uid)
       .where('status','==','pending')
-      .limit(1).get();
-    if (!already.empty) {
+      .get();
+    const already = mine.docs.filter(d => (d.data().modulesRequested || []).indexOf(moduleKey) >= 0);
+    if (already.length) {
       alert(`You've already requested access to ${moduleName} — an admin will follow up.`);
       return;
     }
