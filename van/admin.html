@@ -10,7 +10,6 @@
 
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
@@ -116,93 +115,178 @@
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel" data-presets="react">
-const {useState,useEffect,useRef} = React;
+<script>
+const {
+  useState,
+  useEffect,
+  useRef
+} = React;
 
 // ---------- Firebase ----------
 const firebaseConfig = {
-  apiKey:            "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
-  authDomain:        "bedsidercc.firebaseapp.com",
-  projectId:         "bedsidercc",
-  storageBucket:     "bedsidercc.firebasestorage.app",
+  apiKey: "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+  authDomain: "bedsidercc.firebaseapp.com",
+  projectId: "bedsidercc",
+  storageBucket: "bedsidercc.firebasestorage.app",
   messagingSenderId: "950958384975",
-  appId:             "1:950958384975:web:6f43dec5a7ba842c69c73a"
+  appId: "1:950958384975:web:6f43dec5a7ba842c69c73a"
 };
-try { firebase.app(); } catch(e) { firebase.initializeApp(firebaseConfig); }
+try {
+  firebase.app();
+} catch (e) {
+  firebase.initializeApp(firebaseConfig);
+}
 const auth = firebase.auth();
 const db = firebase.firestore();
+// If a network blocks Firestore's streaming connection, quietly fall back to one that works.
+try {
+  db.settings({
+    experimentalAutoDetectLongPolling: true,
+    merge: true
+  });
+} catch (e) {/* keep going with the default connection */}
 const storage = firebase.storage();
-
-function uid(){ return Math.random().toString(36).slice(2,10); }
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
 
 // Seed vans once if the collection is empty (first-run convenience only)
-async function ensureVansSeeded(){
+async function ensureVansSeeded() {
   const snap = await db.collection('vans').limit(1).get();
-  if(!snap.empty) return;
-  const seed = [
-    {name:'White Chevy Van (low priority use)', mileage:52310, gas:75, status:'available', lowPriority:true},
-    {name:'Brown GMC Van', mileage:88120, gas:40, status:'available', lowPriority:false},
-    {name:'White Ford Van', mileage:31200, gas:90, status:'available', lowPriority:false},
-  ];
+  if (!snap.empty) return;
+  const seed = [{
+    name: 'White Chevy Van (low priority use)',
+    mileage: 52310,
+    gas: 75,
+    status: 'available',
+    lowPriority: true
+  }, {
+    name: 'Brown GMC Van',
+    mileage: 88120,
+    gas: 40,
+    status: 'available',
+    lowPriority: false
+  }, {
+    name: 'White Ford Van',
+    mileage: 31200,
+    gas: 90,
+    status: 'available',
+    lowPriority: false
+  }];
   const batch = db.batch();
-  seed.forEach(v=>{ const ref = db.collection('vans').doc(); batch.set(ref, v); });
+  seed.forEach(v => {
+    const ref = db.collection('vans').doc();
+    batch.set(ref, v);
+  });
   await batch.commit();
 }
-async function ensureWarningLightsSeeded(){
+async function ensureWarningLightsSeeded() {
   const snap = await db.collection('vanWarningLights').limit(1).get();
-  if(!snap.empty) return;
-  const seed = [
-    {name:'Tire Pressure Light', safety:false, feedback:"That's the tire pressure light — we know about it, low priority. Thanks for flagging it, no need to call anyone."},
-    {name:'Check Engine Light (known emissions sensor)', safety:false, feedback:"That's a known issue — not a safety concern. Go ahead and drive.", van:null},
-    {name:'Brake Warning Light', safety:true, feedback:null},
-    {name:'Oil Pressure Light', safety:true, feedback:null},
-  ];
+  if (!snap.empty) return;
+  const seed = [{
+    name: 'Tire Pressure Light',
+    safety: false,
+    feedback: "That's the tire pressure light — we know about it, low priority. Thanks for flagging it, no need to call anyone."
+  }, {
+    name: 'Check Engine Light (known emissions sensor)',
+    safety: false,
+    feedback: "That's a known issue — not a safety concern. Go ahead and drive.",
+    van: null
+  }, {
+    name: 'Brake Warning Light',
+    safety: true,
+    feedback: null
+  }, {
+    name: 'Oil Pressure Light',
+    safety: true,
+    feedback: null
+  }];
   const batch = db.batch();
-  seed.forEach(l=>{ const ref = db.collection('vanWarningLights').doc(); batch.set(ref, l); });
+  seed.forEach(l => {
+    const ref = db.collection('vanWarningLights').doc();
+    batch.set(ref, l);
+  });
   await batch.commit();
 }
 
 // ---------- Small components ----------
-function TopBar({title,onBack,right,hubLink}){
-  return (
-    <div className="topbar">
-      <h1>
-        {hubLink && <a className="backlink" href="../index.html">← All apps</a>}
-        {onBack && <button className="plain" onClick={onBack}>← Back</button>}
-        {title}
-      </h1>
-      <div className="topbar-right">{right}</div>
-    </div>
-  );
+function TopBar({
+  title,
+  onBack,
+  right,
+  hubLink
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "topbar"
+  }, /*#__PURE__*/React.createElement("h1", null, hubLink && /*#__PURE__*/React.createElement("a", {
+    className: "backlink",
+    href: "../index.html"
+  }, "← All apps"), onBack && /*#__PURE__*/React.createElement("button", {
+    className: "plain",
+    onClick: onBack
+  }, "← Back"), title), /*#__PURE__*/React.createElement("div", {
+    className: "topbar-right"
+  }, right));
 }
-
-function YesNo({value,onChange,yesLabel="Yes",noLabel="No"}){
-  return (
-    <div className="toggle-row">
-      <button type="button" className={value===true?'active-yes':''} onClick={()=>onChange(true)}>{yesLabel}</button>
-      <button type="button" className={value===false?'active-no':''} onClick={()=>onChange(false)}>{noLabel}</button>
-    </div>
-  );
+function YesNo({
+  value,
+  onChange,
+  yesLabel = "Yes",
+  noLabel = "No"
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "toggle-row"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: value === true ? 'active-yes' : '',
+    onClick: () => onChange(true)
+  }, yesLabel), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: value === false ? 'active-no' : '',
+    onClick: () => onChange(false)
+  }, noLabel));
 }
-
-function CameraCapture({label, onCapture, photoUrl, uploading}){
+function CameraCapture({
+  label,
+  onCapture,
+  photoUrl,
+  uploading
+}) {
   const inputRef = useRef();
-  return (
-    <div className="camera-box">
-      <div className="muted">{label}</div>
-      <input ref={inputRef} type="file" accept="image/*" capture="environment" style={{display:'none'}}
-        onChange={e=>{ const file = e.target.files[0]; if(file) onCapture(file); }} />
-      <button type="button" className="secondary" style={{marginTop:10}} onClick={()=>inputRef.current.click()} disabled={uploading}>
-        📷 {uploading ? 'Uploading...' : (photoUrl ? 'Retake Photo' : 'Open Camera')}
-      </button>
-      {uploading && <div className="upload-progress">Uploading photo…</div>}
-      {photoUrl && !uploading && <img src={photoUrl} alt="capture" />}
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "camera-box"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, label), /*#__PURE__*/React.createElement("input", {
+    ref: inputRef,
+    type: "file",
+    accept: "image/*",
+    capture: "environment",
+    style: {
+      display: 'none'
+    },
+    onChange: e => {
+      const file = e.target.files[0];
+      if (file) onCapture(file);
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "secondary",
+    style: {
+      marginTop: 10
+    },
+    onClick: () => inputRef.current.click(),
+    disabled: uploading
+  }, "📷 ", uploading ? 'Uploading...' : photoUrl ? 'Retake Photo' : 'Open Camera'), uploading && /*#__PURE__*/React.createElement("div", {
+    className: "upload-progress"
+  }, "Uploading photo…"), photoUrl && !uploading && /*#__PURE__*/React.createElement("img", {
+    src: photoUrl,
+    alt: "capture"
+  }));
 }
 
 // Uploads a File to Firebase Storage under a given path, returns download URL
-async function uploadPhoto(file, path){
+async function uploadPhoto(file, path) {
   const ref = storage.ref().child(path);
   await ref.put(file);
   return await ref.getDownloadURL();
@@ -212,469 +296,881 @@ async function uploadPhoto(file, path){
 // zones. Picking a zone sets the needle to that position. Drivers pick
 // the closest reading at or below the actual needle (e.g. if it's
 // between 3/4 and Full, they pick 3/4).
-const GAS_LEVELS = [
-  {key:'empty', label:'Empty', angle:-90, value:5},
-  {key:'quarter', label:'1/4', angle:-45, value:25},
-  {key:'half', label:'1/2', angle:0, value:50},
-  {key:'threequarter', label:'3/4', angle:45, value:75},
-  {key:'full', label:'Full', angle:90, value:100},
-];
-function GasGauge({value, onChange}){
-  const selected = GAS_LEVELS.find(l=>l.value===value);
+const GAS_LEVELS = [{
+  key: 'empty',
+  label: 'Empty',
+  angle: -90,
+  value: 5
+}, {
+  key: 'quarter',
+  label: '1/4',
+  angle: -45,
+  value: 25
+}, {
+  key: 'half',
+  label: '1/2',
+  angle: 0,
+  value: 50
+}, {
+  key: 'threequarter',
+  label: '3/4',
+  angle: 45,
+  value: 75
+}, {
+  key: 'full',
+  label: 'Full',
+  angle: 90,
+  value: 100
+}];
+function GasGauge({
+  value,
+  onChange
+}) {
+  const selected = GAS_LEVELS.find(l => l.value === value);
   const needleAngle = selected ? selected.angle : -90;
-  const rad = (needleAngle-90) * Math.PI/180;
-  const cx=100, cy=100, r=70;
-  const needleX = cx + r*0.85*Math.cos(rad);
-  const needleY = cy + r*0.85*Math.sin(rad);
-
-  return (
-    <div style={{textAlign:'center'}}>
-      <svg viewBox="0 0 200 130" style={{width:'100%',maxWidth:280,margin:'0 auto',display:'block'}}>
-        <path d="M 30 100 A 70 70 0 0 1 170 100" fill="none" stroke="var(--border)" strokeWidth="14" strokeLinecap="round" />
-        <path d="M 30 100 A 70 70 0 0 1 170 100" fill="none" stroke="var(--blue)" strokeWidth="14" strokeLinecap="round"
-          strokeDasharray={`${selected ? (GAS_LEVELS.indexOf(selected)/4)*220 : 0} 999`} />
-        <line x1={cx} y1={cy} x2={needleX} y2={needleY} stroke="var(--danger)" strokeWidth="3" strokeLinecap="round" />
-        <circle cx={cx} cy={cy} r="6" fill="var(--danger)" />
-        <text x="30" y="118" fontSize="11" fill="var(--muted)" textAnchor="middle">E</text>
-        <text x="170" y="118" fontSize="11" fill="var(--muted)" textAnchor="middle">F</text>
-      </svg>
-      <div style={{display:'flex',gap:6,justifyContent:'center',flexWrap:'wrap',marginTop:10}}>
-        {GAS_LEVELS.map(l=>(
-          <button key={l.key} type="button"
-            onClick={()=>onChange(l.value)}
-            style={{
-              padding:'10px 14px', fontSize:14, fontWeight:600, borderRadius:10, cursor:'pointer',
-              border: value===l.value ? '2px solid var(--blue)' : '2px solid var(--border)',
-              background: value===l.value ? 'var(--blue-dim)' : '#fff',
-              color: value===l.value ? 'var(--blue)' : 'var(--text)',
-            }}>
-            {l.label}
-          </button>
-        ))}
-      </div>
-      <p className="muted" style={{marginTop:8}}>Pick the closest mark at or below the needle — e.g. between 3/4 and Full, pick 3/4.</p>
-    </div>
-  );
+  const rad = (needleAngle - 90) * Math.PI / 180;
+  const cx = 100,
+    cy = 100,
+    r = 70;
+  const needleX = cx + r * 0.85 * Math.cos(rad);
+  const needleY = cy + r * 0.85 * Math.sin(rad);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 200 130",
+    style: {
+      width: '100%',
+      maxWidth: 280,
+      margin: '0 auto',
+      display: 'block'
+    }
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M 30 100 A 70 70 0 0 1 170 100",
+    fill: "none",
+    stroke: "var(--border)",
+    strokeWidth: "14",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 30 100 A 70 70 0 0 1 170 100",
+    fill: "none",
+    stroke: "var(--blue)",
+    strokeWidth: "14",
+    strokeLinecap: "round",
+    strokeDasharray: `${selected ? GAS_LEVELS.indexOf(selected) / 4 * 220 : 0} 999`
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: cx,
+    y1: cy,
+    x2: needleX,
+    y2: needleY,
+    stroke: "var(--danger)",
+    strokeWidth: "3",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: cx,
+    cy: cy,
+    r: "6",
+    fill: "var(--danger)"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: "30",
+    y: "118",
+    fontSize: "11",
+    fill: "var(--muted)",
+    textAnchor: "middle"
+  }, "E"), /*#__PURE__*/React.createElement("text", {
+    x: "170",
+    y: "118",
+    fontSize: "11",
+    fill: "var(--muted)",
+    textAnchor: "middle"
+  }, "F")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 6,
+      justifyContent: 'center',
+      flexWrap: 'wrap',
+      marginTop: 10
+    }
+  }, GAS_LEVELS.map(l => /*#__PURE__*/React.createElement("button", {
+    key: l.key,
+    type: "button",
+    onClick: () => onChange(l.value),
+    style: {
+      padding: '10px 14px',
+      fontSize: 14,
+      fontWeight: 600,
+      borderRadius: 10,
+      cursor: 'pointer',
+      border: value === l.value ? '2px solid var(--blue)' : '2px solid var(--border)',
+      background: value === l.value ? 'var(--blue-dim)' : '#fff',
+      color: value === l.value ? 'var(--blue)' : 'var(--text)'
+    }
+  }, l.label))), /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      marginTop: 8
+    }
+  }, "Pick the closest mark at or below the needle — e.g. between 3/4 and Full, pick 3/4."));
 }
 
 // ---------- Admin Dashboard ----------
-function VanDetailCard({van,maintenanceNotes,repairLog,onSetStatus,onRemove,onResolveMaint}){
-  const [expanded,setExpanded] = useState(false);
-  const openNotes = maintenanceNotes.filter(m=>!m.resolved);
-  const sortedRepairs = repairLog.slice().sort((a,b)=>b.createdAt-a.createdAt);
-
-  return (
-    <div className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={()=>setExpanded(e=>!e)}>
-        <div>
-          <div>{van.name} {van.lowPriority && <span className="badge pending">low priority</span>} {van.borrowed && <span className="badge admin">borrowed</span>} {openNotes.length>0 && <span className="badge maintenance">{openNotes.length} open issue{openNotes.length===1?'':'s'}</span>}</div>
-          <div className="muted">{van.mileage} mi · {van.gas}% gas</div>
-          {van.borrowed && <div className="muted">From {van.borrowedFrom || 'unspecified org'}{van.expectedReturnDate ? ` · return by ${van.expectedReturnDate}` : ''}</div>}
-        </div>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <span className={`badge ${van.status}`}>{van.status}</span>
-          <span className="muted">{expanded?'▲':'▼'}</span>
-        </div>
-      </div>
-
-      {expanded && (
-        <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)'}}>
-          <h4 style={{fontSize:14,marginBottom:6}}>Maintenance Notes</h4>
-          {maintenanceNotes.length===0 && <p className="muted">No notes on file for this van.</p>}
-          {maintenanceNotes.slice().reverse().map(m=>(
-            <div key={m.id} className="list-item" style={{opacity:m.resolved?0.5:1}}>
-              <div className="muted">{m.note} {m.resolved && '(resolved)'}</div>
-              {!m.resolved && <button className="secondary" style={{marginTop:0,width:'auto',padding:'6px 10px'}} onClick={()=>onResolveMaint(m.id)}>Resolve</button>}
-            </div>
-          ))}
-
-          <h4 style={{fontSize:14,marginTop:16,marginBottom:6}}>Repair History</h4>
-          {sortedRepairs.length===0 && <p className="muted">No repairs logged for this van.</p>}
-          {sortedRepairs.map(r=>(
-            <div key={r.id} className="muted" style={{marginBottom:6}}>
-              {r.date} — {r.serviceType}{r.performedBy ? ` (by ${r.performedBy})` : ''}{r.notes ? `: ${r.notes}` : ''}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
-        {van.status!=='maintenance'
-          ? <button className="secondary" style={{marginTop:0}} onClick={()=>onSetStatus(van.id,'maintenance')}>Send to Maintenance</button>
-          : <button className="secondary" style={{marginTop:0}} onClick={()=>onSetStatus(van.id,'available')}>Mark Available</button>}
-        <button className="secondary" style={{marginTop:0,color:'var(--danger)',borderColor:'var(--danger)'}} onClick={()=>onRemove(van.id)}>
-          {van.borrowed ? 'Returned — Remove' : 'Remove'}
-        </button>
-      </div>
-    </div>
-  );
+function VanDetailCard({
+  van,
+  maintenanceNotes,
+  repairLog,
+  onSetStatus,
+  onRemove,
+  onResolveMaint
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const openNotes = maintenanceNotes.filter(m => !m.resolved);
+  const sortedRepairs = repairLog.slice().sort((a, b) => b.createdAt - a.createdAt);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "list-item",
+    style: {
+      flexDirection: 'column',
+      alignItems: 'stretch'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      cursor: 'pointer'
+    },
+    onClick: () => setExpanded(e => !e)
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", null, van.name, " ", van.lowPriority && /*#__PURE__*/React.createElement("span", {
+    className: "badge pending"
+  }, "low priority"), " ", van.borrowed && /*#__PURE__*/React.createElement("span", {
+    className: "badge admin"
+  }, "borrowed"), " ", openNotes.length > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "badge maintenance"
+  }, openNotes.length, " open issue", openNotes.length === 1 ? '' : 's')), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, van.mileage, " mi · ", van.gas, "% gas"), van.borrowed && /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "From ", van.borrowedFrom || 'unspecified org', van.expectedReturnDate ? ` · return by ${van.expectedReturnDate}` : '')), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: `badge ${van.status}`
+  }, van.status), /*#__PURE__*/React.createElement("span", {
+    className: "muted"
+  }, expanded ? '▲' : '▼'))), expanded && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTop: '1px solid var(--border)'
+    }
+  }, /*#__PURE__*/React.createElement("h4", {
+    style: {
+      fontSize: 14,
+      marginBottom: 6
+    }
+  }, "Maintenance Notes"), maintenanceNotes.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "No notes on file for this van."), maintenanceNotes.slice().reverse().map(m => /*#__PURE__*/React.createElement("div", {
+    key: m.id,
+    className: "list-item",
+    style: {
+      opacity: m.resolved ? 0.5 : 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, m.note, " ", m.resolved && '(resolved)'), !m.resolved && /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0,
+      width: 'auto',
+      padding: '6px 10px'
+    },
+    onClick: () => onResolveMaint(m.id)
+  }, "Resolve"))), /*#__PURE__*/React.createElement("h4", {
+    style: {
+      fontSize: 14,
+      marginTop: 16,
+      marginBottom: 6
+    }
+  }, "Repair History"), sortedRepairs.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "No repairs logged for this van."), sortedRepairs.map(r => /*#__PURE__*/React.createElement("div", {
+    key: r.id,
+    className: "muted",
+    style: {
+      marginBottom: 6
+    }
+  }, r.date, " — ", r.serviceType, r.performedBy ? ` (by ${r.performedBy})` : '', r.notes ? `: ${r.notes}` : ''))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 8,
+      flexWrap: 'wrap'
+    }
+  }, van.status !== 'maintenance' ? /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0
+    },
+    onClick: () => onSetStatus(van.id, 'maintenance')
+  }, "Send to Maintenance") : /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0
+    },
+    onClick: () => onSetStatus(van.id, 'available')
+  }, "Mark Available"), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0,
+      color: 'var(--danger)',
+      borderColor: 'var(--danger)'
+    },
+    onClick: () => onRemove(van.id)
+  }, van.borrowed ? 'Returned — Remove' : 'Remove')));
 }
-
-function AddVanForm({onAdd}){
-  const [name,setName] = useState('');
-  const [isBorrowed,setIsBorrowed] = useState(false);
-  const [borrowedFrom,setBorrowedFrom] = useState('');
-  const [returnDate,setReturnDate] = useState('');
-  const [saving,setSaving] = useState(false);
-
-  async function submit(){
+function AddVanForm({
+  onAdd
+}) {
+  const [name, setName] = useState('');
+  const [isBorrowed, setIsBorrowed] = useState(false);
+  const [borrowedFrom, setBorrowedFrom] = useState('');
+  const [returnDate, setReturnDate] = useState('');
+  const [saving, setSaving] = useState(false);
+  async function submit() {
     setSaving(true);
     await onAdd(name, isBorrowed, borrowedFrom, returnDate);
-    setName(''); setIsBorrowed(false); setBorrowedFrom(''); setReturnDate('');
+    setName('');
+    setIsBorrowed(false);
+    setBorrowedFrom('');
+    setReturnDate('');
     setSaving(false);
   }
-
-  return (
-    <div style={{marginTop:20, paddingTop:20, borderTop:'1px solid var(--border)'}}>
-      <h3>Add a Van</h3>
-      <p className="muted">For your own fleet, or a vehicle borrowed from another organization for a season or event.</p>
-      <label>Van Name</label>
-      <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. First Baptist's 15-passenger van" />
-      <label>Is this a borrowed vehicle?</label>
-      <YesNo value={isBorrowed} onChange={setIsBorrowed} />
-      {isBorrowed && (<>
-        <label>Borrowed From</label>
-        <input value={borrowedFrom} onChange={e=>setBorrowedFrom(e.target.value)} placeholder="Organization name" />
-        <label>Expected Return Date</label>
-        <input type="date" value={returnDate} onChange={e=>setReturnDate(e.target.value)} />
-      </>)}
-      <button className="primary" disabled={!name || saving} onClick={submit}>{saving?'Adding...':'Add Van'}</button>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 20,
+      paddingTop: 20,
+      borderTop: '1px solid var(--border)'
+    }
+  }, /*#__PURE__*/React.createElement("h3", null, "Add a Van"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "For your own fleet, or a vehicle borrowed from another organization for a season or event."), /*#__PURE__*/React.createElement("label", null, "Van Name"), /*#__PURE__*/React.createElement("input", {
+    value: name,
+    onChange: e => setName(e.target.value),
+    placeholder: "e.g. First Baptist's 15-passenger van"
+  }), /*#__PURE__*/React.createElement("label", null, "Is this a borrowed vehicle?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: isBorrowed,
+    onChange: setIsBorrowed
+  }), isBorrowed && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Borrowed From"), /*#__PURE__*/React.createElement("input", {
+    value: borrowedFrom,
+    onChange: e => setBorrowedFrom(e.target.value),
+    placeholder: "Organization name"
+  }), /*#__PURE__*/React.createElement("label", null, "Expected Return Date"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: returnDate,
+    onChange: e => setReturnDate(e.target.value)
+  })), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: !name || saving,
+    onClick: submit
+  }, saving ? 'Adding...' : 'Add Van'));
 }
-
-function AdminAddDriver(){
-  const [name,setName] = useState('');
-  const [email,setEmail] = useState('');
-  const [phone,setPhone] = useState('');
-  const [licenseExp,setLicenseExp] = useState('');
-  const [licenseVerified,setLicenseVerified] = useState(false);
-  const [saving,setSaving] = useState(false);
-  const [generatedLink,setGeneratedLink] = useState(null);
-  const [invites,setInvites] = useState([]);
-
-  useEffect(()=>{
-    const unsub = db.collection('vanDriverInvites').where('claimed','==',false).onSnapshot(snap=>{
-      setInvites(snap.docs.map(d=>({id:d.id,...d.data()})));
+function AdminAddDriver() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [licenseExp, setLicenseExp] = useState('');
+  const [licenseVerified, setLicenseVerified] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState(null);
+  const [invites, setInvites] = useState([]);
+  useEffect(() => {
+    const unsub = db.collection('vanDriverInvites').where('claimed', '==', false).onSnapshot(snap => {
+      setInvites(snap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      })));
     });
     return unsub;
-  },[]);
-
+  }, []);
   const canSubmit = name && email && !saving;
-
-  async function createInvite(){
+  async function createInvite() {
     setSaving(true);
-    const token = uid()+uid();
+    const token = uid() + uid();
     await db.collection('vanDriverInvites').doc(token).set({
-      name, email: email.toLowerCase().trim(), phone, licenseExp,
+      name,
+      email: email.toLowerCase().trim(),
+      phone,
+      licenseExp,
       licenseVerifiedInPerson: licenseVerified,
-      claimed:false, createdAt:Date.now(),
+      claimed: false,
+      createdAt: Date.now()
     });
     const url = new URL(window.location.href);
     url.searchParams.set('invite', token);
     setGeneratedLink(url.toString());
-    setName(''); setEmail(''); setPhone(''); setLicenseExp(''); setLicenseVerified(false);
+    setName('');
+    setEmail('');
+    setPhone('');
+    setLicenseExp('');
+    setLicenseVerified(false);
     setSaving(false);
   }
-
-  async function deleteInvite(token){
-    if(!confirm('Remove this invite? The person will need a new one if you want to add them again.')) return;
+  async function deleteInvite(token) {
+    if (!confirm('Remove this invite? The person will need a new one if you want to add them again.')) return;
     await db.collection('vanDriverInvites').doc(token).delete();
   }
-
-  return (
-    <div className="card">
-      <h3>Add an Existing Driver</h3>
-      <p className="muted">For people already approved to drive before this app existed, or anyone you'd rather set up yourself. When they sign in with the matching email, their info here fills in automatically. You can also send them the link directly as a shortcut.</p>
-
-      <label>Full Name</label>
-      <input value={name} onChange={e=>setName(e.target.value)} />
-      <label>Email (must match their Google sign-in)</label>
-      <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@example.com" />
-      <label>Phone Number</label>
-      <input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" />
-      <label>License Expiration Date (if known)</label>
-      <input type="date" value={licenseExp} onChange={e=>setLicenseExp(e.target.value)} />
-      <label>Has this person's license already been seen in person?</label>
-      <YesNo value={licenseVerified} onChange={setLicenseVerified} />
-
-      <button className="primary" disabled={!canSubmit} onClick={createInvite}>{saving?'Creating...':'Add Driver'}</button>
-
-      {generatedLink && (
-        <div className="banner-safe" style={{wordBreak:'break-all', marginTop:14}}>
-          Added! If you'd like, you can also send this direct link — it's optional since matching by email works automatically once they sign in:
-          <div style={{marginTop:8,fontWeight:400,fontSize:14}}>{generatedLink}</div>
-          <button className="secondary" style={{marginTop:10}} onClick={()=>navigator.clipboard.writeText(generatedLink)}>Copy Link</button>
-        </div>
-      )}
-
-      <h3 style={{marginTop:24}}>Awaiting First Sign-In</h3>
-      {invites.length===0 && <p className="muted">None waiting.</p>}
-      {invites.map(inv=>{
-        const url = new URL(window.location.href);
-        url.searchParams.set('invite', inv.id);
-        return (
-          <div key={inv.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-            <div><strong>{inv.name}</strong> — {inv.email}</div>
-            <div className="muted" style={{wordBreak:'break-all'}}>{url.toString()}</div>
-            <div style={{display:'flex',gap:8,marginTop:8}}>
-              <button className="secondary" style={{marginTop:0}} onClick={()=>navigator.clipboard.writeText(url.toString())}>Copy Link</button>
-              <button className="secondary" style={{marginTop:0,color:'var(--danger)',borderColor:'var(--danger)'}} onClick={()=>deleteInvite(inv.id)}>Remove</button>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Add an Existing Driver"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "For people already approved to drive before this app existed, or anyone you'd rather set up yourself. When they sign in with the matching email, their info here fills in automatically. You can also send them the link directly as a shortcut."), /*#__PURE__*/React.createElement("label", null, "Full Name"), /*#__PURE__*/React.createElement("input", {
+    value: name,
+    onChange: e => setName(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Email (must match their Google sign-in)"), /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    value: email,
+    onChange: e => setEmail(e.target.value),
+    placeholder: "name@example.com"
+  }), /*#__PURE__*/React.createElement("label", null, "Phone Number"), /*#__PURE__*/React.createElement("input", {
+    value: phone,
+    onChange: e => setPhone(e.target.value),
+    type: "tel"
+  }), /*#__PURE__*/React.createElement("label", null, "License Expiration Date (if known)"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: licenseExp,
+    onChange: e => setLicenseExp(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Has this person's license already been seen in person?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: licenseVerified,
+    onChange: setLicenseVerified
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: !canSubmit,
+    onClick: createInvite
+  }, saving ? 'Creating...' : 'Add Driver'), generatedLink && /*#__PURE__*/React.createElement("div", {
+    className: "banner-safe",
+    style: {
+      wordBreak: 'break-all',
+      marginTop: 14
+    }
+  }, "Added! If you'd like, you can also send this direct link — it's optional since matching by email works automatically once they sign in:", /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      fontWeight: 400,
+      fontSize: 14
+    }
+  }, generatedLink), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 10
+    },
+    onClick: () => navigator.clipboard.writeText(generatedLink)
+  }, "Copy Link")), /*#__PURE__*/React.createElement("h3", {
+    style: {
+      marginTop: 24
+    }
+  }, "Awaiting First Sign-In"), invites.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "None waiting."), invites.map(inv => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('invite', inv.id);
+    return /*#__PURE__*/React.createElement("div", {
+      key: inv.id,
+      className: "list-item",
+      style: {
+        flexDirection: 'column',
+        alignItems: 'stretch'
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, inv.name), " — ", inv.email), /*#__PURE__*/React.createElement("div", {
+      className: "muted",
+      style: {
+        wordBreak: 'break-all'
+      }
+    }, url.toString()), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 8,
+        marginTop: 8
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "secondary",
+      style: {
+        marginTop: 0
+      },
+      onClick: () => navigator.clipboard.writeText(url.toString())
+    }, "Copy Link"), /*#__PURE__*/React.createElement("button", {
+      className: "secondary",
+      style: {
+        marginTop: 0,
+        color: 'var(--danger)',
+        borderColor: 'var(--danger)'
+      },
+      onClick: () => deleteInvite(inv.id)
+    }, "Remove")));
+  }));
 }
-
-function PendingDriverCard({driverUser,onApprove,onDeny,onVerify,onUpdateExp}){
+function PendingDriverCard({
+  driverUser,
+  onApprove,
+  onDeny,
+  onVerify,
+  onUpdateExp
+}) {
   const vr = driverUser.vanRentalProfile;
-  const [editingExp,setEditingExp] = useState(false);
-  const [expDraft,setExpDraft] = useState(vr.licenseExp||'');
+  const [editingExp, setEditingExp] = useState(false);
+  const [expDraft, setExpDraft] = useState(vr.licenseExp || '');
   const needsVerify = !vr.licenseVerifiedInPerson;
-
-  return (
-    <div className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-      <div><strong>{driverUser.name}</strong> — {driverUser.phone}</div>
-      <div className="muted">DOB: {vr.birthdate}</div>
-      <div className="muted" style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-        {!editingExp ? (
-          <>License expires: {vr.licenseExp || '(not set)'} {vr.cdl ? '· CDL' : ''}
-            <button className="link-btn" style={{padding:0,fontSize:13}} onClick={()=>{setExpDraft(vr.licenseExp||''); setEditingExp(true);}}>Edit</button>
-          </>
-        ) : (
-          <>
-            <input type="date" value={expDraft} onChange={e=>setExpDraft(e.target.value)} style={{width:'auto',padding:8}} />
-            <button className="link-btn" style={{padding:0,fontSize:13}} onClick={()=>{onUpdateExp(driverUser.id, expDraft); setEditingExp(false);}}>Save</button>
-            <button className="link-btn" style={{padding:0,fontSize:13,color:'var(--muted)'}} onClick={()=>setEditingExp(false)}>Cancel</button>
-          </>
-        )}
-      </div>
-      <div className="muted">
-        License check: <strong style={{color: vr.licenseVerifiedInPerson ? 'var(--safe)' : 'var(--danger)'}}>
-          {vr.licenseVerifiedInPerson ? 'Verified in person ✓' : 'Not yet verified in person'}
-        </strong>
-      </div>
-      <div className="muted">At-fault accidents (3yr): {vr.atFaultAccidents3yr ? (vr.atFaultAccidentsDetails||'Yes') : 'None reported'}</div>
-      <div className="muted">Moving violations (3yr): {vr.movingViolations3yr ? (vr.movingViolationsDetails||'Yes') : 'None reported'}</div>
-      <div className="muted">Insurance cancelled/refused: {vr.insuranceCancelled ? <strong style={{color:'var(--danger)'}}>YES</strong> : 'No'}</div>
-      <div className="muted">License revoked/suspended/restricted: {vr.licenseRevokedSuspended ? <strong style={{color:'var(--danger)'}}>YES</strong> : 'No'}</div>
-      <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
-        {needsVerify && <button className="secondary" style={{marginTop:0}} onClick={()=>onVerify(driverUser.id)}>Mark license verified in person</button>}
-        <button className="primary" style={{marginTop:0}} disabled={needsVerify} onClick={()=>onApprove(driverUser.id)}>Approve</button>
-        <button className="secondary" style={{marginTop:0}} onClick={()=>onDeny(driverUser.id)}>Deny</button>
-      </div>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "list-item",
+    style: {
+      flexDirection: 'column',
+      alignItems: 'stretch'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, driverUser.name), " — ", driverUser.phone), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "DOB: ", vr.birthdate), /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      flexWrap: 'wrap'
+    }
+  }, !editingExp ? /*#__PURE__*/React.createElement(React.Fragment, null, "License expires: ", vr.licenseExp || '(not set)', " ", vr.cdl ? '· CDL' : '', /*#__PURE__*/React.createElement("button", {
+    className: "link-btn",
+    style: {
+      padding: 0,
+      fontSize: 13
+    },
+    onClick: () => {
+      setExpDraft(vr.licenseExp || '');
+      setEditingExp(true);
+    }
+  }, "Edit")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: expDraft,
+    onChange: e => setExpDraft(e.target.value),
+    style: {
+      width: 'auto',
+      padding: 8
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "link-btn",
+    style: {
+      padding: 0,
+      fontSize: 13
+    },
+    onClick: () => {
+      onUpdateExp(driverUser.id, expDraft);
+      setEditingExp(false);
+    }
+  }, "Save"), /*#__PURE__*/React.createElement("button", {
+    className: "link-btn",
+    style: {
+      padding: 0,
+      fontSize: 13,
+      color: 'var(--muted)'
+    },
+    onClick: () => setEditingExp(false)
+  }, "Cancel"))), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "License check: ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: vr.licenseVerifiedInPerson ? 'var(--safe)' : 'var(--danger)'
+    }
+  }, vr.licenseVerifiedInPerson ? 'Verified in person ✓' : 'Not yet verified in person')), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "At-fault accidents (3yr): ", vr.atFaultAccidents3yr ? vr.atFaultAccidentsDetails || 'Yes' : 'None reported'), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "Moving violations (3yr): ", vr.movingViolations3yr ? vr.movingViolationsDetails || 'Yes' : 'None reported'), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "Insurance cancelled/refused: ", vr.insuranceCancelled ? /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: 'var(--danger)'
+    }
+  }, "YES") : 'No'), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "License revoked/suspended/restricted: ", vr.licenseRevokedSuspended ? /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: 'var(--danger)'
+    }
+  }, "YES") : 'No'), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 8,
+      flexWrap: 'wrap'
+    }
+  }, needsVerify && /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0
+    },
+    onClick: () => onVerify(driverUser.id)
+  }, "Mark license verified in person"), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    style: {
+      marginTop: 0
+    },
+    disabled: needsVerify,
+    onClick: () => onApprove(driverUser.id)
+  }, "Approve"), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0
+    },
+    onClick: () => onDeny(driverUser.id)
+  }, "Deny")));
 }
-
-function SafetyBlockAlertCard({alert,driver,van,rental,onResolveAlert}){
+function SafetyBlockAlertCard({
+  alert,
+  driver,
+  van,
+  rental,
+  onResolveAlert
+}) {
   const draft = rental.checkoutDraft || {};
-  const [completing,setCompleting] = useState(false);
-  const [clean,setClean] = useState(null);
-  const [cleanPhoto,setCleanPhoto] = useState(null);
-  const [cleanUploading,setCleanUploading] = useState(false);
-  const [saving,setSaving] = useState(false);
-
-  async function clearForDriver(){
+  const [completing, setCompleting] = useState(false);
+  const [clean, setClean] = useState(null);
+  const [cleanPhoto, setCleanPhoto] = useState(null);
+  const [cleanUploading, setCleanUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  async function clearForDriver() {
     setSaving(true);
     await db.collection('vanRentals').doc(rental.id).update({
       checkoutCleared: true,
-      clearedBy: currentUserUid(), clearedAt: Date.now(),
+      clearedBy: currentUserUid(),
+      clearedAt: Date.now()
     });
     await onResolveAlert(alert.id);
     setSaving(false);
   }
-
-  async function handlePhoto(file){
+  async function handlePhoto(file) {
     setCleanUploading(true);
     const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/${uid()}.jpg`);
     setCleanPhoto(url);
     setCleanUploading(false);
   }
-
-  async function completeAsAdmin(){
+  async function completeAsAdmin() {
     setSaving(true);
     await db.collection('vanRentals').doc(rental.id).update({
       checkout: {
-        mileage: draft.mileage, gas: draft.gas, dashPhoto: draft.dashPhoto,
+        mileage: draft.mileage,
+        gas: draft.gas,
+        dashPhoto: draft.dashPhoto,
         warningLightsOn: draft.checkedLights || [],
-        otherLightReported: draft.otherLightChecked||false, otherLightDesc: draft.otherLightDesc||'',
-        clean, cleanPhoto, at: Date.now(), completedByAdmin: true,
+        otherLightReported: draft.otherLightChecked || false,
+        otherLightDesc: draft.otherLightDesc || '',
+        clean,
+        cleanPhoto,
+        at: Date.now(),
+        completedByAdmin: true
       },
       checkoutDraft: firebase.firestore.FieldValue.delete(),
-      checkoutBlocked: false, checkoutCleared: false,
+      checkoutBlocked: false,
+      checkoutCleared: false
     });
     await db.collection('vans').doc(van.id).update({
-      mileage: Number(draft.mileage)||van.mileage, gas: draft.gas,
+      mileage: Number(draft.mileage) || van.mileage,
+      gas: draft.gas
     });
     await onResolveAlert(alert.id);
     setSaving(false);
   }
-
-  return (
-    <div className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-      <div><strong>{driver?.name||'Unknown driver'}</strong> on {van?.name}</div>
-      <div className="muted">"{alert.description}"</div>
-      <div className="muted" style={{marginTop:6}}>Recorded so far — Mileage: {draft.mileage||'—'} · Gas: {draft.gas ?? '—'}%</div>
-      {draft.dashPhoto && <img src={draft.dashPhoto} alt="dashboard" style={{maxWidth:'100%',borderRadius:8,marginTop:8}} />}
-
-      {!completing && (
-        <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
-          <button className="secondary" style={{marginTop:0}} disabled={saving} onClick={clearForDriver}>
-            {saving ? 'Clearing...' : 'Clear — let driver finish'}
-          </button>
-          <button className="secondary" style={{marginTop:0}} onClick={()=>setCompleting(true)}>Complete checkout myself</button>
-        </div>
-      )}
-
-      {completing && (
-        <div style={{marginTop:14, paddingTop:14, borderTop:'1px solid var(--border)'}}>
-          <p className="muted">Finish the last step (cleanliness) on the driver's behalf to complete this checkout now.</p>
-          <label>Is the van clean?</label>
-          <YesNo value={clean} onChange={setClean} />
-          <CameraCapture label="Take a photo of the van interior" photoUrl={cleanPhoto} uploading={cleanUploading} onCapture={handlePhoto} />
-          <button className="primary" disabled={clean===null || !cleanPhoto || saving} onClick={completeAsAdmin}>
-            {saving ? 'Completing...' : 'Complete Checkout'}
-          </button>
-          <button className="link-btn" onClick={()=>setCompleting(false)}>Cancel</button>
-        </div>
-      )}
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "list-item",
+    style: {
+      flexDirection: 'column',
+      alignItems: 'stretch'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, driver?.name || 'Unknown driver'), " on ", van?.name), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "\"", alert.description, "\""), /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      marginTop: 6
+    }
+  }, "Recorded so far — Mileage: ", draft.mileage || '—', " · Gas: ", draft.gas ?? '—', "%"), draft.dashPhoto && /*#__PURE__*/React.createElement("img", {
+    src: draft.dashPhoto,
+    alt: "dashboard",
+    style: {
+      maxWidth: '100%',
+      borderRadius: 8,
+      marginTop: 8
+    }
+  }), !completing && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 10,
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0
+    },
+    disabled: saving,
+    onClick: clearForDriver
+  }, saving ? 'Clearing...' : 'Clear — let driver finish'), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0
+    },
+    onClick: () => setCompleting(true)
+  }, "Complete checkout myself")), completing && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      paddingTop: 14,
+      borderTop: '1px solid var(--border)'
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Finish the last step (cleanliness) on the driver's behalf to complete this checkout now."), /*#__PURE__*/React.createElement("label", null, "Is the van clean?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: clean,
+    onChange: setClean
+  }), /*#__PURE__*/React.createElement(CameraCapture, {
+    label: "Take a photo of the van interior",
+    photoUrl: cleanPhoto,
+    uploading: cleanUploading,
+    onCapture: handlePhoto
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: clean === null || !cleanPhoto || saving,
+    onClick: completeAsAdmin
+  }, saving ? 'Completing...' : 'Complete Checkout'), /*#__PURE__*/React.createElement("button", {
+    className: "link-btn",
+    onClick: () => setCompleting(false)
+  }, "Cancel")));
 }
-function currentUserUid(){ return auth.currentUser ? auth.currentUser.uid : null; }
-
-function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,repairLog,alerts,recurringRequests}){
-  const [tab,setTab] = useState('approvals');
-  const driverUsers = allUsers.filter(u=>u.vanRentalProfile);
-  const pending = driverUsers.filter(u=>u.vanRentalProfile.status==='pending');
-  const approved = driverUsers.filter(u=>u.vanRentalProfile.status==='approved');
-  const openAlerts = alerts.filter(a=>!a.resolved);
-  const recurringPendingCount = recurringRequests.filter(r=>r.status==='pending'||r.status==='renewal_requested').length;
-
-  const driverName = uid_ => ((allUsers||[]).find(u=>u.id===uid_)||{}).name || uid_;
-  const vanLabel = id => ((vans||[]).find(v=>v.id===id)||{}).name || id;
-  async function approve(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'approved'}); RccAudit.log('van.driver.approve','user',uid_,'Approved '+driverName(uid_)+' as a van driver'); }
-  async function deny(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.status':'denied'}); RccAudit.log('van.driver.deny','user',uid_,'Denied '+driverName(uid_)+"'s van driver application"); }
+function currentUserUid() {
+  return auth.currentUser ? auth.currentUser.uid : null;
+}
+function AdminDashboard({
+  allUsers,
+  vans,
+  rentals,
+  warningLights,
+  maintenanceNotes,
+  repairLog,
+  alerts,
+  recurringRequests
+}) {
+  const [tab, setTab] = useState('approvals');
+  const driverUsers = allUsers.filter(u => u.vanRentalProfile);
+  const pending = driverUsers.filter(u => u.vanRentalProfile.status === 'pending');
+  const approved = driverUsers.filter(u => u.vanRentalProfile.status === 'approved');
+  const openAlerts = alerts.filter(a => !a.resolved);
+  const recurringPendingCount = recurringRequests.filter(r => r.status === 'pending' || r.status === 'renewal_requested').length;
+  const driverName = uid_ => ((allUsers || []).find(u => u.id === uid_) || {}).name || uid_;
+  const vanLabel = id => ((vans || []).find(v => v.id === id) || {}).name || id;
+  async function approve(uid_) {
+    await db.collection('users').doc(uid_).update({
+      'vanRentalProfile.status': 'approved'
+    });
+    RccAudit.log('van.driver.approve', 'user', uid_, 'Approved ' + driverName(uid_) + ' as a van driver');
+  }
+  async function deny(uid_) {
+    await db.collection('users').doc(uid_).update({
+      'vanRentalProfile.status': 'denied'
+    });
+    RccAudit.log('van.driver.deny', 'user', uid_, 'Denied ' + driverName(uid_) + "'s van driver application");
+  }
 
   // Generates individual weekly vanRentals docs across a 3-month
   // window for an approved recurring request, checking each week for
   // van conflicts the same way a one-time request does.
-  async function approveRecurring(reqId){
-    const req = recurringRequests.find(r=>r.id===reqId);
-    if(!req) return;
-    const activeRentals = rentals.filter(r=>r.status!=='completed' && r.status!=='cancelled');
-    const start = new Date(req.windowStart+'T00:00:00');
-    const end = new Date(req.windowEnd+'T00:00:00');
+  async function approveRecurring(reqId) {
+    const req = recurringRequests.find(r => r.id === reqId);
+    if (!req) return;
+    const activeRentals = rentals.filter(r => r.status !== 'completed' && r.status !== 'cancelled');
+    const start = new Date(req.windowStart + 'T00:00:00');
+    const end = new Date(req.windowEnd + 'T00:00:00');
     let cursor = new Date(start);
     // Move cursor to the first matching day-of-week on or after windowStart
-    while(cursor.getDay() !== Number(req.dayOfWeek)) cursor.setDate(cursor.getDate()+1);
-
+    while (cursor.getDay() !== Number(req.dayOfWeek)) cursor.setDate(cursor.getDate() + 1);
     const createdDates = [];
     const skippedDates = [];
-    while(cursor <= end){
+    while (cursor <= end) {
       const dateStr = cursor.toISOString().split('T')[0];
       const slotStart = new Date(`${dateStr}T${req.time}`);
       const slotEnd = new Date(`${dateStr}T${req.endTime}`);
-      const conflictVanIds = new Set(
-        activeRentals.filter(r=>{
-          if(!r.date || !r.time) return false;
-          const rStart = new Date(`${r.date}T${r.time}`);
-          const rEnd = r.endDate && r.endTime ? new Date(`${r.endDate}T${r.endTime}`) : new Date(rStart.getTime()+4*60*60*1000);
-          return rentalOverlaps(slotStart,slotEnd,rStart,rEnd);
-        }).map(r=>r.vanId)
-      );
-      const available = vans.filter(v=>v.status!=='maintenance' && !conflictVanIds.has(v.id));
-      if(available.length>0){
-        const van = [...available].sort((a,b)=>{
-          if(!!a.lowPriority !== !!b.lowPriority) return a.lowPriority ? 1 : -1;
-          return a.mileage-b.mileage;
+      const conflictVanIds = new Set(activeRentals.filter(r => {
+        if (!r.date || !r.time) return false;
+        const rStart = new Date(`${r.date}T${r.time}`);
+        const rEnd = r.endDate && r.endTime ? new Date(`${r.endDate}T${r.endTime}`) : new Date(rStart.getTime() + 4 * 60 * 60 * 1000);
+        return rentalOverlaps(slotStart, slotEnd, rStart, rEnd);
+      }).map(r => r.vanId));
+      const available = vans.filter(v => v.status !== 'maintenance' && !conflictVanIds.has(v.id));
+      if (available.length > 0) {
+        const van = [...available].sort((a, b) => {
+          if (!!a.lowPriority !== !!b.lowPriority) return a.lowPriority ? 1 : -1;
+          return a.mileage - b.mileage;
         })[0];
         await db.collection('vanRentals').add({
-          driverId: req.driverId, vanId: van.id, date: dateStr, time: req.time,
-          endDate: dateStr, endTime: req.endTime, purpose: req.purpose,
-          status:'assigned', createdAt: Date.now(), recurringRequestId: reqId,
+          driverId: req.driverId,
+          vanId: van.id,
+          date: dateStr,
+          time: req.time,
+          endDate: dateStr,
+          endTime: req.endTime,
+          purpose: req.purpose,
+          status: 'assigned',
+          createdAt: Date.now(),
+          recurringRequestId: reqId
         });
         createdDates.push(dateStr);
       } else {
         skippedDates.push(dateStr);
       }
-      cursor.setDate(cursor.getDate()+7);
+      cursor.setDate(cursor.getDate() + 7);
     }
-
     await db.collection('vanRecurringRequests').doc(reqId).update({
-      status:'active', approvedAt: Date.now(),
-      lastGeneratedDates: createdDates, skippedDates,
+      status: 'active',
+      approvedAt: Date.now(),
+      lastGeneratedDates: createdDates,
+      skippedDates
     });
   }
-
-  async function denyRecurring(reqId){
-    await db.collection('vanRecurringRequests').doc(reqId).update({status:'denied'});
+  async function denyRecurring(reqId) {
+    await db.collection('vanRecurringRequests').doc(reqId).update({
+      status: 'denied'
+    });
   }
-
-  async function endRecurring(reqId){
-    if(!confirm('End this recurring reservation? Already-scheduled weeks stay on the calendar, but no new weeks will be generated.')) return;
-    await db.collection('vanRecurringRequests').doc(reqId).update({status:'ended', endedAt: Date.now()});
+  async function endRecurring(reqId) {
+    if (!confirm('End this recurring reservation? Already-scheduled weeks stay on the calendar, but no new weeks will be generated.')) return;
+    await db.collection('vanRecurringRequests').doc(reqId).update({
+      status: 'ended',
+      endedAt: Date.now()
+    });
   }
 
   // Approving a renewal extends the window another 3 months and
   // generates the next batch of weekly slots, same conflict-checking
   // as the initial approval.
-  async function approveRenewal(reqId){
-    const req = recurringRequests.find(r=>r.id===reqId);
-    if(!req) return;
+  async function approveRenewal(reqId) {
+    const req = recurringRequests.find(r => r.id === reqId);
+    if (!req) return;
     const newWindowStart = req.windowEnd;
-    const d = new Date(newWindowStart+'T00:00:00');
-    d.setMonth(d.getMonth()+3);
+    const d = new Date(newWindowStart + 'T00:00:00');
+    d.setMonth(d.getMonth() + 3);
     const newWindowEnd = d.toISOString().split('T')[0];
     await db.collection('vanRecurringRequests').doc(reqId).update({
-      windowStart: newWindowStart, windowEnd: newWindowEnd, status:'pending', renewalRequestedAt: null,
+      windowStart: newWindowStart,
+      windowEnd: newWindowEnd,
+      status: 'pending',
+      renewalRequestedAt: null
     });
     // Re-run the same generation logic against the new window.
     await approveRecurring(reqId);
   }
-  async function verifyLicenseInPerson(uid_){ await db.collection('users').doc(uid_).update({'vanRentalProfile.licenseVerifiedInPerson':true}); RccAudit.log('van.license.verify','user',uid_,'Marked '+driverName(uid_)+"'s license verified in person"); }
-  async function updateLicenseExp(uid_, newExp){ await db.collection('users').doc(uid_).update({'vanRentalProfile.licenseExp':newExp}); RccAudit.log('van.license.expiry','user',uid_,driverName(uid_)+"'s license expiration set to "+newExp); }
-  async function resolveAlert(id){ await db.collection('vanAlerts').doc(id).update({resolved:true}); }
-  async function addWarningLight(name,safety,feedback,vanId){
-    await db.collection('vanWarningLights').add({name,safety,feedback: safety? null : feedback, van: vanId||null});
+  async function verifyLicenseInPerson(uid_) {
+    await db.collection('users').doc(uid_).update({
+      'vanRentalProfile.licenseVerifiedInPerson': true
+    });
+    RccAudit.log('van.license.verify', 'user', uid_, 'Marked ' + driverName(uid_) + "'s license verified in person");
   }
-  async function resolveMaint(id){ await db.collection('vanMaintenanceNotes').doc(id).update({resolved:true}); }
-  async function setVanStatus(vanId,status){ await db.collection('vans').doc(vanId).update({status}); RccAudit.log('van.status','van',vanId,vanLabel(vanId)+' set to '+status); }
-  async function addVan(name, isBorrowed, borrowedFrom, returnDate){
-    await db.collection('vans').add({
-      name, mileage:0, gas:100, status:'available', lowPriority:false,
-      borrowed: isBorrowed, borrowedFrom: isBorrowed ? borrowedFrom : null,
-      expectedReturnDate: isBorrowed ? returnDate : null,
+  async function updateLicenseExp(uid_, newExp) {
+    await db.collection('users').doc(uid_).update({
+      'vanRentalProfile.licenseExp': newExp
+    });
+    RccAudit.log('van.license.expiry', 'user', uid_, driverName(uid_) + "'s license expiration set to " + newExp);
+  }
+  async function resolveAlert(id) {
+    await db.collection('vanAlerts').doc(id).update({
+      resolved: true
     });
   }
-  async function removeVan(vanId){
-    if(!confirm('Remove this van from the system? This does not delete its rental history.')) return;
+  async function addWarningLight(name, safety, feedback, vanId) {
+    await db.collection('vanWarningLights').add({
+      name,
+      safety,
+      feedback: safety ? null : feedback,
+      van: vanId || null
+    });
+  }
+  async function resolveMaint(id) {
+    await db.collection('vanMaintenanceNotes').doc(id).update({
+      resolved: true
+    });
+  }
+  async function setVanStatus(vanId, status) {
+    await db.collection('vans').doc(vanId).update({
+      status
+    });
+    RccAudit.log('van.status', 'van', vanId, vanLabel(vanId) + ' set to ' + status);
+  }
+  async function addVan(name, isBorrowed, borrowedFrom, returnDate) {
+    await db.collection('vans').add({
+      name,
+      mileage: 0,
+      gas: 100,
+      status: 'available',
+      lowPriority: false,
+      borrowed: isBorrowed,
+      borrowedFrom: isBorrowed ? borrowedFrom : null,
+      expectedReturnDate: isBorrowed ? returnDate : null
+    });
+  }
+  async function removeVan(vanId) {
+    if (!confirm('Remove this van from the system? This does not delete its rental history.')) return;
     const gone = vanLabel(vanId);
     await db.collection('vans').doc(vanId).delete();
-    RccAudit.log('van.remove','van',vanId,'Removed the van "'+gone+'"');
+    RccAudit.log('van.remove', 'van', vanId, 'Removed the van "' + gone + '"');
   }
-  async function addRepair(vanId,date,serviceType,notes,performedBy){
-    await db.collection('vanRepairLog').add({vanId,date,serviceType,notes,performedBy,createdAt:Date.now()});
-  }
-  async function addManualReservation({vanId,driverId,date,time,endDate,endTime,purpose}){
-    await db.collection('vanRentals').add({
-      driverId: driverId||null, vanId, date, time, endDate, endTime, purpose,
-      status:'assigned', createdAt:Date.now(), createdByAdmin:true,
+  async function addRepair(vanId, date, serviceType, notes, performedBy) {
+    await db.collection('vanRepairLog').add({
+      vanId,
+      date,
+      serviceType,
+      notes,
+      performedBy,
+      createdAt: Date.now()
     });
-    const van = vans.find(v=>v.id===vanId);
-    if(van && van.status!=='maintenance') await db.collection('vans').doc(vanId).update({status:'inuse'});
   }
-  async function cancelReservation(rentalId){
-    const rental = rentals.find(r=>r.id===rentalId);
-    if(!rental) return;
-    await db.collection('vanRentals').doc(rentalId).update({status:'cancelled'});
-    RccAudit.log('van.reservation.cancel','vanRental',rentalId,'Cancelled the reservation for '+vanLabel(rental.vanId)+' on '+(rental.date||'')+(rental.driverName?' ('+rental.driverName+')':''));
-    const otherActive = rentals.some(r=>r.id!==rentalId && r.vanId===rental.vanId && r.status!=='completed' && r.status!=='cancelled' && r.checkout && !r.return);
-    const van = vans.find(v=>v.id===rental.vanId);
-    if(van && van.status!=='maintenance' && !otherActive){ await db.collection('vans').doc(rental.vanId).update({status:'available'}); }
+  async function addManualReservation({
+    vanId,
+    driverId,
+    date,
+    time,
+    endDate,
+    endTime,
+    purpose
+  }) {
+    await db.collection('vanRentals').add({
+      driverId: driverId || null,
+      vanId,
+      date,
+      time,
+      endDate,
+      endTime,
+      purpose,
+      status: 'assigned',
+      createdAt: Date.now(),
+      createdByAdmin: true
+    });
+    const van = vans.find(v => v.id === vanId);
+    if (van && van.status !== 'maintenance') await db.collection('vans').doc(vanId).update({
+      status: 'inuse'
+    });
+  }
+  async function cancelReservation(rentalId) {
+    const rental = rentals.find(r => r.id === rentalId);
+    if (!rental) return;
+    await db.collection('vanRentals').doc(rentalId).update({
+      status: 'cancelled'
+    });
+    RccAudit.log('van.reservation.cancel', 'vanRental', rentalId, 'Cancelled the reservation for ' + vanLabel(rental.vanId) + ' on ' + (rental.date || '') + (rental.driverName ? ' (' + rental.driverName + ')' : ''));
+    const otherActive = rentals.some(r => r.id !== rentalId && r.vanId === rental.vanId && r.status !== 'completed' && r.status !== 'cancelled' && r.checkout && !r.return);
+    const van = vans.find(v => v.id === rental.vanId);
+    if (van && van.status !== 'maintenance' && !otherActive) {
+      await db.collection('vans').doc(rental.vanId).update({
+        status: 'available'
+      });
+    }
   }
 
   // Lets an admin complete a checkout on a driver's behalf, without
@@ -685,21 +1181,33 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
   // History and other views don't need special-casing, but flags
   // completedByAdmin so it's clear this wasn't the driver's own
   // in-person confirmation.
-  async function manualCheckout(rentalId, {mileage, gas}){
-    const rental = rentals.find(r=>r.id===rentalId);
-    if(!rental) return;
-    const van = vans.find(v=>v.id===rental.vanId);
+  async function manualCheckout(rentalId, {
+    mileage,
+    gas
+  }) {
+    const rental = rentals.find(r => r.id === rentalId);
+    if (!rental) return;
+    const van = vans.find(v => v.id === rental.vanId);
     await db.collection('vanRentals').doc(rentalId).update({
       checkout: {
-        mileage, gas, dashPhoto: null, warningLightsOn: [],
-        otherLightReported: false, otherLightDesc: '',
-        clean: null, cleanPhoto: null, at: Date.now(),
-        completedByAdmin: true, completedByAdminUid: currentUserUid(),
-      },
+        mileage,
+        gas,
+        dashPhoto: null,
+        warningLightsOn: [],
+        otherLightReported: false,
+        otherLightDesc: '',
+        clean: null,
+        cleanPhoto: null,
+        at: Date.now(),
+        completedByAdmin: true,
+        completedByAdminUid: currentUserUid()
+      }
     });
-    if(van){
+    if (van) {
       await db.collection('vans').doc(van.id).update({
-        mileage: Number(mileage)||van.mileage, gas: Number(gas)||van.gas, status:'inuse',
+        mileage: Number(mileage) || van.mileage,
+        gas: Number(gas) || van.gas,
+        status: 'inuse'
       });
     }
   }
@@ -708,28 +1216,47 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
   // functionally identical to any approved driver checking in someone
   // else's van (which is already allowed), just surfaced here as a
   // dedicated admin action for convenience.
-  async function manualCheckin(rentalId, {mileage, gas, problems, problemDetails}){
-    const rental = rentals.find(r=>r.id===rentalId);
-    if(!rental) return;
-    const van = vans.find(v=>v.id===rental.vanId);
+  async function manualCheckin(rentalId, {
+    mileage,
+    gas,
+    problems,
+    problemDetails
+  }) {
+    const rental = rentals.find(r => r.id === rentalId);
+    if (!rental) return;
+    const van = vans.find(v => v.id === rental.vanId);
     await db.collection('vanRentals').doc(rentalId).update({
-      status:'completed',
+      status: 'completed',
       return: {
-        mileage, gas, clean: null, cleanPhoto: null,
-        warningLightsOn: [], otherLightReported: false, otherLightDesc: '',
-        completedBy: currentUserUid(), completedByAdmin: true,
-        problems, problemDetails, at: Date.now(),
-      },
+        mileage,
+        gas,
+        clean: null,
+        cleanPhoto: null,
+        warningLightsOn: [],
+        otherLightReported: false,
+        otherLightDesc: '',
+        completedBy: currentUserUid(),
+        completedByAdmin: true,
+        problems,
+        problemDetails,
+        at: Date.now()
+      }
     });
-    if(van){
+    if (van) {
       await db.collection('vans').doc(van.id).update({
-        mileage: Number(mileage)||van.mileage, gas: Number(gas)||van.gas, status:'available',
+        mileage: Number(mileage) || van.mileage,
+        gas: Number(gas) || van.gas,
+        status: 'available'
       });
     }
-    if(problems && problemDetails){
+    if (problems && problemDetails) {
       await db.collection('vanMaintenanceNotes').add({
-        vanId: rental.vanId, note: problemDetails, reportedBy: rental.driverId, rentalId,
-        createdAt: Date.now(), resolved: false,
+        vanId: rental.vanId,
+        note: problemDetails,
+        reportedBy: rental.driverId,
+        rentalId,
+        createdAt: Date.now(),
+        resolved: false
       });
     }
   }
@@ -740,39 +1267,65 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
   // Still checks for conflicts against the van's other active
   // rentals for today, so this can't silently double-book a van
   // that's already out or reserved for right now.
-  async function assignVanDirectly(driverId, vanId, {mileage, gas, purpose}){
-    const van = vans.find(v=>v.id===vanId);
-    if(!van) return {error: 'Van not found.'};
-    if(van.status==='maintenance') return {error: 'That van is currently in maintenance.'};
-
+  async function assignVanDirectly(driverId, vanId, {
+    mileage,
+    gas,
+    purpose
+  }) {
+    const van = vans.find(v => v.id === vanId);
+    if (!van) return {
+      error: 'Van not found.'
+    };
+    if (van.status === 'maintenance') return {
+      error: 'That van is currently in maintenance.'
+    };
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
-    const timeStr = now.toTimeString().slice(0,5);
+    const timeStr = now.toTimeString().slice(0, 5);
     const nowTime = now.getTime();
-
-    const conflict = rentals.some(r=>{
-      if(r.vanId!==vanId || r.status==='completed' || r.status==='cancelled') return false;
-      if(!r.checkout) return false; // not out yet, no conflict with a fresh checkout
-      if(r.return) return false; // already back
+    const conflict = rentals.some(r => {
+      if (r.vanId !== vanId || r.status === 'completed' || r.status === 'cancelled') return false;
+      if (!r.checkout) return false; // not out yet, no conflict with a fresh checkout
+      if (r.return) return false; // already back
       return true; // van is currently checked out to someone else
     });
-    if(conflict) return {error: 'That van is currently checked out to someone else.'};
-
+    if (conflict) return {
+      error: 'That van is currently checked out to someone else.'
+    };
     const rentalRef = db.collection('vanRentals').doc();
     await rentalRef.set({
-      driverId, vanId, date: dateStr, time: timeStr, endDate: dateStr, endTime: timeStr,
-      purpose: purpose || '', status: 'assigned', createdAt: Date.now(), createdByAdmin: true,
+      driverId,
+      vanId,
+      date: dateStr,
+      time: timeStr,
+      endDate: dateStr,
+      endTime: timeStr,
+      purpose: purpose || '',
+      status: 'assigned',
+      createdAt: Date.now(),
+      createdByAdmin: true,
       checkout: {
-        mileage, gas, dashPhoto: null, warningLightsOn: [],
-        otherLightReported: false, otherLightDesc: '',
-        clean: null, cleanPhoto: null, at: Date.now(),
-        completedByAdmin: true, completedByAdminUid: currentUserUid(),
-      },
+        mileage,
+        gas,
+        dashPhoto: null,
+        warningLightsOn: [],
+        otherLightReported: false,
+        otherLightDesc: '',
+        clean: null,
+        cleanPhoto: null,
+        at: Date.now(),
+        completedByAdmin: true,
+        completedByAdminUid: currentUserUid()
+      }
     });
     await db.collection('vans').doc(vanId).update({
-      mileage: Number(mileage)||van.mileage, gas: Number(gas)||van.gas, status:'inuse',
+      mileage: Number(mileage) || van.mileage,
+      gas: Number(gas) || van.gas,
+      status: 'inuse'
     });
-    return {success: true};
+    return {
+      success: true
+    };
   }
 
   // Reassigns an in-progress rental to a new driver, a new van, or
@@ -782,741 +1335,1350 @@ function AdminDashboard({allUsers,vans,rentals,warningLights,maintenanceNotes,re
   // carrying over the handoff mileage/gas as the new leg's starting
   // point. Two linked records instead of editing one in place, so
   // the trail of who actually had the van and when stays honest.
-  async function reassignVan(oldRentalId, {newDriverId, newVanId, mileage, gas, purpose}){
-    const oldRental = rentals.find(r=>r.id===oldRentalId);
-    if(!oldRental) return {error: 'Original rental not found.'};
+  async function reassignVan(oldRentalId, {
+    newDriverId,
+    newVanId,
+    mileage,
+    gas,
+    purpose
+  }) {
+    const oldRental = rentals.find(r => r.id === oldRentalId);
+    if (!oldRental) return {
+      error: 'Original rental not found.'
+    };
     const targetVanId = newVanId || oldRental.vanId;
     const targetDriverId = newDriverId || oldRental.driverId;
-    const newVan = vans.find(v=>v.id===targetVanId);
-    if(!newVan) return {error: 'Van not found.'};
-    if(newVanId && newVanId!==oldRental.vanId && newVan.status==='maintenance'){
-      return {error: 'That van is currently in maintenance.'};
+    const newVan = vans.find(v => v.id === targetVanId);
+    if (!newVan) return {
+      error: 'Van not found.'
+    };
+    if (newVanId && newVanId !== oldRental.vanId && newVan.status === 'maintenance') {
+      return {
+        error: 'That van is currently in maintenance.'
+      };
     }
 
     // Only check for conflicts if switching to a genuinely different
     // van — reassigning the same van to a new driver can't conflict
     // with itself.
-    if(newVanId && newVanId!==oldRental.vanId){
-      const conflict = rentals.some(r=>{
-        if(r.id===oldRentalId || r.vanId!==newVanId || r.status==='completed' || r.status==='cancelled') return false;
-        if(!r.checkout || r.return) return false;
+    if (newVanId && newVanId !== oldRental.vanId) {
+      const conflict = rentals.some(r => {
+        if (r.id === oldRentalId || r.vanId !== newVanId || r.status === 'completed' || r.status === 'cancelled') return false;
+        if (!r.checkout || r.return) return false;
         return true;
       });
-      if(conflict) return {error: 'That van is currently checked out to someone else.'};
+      if (conflict) return {
+        error: 'That van is currently checked out to someone else.'
+      };
     }
-
-    const oldVan = vans.find(v=>v.id===oldRental.vanId);
+    const oldVan = vans.find(v => v.id === oldRental.vanId);
 
     // Close out the old rental as reassigned, not a normal return.
     await db.collection('vanRentals').doc(oldRentalId).update({
       status: 'completed',
       return: {
-        mileage, gas, clean: null, cleanPhoto: null,
-        warningLightsOn: [], otherLightReported: false, otherLightDesc: '',
-        completedBy: currentUserUid(), completedByAdmin: true,
-        reassigned: true, reassignedTo: {driverId: targetDriverId, vanId: targetVanId},
-        at: Date.now(),
-      },
+        mileage,
+        gas,
+        clean: null,
+        cleanPhoto: null,
+        warningLightsOn: [],
+        otherLightReported: false,
+        otherLightDesc: '',
+        completedBy: currentUserUid(),
+        completedByAdmin: true,
+        reassigned: true,
+        reassignedTo: {
+          driverId: targetDriverId,
+          vanId: targetVanId
+        },
+        at: Date.now()
+      }
     });
 
     // If the van itself is changing, the old van goes back to
     // available (assuming nothing else has it out already).
-    if(oldVan && newVanId && newVanId!==oldRental.vanId){
-      await db.collection('vans').doc(oldVan.id).update({status:'available'});
+    if (oldVan && newVanId && newVanId !== oldRental.vanId) {
+      await db.collection('vans').doc(oldVan.id).update({
+        status: 'available'
+      });
     }
 
     // Open the new leg.
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
-    const timeStr = now.toTimeString().slice(0,5);
+    const timeStr = now.toTimeString().slice(0, 5);
     const newRentalRef = db.collection('vanRentals').doc();
     await newRentalRef.set({
-      driverId: targetDriverId, vanId: targetVanId, date: dateStr, time: timeStr,
-      endDate: dateStr, endTime: timeStr, purpose: purpose || oldRental.purpose || '',
-      status: 'assigned', createdAt: Date.now(), createdByAdmin: true,
+      driverId: targetDriverId,
+      vanId: targetVanId,
+      date: dateStr,
+      time: timeStr,
+      endDate: dateStr,
+      endTime: timeStr,
+      purpose: purpose || oldRental.purpose || '',
+      status: 'assigned',
+      createdAt: Date.now(),
+      createdByAdmin: true,
       reassignedFrom: oldRentalId,
       checkout: {
-        mileage, gas, dashPhoto: null, warningLightsOn: [],
-        otherLightReported: false, otherLightDesc: '',
-        clean: null, cleanPhoto: null, at: Date.now(),
-        completedByAdmin: true, completedByAdminUid: currentUserUid(),
-      },
+        mileage,
+        gas,
+        dashPhoto: null,
+        warningLightsOn: [],
+        otherLightReported: false,
+        otherLightDesc: '',
+        clean: null,
+        cleanPhoto: null,
+        at: Date.now(),
+        completedByAdmin: true,
+        completedByAdminUid: currentUserUid()
+      }
     });
     await db.collection('vans').doc(targetVanId).update({
-      mileage: Number(mileage)||newVan.mileage, gas: Number(gas)||newVan.gas, status:'inuse',
+      mileage: Number(mileage) || newVan.mileage,
+      gas: Number(gas) || newVan.gas,
+      status: 'inuse'
     });
-
-    return {success: true};
+    return {
+      success: true
+    };
   }
-
-  return (
-    <div className="content">
-      <div className="nav-tabs">
-        <button className={tab==='approvals'?'active':''} onClick={()=>setTab('approvals')}>Drivers</button>
-        <button className={tab==='adddriver'?'active':''} onClick={()=>setTab('adddriver')}>Add Driver</button>
-        <button className={tab==='vans'?'active':''} onClick={()=>setTab('vans')}>Vans</button>
-        <button className={tab==='checkinout'?'active':''} onClick={()=>setTab('checkinout')}>Check In/Out</button>
-        <button className={tab==='schedule'?'active':''} onClick={()=>setTab('schedule')}>Schedule</button>
-        <button className={tab==='history'?'active':''} onClick={()=>setTab('history')}>History</button>
-        <button className={tab==='recurring'?'active':''} onClick={()=>setTab('recurring')}>Recurring{recurringPendingCount>0?` (${recurringPendingCount})`:''}</button>
-        <button className={tab==='team'?'active':''} onClick={()=>setTab('team')}>Team</button>
-        <button className={tab==='repairs'?'active':''} onClick={()=>setTab('repairs')}>Repairs</button>
-        <button className={tab==='lights'?'active':''} onClick={()=>setTab('lights')}>Lights</button>
-        <button className={tab==='alerts'?'active':''} onClick={()=>setTab('alerts')}>Alerts{openAlerts.length>0?` (${openAlerts.length})`:''}</button>
-        <button className={tab==='maint'?'active':''} onClick={()=>setTab('maint')}>Maint.</button>
-      </div>
-
-      {tab==='approvals' && (
-        <div className="card">
-          <h3>Pending Applications</h3>
-          {pending.length===0 && <p className="muted">None pending.</p>}
-          {pending.map(u=>(
-            <PendingDriverCard key={u.id} driverUser={u} onApprove={approve} onDeny={deny} onVerify={verifyLicenseInPerson} onUpdateExp={updateLicenseExp} />
-          ))}
-          <h3 style={{marginTop:20}}>Approved Drivers</h3>
-          {approved.map(u=>{
-            const vr = u.vanRentalProfile;
-            const flags = [];
-            if(vr.atFaultAccidents1yr) flags.push('at-fault accident');
-            if(vr.movingViolations1yr) flags.push('moving violation');
-            if(vr.licenseRevokedSuspended) flags.push('license revoked/suspended');
-            return (
-              <div key={u.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-                <div style={{display:'flex',justifyContent:'space-between'}}>
-                  <div>{u.name}</div><span className="badge approved">approved</span>
-                </div>
-                {vr.lastRenewed && <div className="muted">Last renewed: {new Date(vr.lastRenewed).toLocaleDateString()}</div>}
-                {flags.length>0 && <div className="muted" style={{color:'var(--danger)',fontWeight:600}}>Flagged at renewal: {flags.join(', ')}</div>}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {tab==='adddriver' && <AdminAddDriver />}
-
-      {tab==='vans' && (
-        <div className="card">
-          <h3>Vans</h3>
-          {vans.map(v=>(
-            <VanDetailCard
-              key={v.id}
-              van={v}
-              maintenanceNotes={maintenanceNotes.filter(m=>m.vanId===v.id)}
-              repairLog={repairLog.filter(r=>r.vanId===v.id)}
-              onSetStatus={setVanStatus}
-              onRemove={removeVan}
-              onResolveMaint={resolveMaint}
-            />
-          ))}
-          <AddVanForm onAdd={addVan} />
-        </div>
-      )}
-
-      {tab==='checkinout' && <ManualCheckInOut vans={vans} rentals={rentals} approvedDrivers={approved} onCheckout={manualCheckout} onCheckin={manualCheckin} onAssignDirectly={assignVanDirectly} onReassign={reassignVan} />}
-
-      {tab==='schedule' && <ScheduleAdmin vans={vans} approvedDrivers={approved} rentals={rentals} onAdd={addManualReservation} onCancel={cancelReservation} />}
-      {tab==='history' && <RentalHistoryAdmin vans={vans} rentals={rentals} allUsers={allUsers} />}
-      {tab==='recurring' && <RecurringAdmin recurringRequests={recurringRequests} allUsers={allUsers} onApprove={approveRecurring} onDeny={denyRecurring} onEnd={endRecurring} onApproveRenewal={approveRenewal} />}
-      {tab==='team' && <VanTeamAdmin allUsers={allUsers} />}
-      {tab==='repairs' && <RepairsAdmin vans={vans} repairLog={repairLog} onAdd={addRepair} />}
-      {tab==='lights' && <WarningLightsAdmin vans={vans} warningLights={warningLights} onAdd={addWarningLight} />}
-
-      {tab==='alerts' && (
-        <div className="card">
-          <h3>Safety Alerts</h3>
-          {openAlerts.length===0 && <p className="muted">No open alerts.</p>}
-          {openAlerts.map(a=>{
-            const driver = allUsers.find(u=>u.id===a.driverId);
-            const van = vans.find(v=>v.id===a.vanId);
-            const rental = a.rentalId ? rentals.find(r=>r.id===a.rentalId) : null;
-            const isCheckoutBlock = a.type==='safety_light_block' && rental && rental.checkoutBlocked && !rental.checkoutCleared;
-
-            if(isCheckoutBlock){
-              return <SafetyBlockAlertCard key={a.id} alert={a} driver={driver} van={van} rental={rental} onResolveAlert={resolveAlert} />;
-            }
-            return (
-              <div key={a.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-                <div><strong>{driver?.name||'Unknown driver'}</strong> on {van?.name}</div>
-                <div className="muted">"{a.description}"</div>
-                <button className="secondary" style={{marginTop:8}} onClick={()=>resolveAlert(a.id)}>Mark Resolved</button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {tab==='maint' && (
-        <div className="card">
-          <h3>Maintenance Notes</h3>
-          {maintenanceNotes.length===0 && <p className="muted">No notes.</p>}
-          {maintenanceNotes.slice().reverse().map(m=>{
-            const van = vans.find(v=>v.id===m.vanId);
-            return (
-              <div key={m.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch',opacity:m.resolved?0.5:1}}>
-                <div><strong>{van?.name}</strong></div>
-                <div className="muted">{m.note}</div>
-                {!m.resolved && <button className="secondary" style={{marginTop:8}} onClick={()=>resolveMaint(m.id)}>Mark Resolved</button>}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "content"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "nav-tabs"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: tab === 'approvals' ? 'active' : '',
+    onClick: () => setTab('approvals')
+  }, "Drivers"), /*#__PURE__*/React.createElement("button", {
+    className: tab === 'adddriver' ? 'active' : '',
+    onClick: () => setTab('adddriver')
+  }, "Add Driver"), /*#__PURE__*/React.createElement("button", {
+    className: tab === 'vans' ? 'active' : '',
+    onClick: () => setTab('vans')
+  }, "Vans"), /*#__PURE__*/React.createElement("button", {
+    className: tab === 'checkinout' ? 'active' : '',
+    onClick: () => setTab('checkinout')
+  }, "Check In/Out"), /*#__PURE__*/React.createElement("button", {
+    className: tab === 'schedule' ? 'active' : '',
+    onClick: () => setTab('schedule')
+  }, "Schedule"), /*#__PURE__*/React.createElement("button", {
+    className: tab === 'history' ? 'active' : '',
+    onClick: () => setTab('history')
+  }, "History"), /*#__PURE__*/React.createElement("button", {
+    className: tab === 'recurring' ? 'active' : '',
+    onClick: () => setTab('recurring')
+  }, "Recurring", recurringPendingCount > 0 ? ` (${recurringPendingCount})` : ''), /*#__PURE__*/React.createElement("button", {
+    className: tab === 'team' ? 'active' : '',
+    onClick: () => setTab('team')
+  }, "Team"), /*#__PURE__*/React.createElement("button", {
+    className: tab === 'repairs' ? 'active' : '',
+    onClick: () => setTab('repairs')
+  }, "Repairs"), /*#__PURE__*/React.createElement("button", {
+    className: tab === 'lights' ? 'active' : '',
+    onClick: () => setTab('lights')
+  }, "Lights"), /*#__PURE__*/React.createElement("button", {
+    className: tab === 'alerts' ? 'active' : '',
+    onClick: () => setTab('alerts')
+  }, "Alerts", openAlerts.length > 0 ? ` (${openAlerts.length})` : ''), /*#__PURE__*/React.createElement("button", {
+    className: tab === 'maint' ? 'active' : '',
+    onClick: () => setTab('maint')
+  }, "Maint.")), tab === 'approvals' && /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Pending Applications"), pending.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "None pending."), pending.map(u => /*#__PURE__*/React.createElement(PendingDriverCard, {
+    key: u.id,
+    driverUser: u,
+    onApprove: approve,
+    onDeny: deny,
+    onVerify: verifyLicenseInPerson,
+    onUpdateExp: updateLicenseExp
+  })), /*#__PURE__*/React.createElement("h3", {
+    style: {
+      marginTop: 20
+    }
+  }, "Approved Drivers"), approved.map(u => {
+    const vr = u.vanRentalProfile;
+    const flags = [];
+    if (vr.atFaultAccidents1yr) flags.push('at-fault accident');
+    if (vr.movingViolations1yr) flags.push('moving violation');
+    if (vr.licenseRevokedSuspended) flags.push('license revoked/suspended');
+    return /*#__PURE__*/React.createElement("div", {
+      key: u.id,
+      className: "list-item",
+      style: {
+        flexDirection: 'column',
+        alignItems: 'stretch'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between'
+      }
+    }, /*#__PURE__*/React.createElement("div", null, u.name), /*#__PURE__*/React.createElement("span", {
+      className: "badge approved"
+    }, "approved")), vr.lastRenewed && /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, "Last renewed: ", new Date(vr.lastRenewed).toLocaleDateString()), flags.length > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "muted",
+      style: {
+        color: 'var(--danger)',
+        fontWeight: 600
+      }
+    }, "Flagged at renewal: ", flags.join(', ')));
+  })), tab === 'adddriver' && /*#__PURE__*/React.createElement(AdminAddDriver, null), tab === 'vans' && /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Vans"), vans.map(v => /*#__PURE__*/React.createElement(VanDetailCard, {
+    key: v.id,
+    van: v,
+    maintenanceNotes: maintenanceNotes.filter(m => m.vanId === v.id),
+    repairLog: repairLog.filter(r => r.vanId === v.id),
+    onSetStatus: setVanStatus,
+    onRemove: removeVan,
+    onResolveMaint: resolveMaint
+  })), /*#__PURE__*/React.createElement(AddVanForm, {
+    onAdd: addVan
+  })), tab === 'checkinout' && /*#__PURE__*/React.createElement(ManualCheckInOut, {
+    vans: vans,
+    rentals: rentals,
+    approvedDrivers: approved,
+    onCheckout: manualCheckout,
+    onCheckin: manualCheckin,
+    onAssignDirectly: assignVanDirectly,
+    onReassign: reassignVan
+  }), tab === 'schedule' && /*#__PURE__*/React.createElement(ScheduleAdmin, {
+    vans: vans,
+    approvedDrivers: approved,
+    rentals: rentals,
+    onAdd: addManualReservation,
+    onCancel: cancelReservation
+  }), tab === 'history' && /*#__PURE__*/React.createElement(RentalHistoryAdmin, {
+    vans: vans,
+    rentals: rentals,
+    allUsers: allUsers
+  }), tab === 'recurring' && /*#__PURE__*/React.createElement(RecurringAdmin, {
+    recurringRequests: recurringRequests,
+    allUsers: allUsers,
+    onApprove: approveRecurring,
+    onDeny: denyRecurring,
+    onEnd: endRecurring,
+    onApproveRenewal: approveRenewal
+  }), tab === 'team' && /*#__PURE__*/React.createElement(VanTeamAdmin, {
+    allUsers: allUsers
+  }), tab === 'repairs' && /*#__PURE__*/React.createElement(RepairsAdmin, {
+    vans: vans,
+    repairLog: repairLog,
+    onAdd: addRepair
+  }), tab === 'lights' && /*#__PURE__*/React.createElement(WarningLightsAdmin, {
+    vans: vans,
+    warningLights: warningLights,
+    onAdd: addWarningLight
+  }), tab === 'alerts' && /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Safety Alerts"), openAlerts.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "No open alerts."), openAlerts.map(a => {
+    const driver = allUsers.find(u => u.id === a.driverId);
+    const van = vans.find(v => v.id === a.vanId);
+    const rental = a.rentalId ? rentals.find(r => r.id === a.rentalId) : null;
+    const isCheckoutBlock = a.type === 'safety_light_block' && rental && rental.checkoutBlocked && !rental.checkoutCleared;
+    if (isCheckoutBlock) {
+      return /*#__PURE__*/React.createElement(SafetyBlockAlertCard, {
+        key: a.id,
+        alert: a,
+        driver: driver,
+        van: van,
+        rental: rental,
+        onResolveAlert: resolveAlert
+      });
+    }
+    return /*#__PURE__*/React.createElement("div", {
+      key: a.id,
+      className: "list-item",
+      style: {
+        flexDirection: 'column',
+        alignItems: 'stretch'
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, driver?.name || 'Unknown driver'), " on ", van?.name), /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, "\"", a.description, "\""), /*#__PURE__*/React.createElement("button", {
+      className: "secondary",
+      style: {
+        marginTop: 8
+      },
+      onClick: () => resolveAlert(a.id)
+    }, "Mark Resolved"));
+  })), tab === 'maint' && /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Maintenance Notes"), maintenanceNotes.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "No notes."), maintenanceNotes.slice().reverse().map(m => {
+    const van = vans.find(v => v.id === m.vanId);
+    return /*#__PURE__*/React.createElement("div", {
+      key: m.id,
+      className: "list-item",
+      style: {
+        flexDirection: 'column',
+        alignItems: 'stretch',
+        opacity: m.resolved ? 0.5 : 1
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, van?.name)), /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, m.note), !m.resolved && /*#__PURE__*/React.createElement("button", {
+      className: "secondary",
+      style: {
+        marginTop: 8
+      },
+      onClick: () => resolveMaint(m.id)
+    }, "Mark Resolved"));
+  })));
 }
-
-const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-
-function VanTeamAdmin({allUsers}){
-  const [search,setSearch] = useState('');
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+function VanTeamAdmin({
+  allUsers
+}) {
+  const [search, setSearch] = useState('');
   const vanAdmins = allUsers.filter(u => u.roles && u.roles.vanAdmin === true);
-  const others = allUsers.filter(u => !(u.roles && u.roles.vanAdmin === true))
-    .filter(u => search && ((u.name||'').toLowerCase().includes(search.toLowerCase()) || (u.email||'').toLowerCase().includes(search.toLowerCase())));
-
-  async function grant(uid_){
-    await db.collection('users').doc(uid_).set({roles:{vanAdmin:true}}, {merge:true});
+  const others = allUsers.filter(u => !(u.roles && u.roles.vanAdmin === true)).filter(u => search && ((u.name || '').toLowerCase().includes(search.toLowerCase()) || (u.email || '').toLowerCase().includes(search.toLowerCase())));
+  async function grant(uid_) {
+    await db.collection('users').doc(uid_).set({
+      roles: {
+        vanAdmin: true
+      }
+    }, {
+      merge: true
+    });
   }
-  async function revoke(uid_){
-    if(!confirm('Remove Van Usage admin access for this person?')) return;
-    await db.collection('users').doc(uid_).set({roles:{vanAdmin:false}}, {merge:true});
+  async function revoke(uid_) {
+    if (!confirm('Remove Van Usage admin access for this person?')) return;
+    await db.collection('users').doc(uid_).set({
+      roles: {
+        vanAdmin: false
+      }
+    }, {
+      merge: true
+    });
   }
-
-  return (
-    <div className="card">
-      <h3>Van Usage Admins</h3>
-      <p className="muted">People with this role can approve drivers, manage vans, and handle scheduling — but nothing outside Van Usage (no Bedside, Graphics, Marketing, or other apps).</p>
-      {vanAdmins.length===0 && <p className="muted">No one else has this yet.</p>}
-      {vanAdmins.map(u=>(
-        <div key={u.id} className="list-item">
-          <div><div>{u.name||u.email}</div><div className="muted">{u.email}</div></div>
-          <button className="secondary" style={{marginTop:0,width:'auto',padding:'8px 14px'}} onClick={()=>revoke(u.id)}>Remove</button>
-        </div>
-      ))}
-
-      <h3 style={{marginTop:24}}>Add Someone</h3>
-      <p className="muted">Search by name or email among people who've already signed into the hub at least once.</p>
-      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or email..." />
-      {search && others.length===0 && <p className="muted" style={{marginTop:10}}>No matches. They need to sign into the hub at least once first.</p>}
-      {others.map(u=>(
-        <div key={u.id} className="list-item">
-          <div><div>{u.name||u.email}</div><div className="muted">{u.email}</div></div>
-          <button className="secondary" style={{marginTop:0,width:'auto',padding:'8px 14px'}} onClick={()=>grant(u.id)}>Make Van Admin</button>
-        </div>
-      ))}
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Van Usage Admins"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "People with this role can approve drivers, manage vans, and handle scheduling — but nothing outside Van Usage (no Bedside, Graphics, Marketing, or other apps)."), vanAdmins.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "No one else has this yet."), vanAdmins.map(u => /*#__PURE__*/React.createElement("div", {
+    key: u.id,
+    className: "list-item"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", null, u.name || u.email), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, u.email)), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0,
+      width: 'auto',
+      padding: '8px 14px'
+    },
+    onClick: () => revoke(u.id)
+  }, "Remove"))), /*#__PURE__*/React.createElement("h3", {
+    style: {
+      marginTop: 24
+    }
+  }, "Add Someone"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Search by name or email among people who've already signed into the hub at least once."), /*#__PURE__*/React.createElement("input", {
+    value: search,
+    onChange: e => setSearch(e.target.value),
+    placeholder: "Search name or email..."
+  }), search && others.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      marginTop: 10
+    }
+  }, "No matches. They need to sign into the hub at least once first."), others.map(u => /*#__PURE__*/React.createElement("div", {
+    key: u.id,
+    className: "list-item"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", null, u.name || u.email), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, u.email)), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0,
+      width: 'auto',
+      padding: '8px 14px'
+    },
+    onClick: () => grant(u.id)
+  }, "Make Van Admin"))));
 }
-
-function RecurringAdmin({recurringRequests,allUsers,onApprove,onDeny,onEnd,onApproveRenewal}){
-  function nameFor(uid_){
-    const u = allUsers.find(u=>u.id===uid_);
+function RecurringAdmin({
+  recurringRequests,
+  allUsers,
+  onApprove,
+  onDeny,
+  onEnd,
+  onApproveRenewal
+}) {
+  function nameFor(uid_) {
+    const u = allUsers.find(u => u.id === uid_);
     return u?.name || u?.email || 'Unknown';
   }
-
-  const pendingNew = recurringRequests.filter(r=>r.status==='pending');
-  const renewals = recurringRequests.filter(r=>r.status==='renewal_requested');
-  const active = recurringRequests.filter(r=>r.status==='active');
-  const ended = recurringRequests.filter(r=>r.status==='ended'||r.status==='denied');
-
-  return (
-    <div className="card">
-      <h3>Renewal Requests</h3>
-      <p className="muted">These are already active but the driver has asked to continue for another 3 months.</p>
-      {renewals.length===0 && <p className="muted">None right now.</p>}
-      {renewals.map(r=>(
-        <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-          <div><strong>{nameFor(r.driverId)}</strong> — {DAY_NAMES[r.dayOfWeek]}s, {r.time}–{r.endTime}</div>
-          <div className="muted">Current window ends {r.windowEnd}. Purpose: {r.purpose||'—'}</div>
-          <div style={{display:'flex',gap:8,marginTop:8}}>
-            <button className="primary" style={{marginTop:0}} onClick={()=>onApproveRenewal(r.id)}>Approve — Extend 3 More Months</button>
-            <button className="secondary" style={{marginTop:0}} onClick={()=>onEnd(r.id)}>Let It End</button>
-          </div>
-        </div>
-      ))}
-
-      <h3 style={{marginTop:24}}>New Recurring Requests</h3>
-      {pendingNew.length===0 && <p className="muted">None pending.</p>}
-      {pendingNew.map(r=>(
-        <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-          <div><strong>{nameFor(r.driverId)}</strong> — {DAY_NAMES[r.dayOfWeek]}s, {r.time}–{r.endTime}</div>
-          <div className="muted">Requested window: {r.windowStart} → {r.windowEnd}. Purpose: {r.purpose||'—'}</div>
-          <div style={{display:'flex',gap:8,marginTop:8}}>
-            <button className="primary" style={{marginTop:0}} onClick={()=>onApprove(r.id)}>Approve — Schedule 3 Months</button>
-            <button className="secondary" style={{marginTop:0}} onClick={()=>onDeny(r.id)}>Deny</button>
-          </div>
-        </div>
-      ))}
-
-      <h3 style={{marginTop:24}}>Active Recurring Reservations</h3>
-      {active.length===0 && <p className="muted">None active.</p>}
-      {active.map(r=>{
-        const skipped = r.skippedDates || [];
-        return (
-          <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-            <div><strong>{nameFor(r.driverId)}</strong> — {DAY_NAMES[r.dayOfWeek]}s, {r.time}–{r.endTime}</div>
-            <div className="muted">Window: {r.windowStart} → {r.windowEnd}</div>
-            {skipped.length>0 && <div className="muted" style={{color:'var(--danger)'}}>Couldn't find a van for: {skipped.join(', ')}</div>}
-            <button className="secondary" style={{marginTop:8}} onClick={()=>onEnd(r.id)}>End This Reservation</button>
-          </div>
-        );
-      })}
-
-      {ended.length>0 && (<>
-        <h3 style={{marginTop:24}}>Ended / Denied</h3>
-        {ended.map(r=>(
-          <div key={r.id} className="list-item">
-            <div><div>{nameFor(r.driverId)} — {DAY_NAMES[r.dayOfWeek]}s</div><div className="muted">{r.windowStart} → {r.windowEnd}</div></div>
-            <span className="badge maintenance">{r.status}</span>
-          </div>
-        ))}
-      </>)}
-    </div>
-  );
+  const pendingNew = recurringRequests.filter(r => r.status === 'pending');
+  const renewals = recurringRequests.filter(r => r.status === 'renewal_requested');
+  const active = recurringRequests.filter(r => r.status === 'active');
+  const ended = recurringRequests.filter(r => r.status === 'ended' || r.status === 'denied');
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Renewal Requests"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "These are already active but the driver has asked to continue for another 3 months."), renewals.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "None right now."), renewals.map(r => /*#__PURE__*/React.createElement("div", {
+    key: r.id,
+    className: "list-item",
+    style: {
+      flexDirection: 'column',
+      alignItems: 'stretch'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, nameFor(r.driverId)), " — ", DAY_NAMES[r.dayOfWeek], "s, ", r.time, "–", r.endTime), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "Current window ends ", r.windowEnd, ". Purpose: ", r.purpose || '—'), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    style: {
+      marginTop: 0
+    },
+    onClick: () => onApproveRenewal(r.id)
+  }, "Approve — Extend 3 More Months"), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0
+    },
+    onClick: () => onEnd(r.id)
+  }, "Let It End")))), /*#__PURE__*/React.createElement("h3", {
+    style: {
+      marginTop: 24
+    }
+  }, "New Recurring Requests"), pendingNew.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "None pending."), pendingNew.map(r => /*#__PURE__*/React.createElement("div", {
+    key: r.id,
+    className: "list-item",
+    style: {
+      flexDirection: 'column',
+      alignItems: 'stretch'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, nameFor(r.driverId)), " — ", DAY_NAMES[r.dayOfWeek], "s, ", r.time, "–", r.endTime), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "Requested window: ", r.windowStart, " → ", r.windowEnd, ". Purpose: ", r.purpose || '—'), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    style: {
+      marginTop: 0
+    },
+    onClick: () => onApprove(r.id)
+  }, "Approve — Schedule 3 Months"), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0
+    },
+    onClick: () => onDeny(r.id)
+  }, "Deny")))), /*#__PURE__*/React.createElement("h3", {
+    style: {
+      marginTop: 24
+    }
+  }, "Active Recurring Reservations"), active.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "None active."), active.map(r => {
+    const skipped = r.skippedDates || [];
+    return /*#__PURE__*/React.createElement("div", {
+      key: r.id,
+      className: "list-item",
+      style: {
+        flexDirection: 'column',
+        alignItems: 'stretch'
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, nameFor(r.driverId)), " — ", DAY_NAMES[r.dayOfWeek], "s, ", r.time, "–", r.endTime), /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, "Window: ", r.windowStart, " → ", r.windowEnd), skipped.length > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "muted",
+      style: {
+        color: 'var(--danger)'
+      }
+    }, "Couldn't find a van for: ", skipped.join(', ')), /*#__PURE__*/React.createElement("button", {
+      className: "secondary",
+      style: {
+        marginTop: 8
+      },
+      onClick: () => onEnd(r.id)
+    }, "End This Reservation"));
+  }), ended.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      marginTop: 24
+    }
+  }, "Ended / Denied"), ended.map(r => /*#__PURE__*/React.createElement("div", {
+    key: r.id,
+    className: "list-item"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", null, nameFor(r.driverId), " — ", DAY_NAMES[r.dayOfWeek], "s"), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, r.windowStart, " → ", r.windowEnd)), /*#__PURE__*/React.createElement("span", {
+    className: "badge maintenance"
+  }, r.status)))));
 }
-
-function ManualCheckInOut({vans,rentals,approvedDrivers,onCheckout,onCheckin,onAssignDirectly,onReassign}){
-  const pendingCheckouts = rentals.filter(r=>r.status==='assigned' && !r.checkout);
-  const outstandingReturns = rentals.filter(r=>r.checkout && !r.return);
-  const availableVans = vans.filter(v=>v.status!=='maintenance');
-
-  function nameFor(uid_){
-    const u = approvedDrivers.find(u=>u.id===uid_);
+function ManualCheckInOut({
+  vans,
+  rentals,
+  approvedDrivers,
+  onCheckout,
+  onCheckin,
+  onAssignDirectly,
+  onReassign
+}) {
+  const pendingCheckouts = rentals.filter(r => r.status === 'assigned' && !r.checkout);
+  const outstandingReturns = rentals.filter(r => r.checkout && !r.return);
+  const availableVans = vans.filter(v => v.status !== 'maintenance');
+  function nameFor(uid_) {
+    const u = approvedDrivers.find(u => u.id === uid_);
     return u?.name || u?.email || 'Unknown driver';
   }
-
-  return (
-    <div className="card">
-      <h3>Assign a Specific Van</h3>
-      <p className="muted">Pick a driver and a specific van to check out directly — no reservation needed first.</p>
-      <DirectAssignForm vans={availableVans} approvedDrivers={approvedDrivers} onAssign={onAssignDirectly} />
-
-      <h3 style={{marginTop:24}}>Check Out a Van</h3>
-      <p className="muted">Complete a checkout on a driver's behalf — useful when you're handing off keys in person.</p>
-      {pendingCheckouts.length===0 && <p className="muted">No vans waiting to be checked out.</p>}
-      {pendingCheckouts.map(r=>{
-        const van = vans.find(v=>v.id===r.vanId);
-        return <ManualCheckoutRow key={r.id} rental={r} van={van} driverName={nameFor(r.driverId)} onSubmit={onCheckout} />;
-      })}
-
-      <h3 style={{marginTop:24}}>Currently Out — Check In or Reassign</h3>
-      <p className="muted">Complete a return, or hand the van off to a different driver or a different van mid-use.</p>
-      {outstandingReturns.length===0 && <p className="muted">No vans currently out.</p>}
-      {outstandingReturns.map(r=>{
-        const van = vans.find(v=>v.id===r.vanId);
-        return <ManualCheckinRow key={r.id} rental={r} van={van} vans={availableVans} approvedDrivers={approvedDrivers} driverName={nameFor(r.driverId)} onSubmit={onCheckin} onReassign={onReassign} />;
-      })}
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Assign a Specific Van"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Pick a driver and a specific van to check out directly — no reservation needed first."), /*#__PURE__*/React.createElement(DirectAssignForm, {
+    vans: availableVans,
+    approvedDrivers: approvedDrivers,
+    onAssign: onAssignDirectly
+  }), /*#__PURE__*/React.createElement("h3", {
+    style: {
+      marginTop: 24
+    }
+  }, "Check Out a Van"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Complete a checkout on a driver's behalf — useful when you're handing off keys in person."), pendingCheckouts.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "No vans waiting to be checked out."), pendingCheckouts.map(r => {
+    const van = vans.find(v => v.id === r.vanId);
+    return /*#__PURE__*/React.createElement(ManualCheckoutRow, {
+      key: r.id,
+      rental: r,
+      van: van,
+      driverName: nameFor(r.driverId),
+      onSubmit: onCheckout
+    });
+  }), /*#__PURE__*/React.createElement("h3", {
+    style: {
+      marginTop: 24
+    }
+  }, "Currently Out — Check In or Reassign"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Complete a return, or hand the van off to a different driver or a different van mid-use."), outstandingReturns.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "No vans currently out."), outstandingReturns.map(r => {
+    const van = vans.find(v => v.id === r.vanId);
+    return /*#__PURE__*/React.createElement(ManualCheckinRow, {
+      key: r.id,
+      rental: r,
+      van: van,
+      vans: availableVans,
+      approvedDrivers: approvedDrivers,
+      driverName: nameFor(r.driverId),
+      onSubmit: onCheckin,
+      onReassign: onReassign
+    });
+  }));
 }
-
-function DirectAssignForm({vans,approvedDrivers,onAssign}){
-  const [driverId,setDriverId] = useState('');
-  const [vanId,setVanId] = useState('');
-  const [mileage,setMileage] = useState('');
-  const [gas,setGas] = useState('');
-  const [purpose,setPurpose] = useState('');
-  const [saving,setSaving] = useState(false);
-  const [error,setError] = useState('');
-
-  const selectedVan = vans.find(v=>v.id===vanId);
+function DirectAssignForm({
+  vans,
+  approvedDrivers,
+  onAssign
+}) {
+  const [driverId, setDriverId] = useState('');
+  const [vanId, setVanId] = useState('');
+  const [mileage, setMileage] = useState('');
+  const [gas, setGas] = useState('');
+  const [purpose, setPurpose] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const selectedVan = vans.find(v => v.id === vanId);
   const canSubmit = driverId && vanId && mileage && gas && !saving;
-
-  async function submit(){
-    setError(''); setSaving(true);
-    const result = await onAssign(driverId, vanId, {mileage, gas, purpose});
-    setSaving(false);
-    if(result?.error){ setError(result.error); return; }
-    setDriverId(''); setVanId(''); setMileage(''); setGas(''); setPurpose('');
-  }
-
-  return (
-    <div style={{border:'1px solid var(--border)', borderRadius:10, padding:14, marginTop:10}}>
-      <label>Driver</label>
-      <select value={driverId} onChange={e=>setDriverId(e.target.value)}>
-        <option value="">Select a driver...</option>
-        {approvedDrivers.map(d=><option key={d.id} value={d.id}>{d.name||d.email}</option>)}
-      </select>
-      <label>Van</label>
-      <select value={vanId} onChange={e=>setVanId(e.target.value)}>
-        <option value="">Select a van...</option>
-        {vans.map(v=><option key={v.id} value={v.id}>{v.name} ({v.status})</option>)}
-      </select>
-      <label>Mileage</label>
-      <input type="number" value={mileage} onChange={e=>setMileage(e.target.value)} placeholder={selectedVan ? `Last known: ${selectedVan.mileage}` : 'Mileage'} />
-      <label>Gas %</label>
-      <input type="number" min="0" max="100" value={gas} onChange={e=>setGas(e.target.value)} />
-      <label>Purpose (optional)</label>
-      <input type="text" value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="e.g. Youth group errand" />
-      {error && <div className="banner-danger">{error}</div>}
-      <button className="primary" disabled={!canSubmit} onClick={submit}>{saving?'Assigning...':'Assign & Check Out'}</button>
-    </div>
-  );
-}
-
-function ManualCheckoutRow({rental,van,driverName,onSubmit}){
-  const [mileage,setMileage] = useState('');
-  const [gas,setGas] = useState('');
-  const [saving,setSaving] = useState(false);
-
-  async function submit(){
-    setSaving(true);
-    await onSubmit(rental.id, {mileage, gas: Number(gas)});
-    setSaving(false);
-  }
-
-  return (
-    <div className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-      <div><strong>{van?.name||'Unknown van'}</strong> — {driverName}</div>
-      <div className="muted">Reserved {rental.date} {rental.time} → {rental.endDate} {rental.endTime}</div>
-      <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
-        <input type="number" placeholder={`Mileage (last known: ${van?.mileage||'—'})`} value={mileage} onChange={e=>setMileage(e.target.value)} style={{flex:1,minWidth:140}} />
-        <input type="number" placeholder="Gas %" min="0" max="100" value={gas} onChange={e=>setGas(e.target.value)} style={{width:90}} />
-        <button className="primary" style={{marginTop:0,width:'auto',padding:'10px 16px'}} disabled={!mileage||!gas||saving} onClick={submit}>{saving?'Saving...':'Check Out'}</button>
-      </div>
-    </div>
-  );
-}
-
-function ManualCheckinRow({rental,van,vans,approvedDrivers,driverName,onSubmit,onReassign}){
-  const [mode,setMode] = useState('checkin'); // checkin | reassign
-  const [mileage,setMileage] = useState('');
-  const [gas,setGas] = useState('');
-  const [problems,setProblems] = useState(false);
-  const [problemDetails,setProblemDetails] = useState('');
-  const [newDriverId,setNewDriverId] = useState('');
-  const [newVanId,setNewVanId] = useState('');
-  const [purpose,setPurpose] = useState('');
-  const [saving,setSaving] = useState(false);
-  const [error,setError] = useState('');
-
-  async function submitCheckin(){
-    setSaving(true);
-    await onSubmit(rental.id, {mileage, gas: Number(gas), problems, problemDetails});
-    setSaving(false);
-  }
-
-  async function submitReassign(){
+  async function submit() {
     setError('');
-    if(!newDriverId && !newVanId){ setError('Pick a new driver, a new van, or both.'); return; }
+    setSaving(true);
+    const result = await onAssign(driverId, vanId, {
+      mileage,
+      gas,
+      purpose
+    });
+    setSaving(false);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
+    setDriverId('');
+    setVanId('');
+    setMileage('');
+    setGas('');
+    setPurpose('');
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      border: '1px solid var(--border)',
+      borderRadius: 10,
+      padding: 14,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Driver"), /*#__PURE__*/React.createElement("select", {
+    value: driverId,
+    onChange: e => setDriverId(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select a driver..."), approvedDrivers.map(d => /*#__PURE__*/React.createElement("option", {
+    key: d.id,
+    value: d.id
+  }, d.name || d.email))), /*#__PURE__*/React.createElement("label", null, "Van"), /*#__PURE__*/React.createElement("select", {
+    value: vanId,
+    onChange: e => setVanId(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select a van..."), vans.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v.id,
+    value: v.id
+  }, v.name, " (", v.status, ")"))), /*#__PURE__*/React.createElement("label", null, "Mileage"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: mileage,
+    onChange: e => setMileage(e.target.value),
+    placeholder: selectedVan ? `Last known: ${selectedVan.mileage}` : 'Mileage'
+  }), /*#__PURE__*/React.createElement("label", null, "Gas %"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0",
+    max: "100",
+    value: gas,
+    onChange: e => setGas(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Purpose (optional)"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: purpose,
+    onChange: e => setPurpose(e.target.value),
+    placeholder: "e.g. Youth group errand"
+  }), error && /*#__PURE__*/React.createElement("div", {
+    className: "banner-danger"
+  }, error), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: !canSubmit,
+    onClick: submit
+  }, saving ? 'Assigning...' : 'Assign & Check Out'));
+}
+function ManualCheckoutRow({
+  rental,
+  van,
+  driverName,
+  onSubmit
+}) {
+  const [mileage, setMileage] = useState('');
+  const [gas, setGas] = useState('');
+  const [saving, setSaving] = useState(false);
+  async function submit() {
+    setSaving(true);
+    await onSubmit(rental.id, {
+      mileage,
+      gas: Number(gas)
+    });
+    setSaving(false);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "list-item",
+    style: {
+      flexDirection: 'column',
+      alignItems: 'stretch'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, van?.name || 'Unknown van'), " — ", driverName), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "Reserved ", rental.date, " ", rental.time, " → ", rental.endDate, " ", rental.endTime), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 8,
+      flexWrap: 'wrap',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    placeholder: `Mileage (last known: ${van?.mileage || '—'})`,
+    value: mileage,
+    onChange: e => setMileage(e.target.value),
+    style: {
+      flex: 1,
+      minWidth: 140
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    placeholder: "Gas %",
+    min: "0",
+    max: "100",
+    value: gas,
+    onChange: e => setGas(e.target.value),
+    style: {
+      width: 90
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    style: {
+      marginTop: 0,
+      width: 'auto',
+      padding: '10px 16px'
+    },
+    disabled: !mileage || !gas || saving,
+    onClick: submit
+  }, saving ? 'Saving...' : 'Check Out')));
+}
+function ManualCheckinRow({
+  rental,
+  van,
+  vans,
+  approvedDrivers,
+  driverName,
+  onSubmit,
+  onReassign
+}) {
+  const [mode, setMode] = useState('checkin'); // checkin | reassign
+  const [mileage, setMileage] = useState('');
+  const [gas, setGas] = useState('');
+  const [problems, setProblems] = useState(false);
+  const [problemDetails, setProblemDetails] = useState('');
+  const [newDriverId, setNewDriverId] = useState('');
+  const [newVanId, setNewVanId] = useState('');
+  const [purpose, setPurpose] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  async function submitCheckin() {
+    setSaving(true);
+    await onSubmit(rental.id, {
+      mileage,
+      gas: Number(gas),
+      problems,
+      problemDetails
+    });
+    setSaving(false);
+  }
+  async function submitReassign() {
+    setError('');
+    if (!newDriverId && !newVanId) {
+      setError('Pick a new driver, a new van, or both.');
+      return;
+    }
     setSaving(true);
     const result = await onReassign(rental.id, {
-      newDriverId: newDriverId || null, newVanId: newVanId || null,
-      mileage, gas: Number(gas), purpose,
+      newDriverId: newDriverId || null,
+      newVanId: newVanId || null,
+      mileage,
+      gas: Number(gas),
+      purpose
     });
     setSaving(false);
-    if(result?.error){ setError(result.error); return; }
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
   }
-
-  return (
-    <div className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-      <div><strong>{van?.name||'Unknown van'}</strong> — {driverName}</div>
-      <div className="muted">Out since {rental.checkout?.at ? new Date(rental.checkout.at).toLocaleString() : '—'}</div>
-
-      <div style={{display:'flex',gap:6,marginTop:10}}>
-        <button className={mode==='checkin'?'primary':'secondary'} style={{marginTop:0,width:'auto',padding:'6px 12px',fontSize:13}} onClick={()=>setMode('checkin')}>Check In</button>
-        <button className={mode==='reassign'?'primary':'secondary'} style={{marginTop:0,width:'auto',padding:'6px 12px',fontSize:13}} onClick={()=>setMode('reassign')}>Reassign</button>
-      </div>
-
-      <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap',alignItems:'center'}}>
-        <input type="number" placeholder={mode==='checkin' ? 'Final mileage' : 'Mileage at handoff'} value={mileage} onChange={e=>setMileage(e.target.value)} style={{flex:1,minWidth:140}} />
-        <input type="number" placeholder="Gas %" min="0" max="100" value={gas} onChange={e=>setGas(e.target.value)} style={{width:90}} />
-      </div>
-
-      {mode==='checkin' && (<>
-        <label style={{display:'flex',alignItems:'center',gap:8,marginTop:8,fontSize:14,fontWeight:400,cursor:'pointer'}}>
-          <input type="checkbox" checked={problems} onChange={e=>setProblems(e.target.checked)} style={{width:'auto'}} />
-          Any problems to report?
-        </label>
-        {problems && <textarea placeholder="Describe the problem" value={problemDetails} onChange={e=>setProblemDetails(e.target.value)} style={{marginTop:8}} />}
-        <button className="primary" style={{width:'auto',padding:'10px 16px'}} disabled={!mileage||!gas||saving} onClick={submitCheckin}>{saving?'Saving...':'Check In'}</button>
-      </>)}
-
-      {mode==='reassign' && (<>
-        <p className="muted" style={{marginTop:8}}>Change the driver, the van, or both — leave either as-is to keep it the same.</p>
-        <label>New Driver (optional — leave blank to keep {driverName})</label>
-        <select value={newDriverId} onChange={e=>setNewDriverId(e.target.value)}>
-          <option value="">Keep {driverName}</option>
-          {approvedDrivers.filter(d=>d.id!==rental.driverId).map(d=><option key={d.id} value={d.id}>{d.name||d.email}</option>)}
-        </select>
-        <label>New Van (optional — leave blank to keep {van?.name||'this van'})</label>
-        <select value={newVanId} onChange={e=>setNewVanId(e.target.value)}>
-          <option value="">Keep {van?.name||'this van'}</option>
-          {vans.filter(v=>v.id!==rental.vanId).map(v=><option key={v.id} value={v.id}>{v.name} ({v.status})</option>)}
-        </select>
-        <label>Purpose (optional)</label>
-        <input type="text" value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="Carries over if left blank" />
-        {error && <div className="banner-danger">{error}</div>}
-        <button className="primary" style={{width:'auto',padding:'10px 16px'}} disabled={!mileage||!gas||saving} onClick={submitReassign}>{saving?'Reassigning...':'Confirm Reassignment'}</button>
-      </>)}
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "list-item",
+    style: {
+      flexDirection: 'column',
+      alignItems: 'stretch'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, van?.name || 'Unknown van'), " — ", driverName), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "Out since ", rental.checkout?.at ? new Date(rental.checkout.at).toLocaleString() : '—'), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 6,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: mode === 'checkin' ? 'primary' : 'secondary',
+    style: {
+      marginTop: 0,
+      width: 'auto',
+      padding: '6px 12px',
+      fontSize: 13
+    },
+    onClick: () => setMode('checkin')
+  }, "Check In"), /*#__PURE__*/React.createElement("button", {
+    className: mode === 'reassign' ? 'primary' : 'secondary',
+    style: {
+      marginTop: 0,
+      width: 'auto',
+      padding: '6px 12px',
+      fontSize: 13
+    },
+    onClick: () => setMode('reassign')
+  }, "Reassign")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 10,
+      flexWrap: 'wrap',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    placeholder: mode === 'checkin' ? 'Final mileage' : 'Mileage at handoff',
+    value: mileage,
+    onChange: e => setMileage(e.target.value),
+    style: {
+      flex: 1,
+      minWidth: 140
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    placeholder: "Gas %",
+    min: "0",
+    max: "100",
+    value: gas,
+    onChange: e => setGas(e.target.value),
+    style: {
+      width: 90
+    }
+  })), mode === 'checkin' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 8,
+      fontSize: 14,
+      fontWeight: 400,
+      cursor: 'pointer'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: problems,
+    onChange: e => setProblems(e.target.checked),
+    style: {
+      width: 'auto'
+    }
+  }), "Any problems to report?"), problems && /*#__PURE__*/React.createElement("textarea", {
+    placeholder: "Describe the problem",
+    value: problemDetails,
+    onChange: e => setProblemDetails(e.target.value),
+    style: {
+      marginTop: 8
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    style: {
+      width: 'auto',
+      padding: '10px 16px'
+    },
+    disabled: !mileage || !gas || saving,
+    onClick: submitCheckin
+  }, saving ? 'Saving...' : 'Check In')), mode === 'reassign' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      marginTop: 8
+    }
+  }, "Change the driver, the van, or both — leave either as-is to keep it the same."), /*#__PURE__*/React.createElement("label", null, "New Driver (optional — leave blank to keep ", driverName, ")"), /*#__PURE__*/React.createElement("select", {
+    value: newDriverId,
+    onChange: e => setNewDriverId(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Keep ", driverName), approvedDrivers.filter(d => d.id !== rental.driverId).map(d => /*#__PURE__*/React.createElement("option", {
+    key: d.id,
+    value: d.id
+  }, d.name || d.email))), /*#__PURE__*/React.createElement("label", null, "New Van (optional — leave blank to keep ", van?.name || 'this van', ")"), /*#__PURE__*/React.createElement("select", {
+    value: newVanId,
+    onChange: e => setNewVanId(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Keep ", van?.name || 'this van'), vans.filter(v => v.id !== rental.vanId).map(v => /*#__PURE__*/React.createElement("option", {
+    key: v.id,
+    value: v.id
+  }, v.name, " (", v.status, ")"))), /*#__PURE__*/React.createElement("label", null, "Purpose (optional)"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: purpose,
+    onChange: e => setPurpose(e.target.value),
+    placeholder: "Carries over if left blank"
+  }), error && /*#__PURE__*/React.createElement("div", {
+    className: "banner-danger"
+  }, error), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    style: {
+      width: 'auto',
+      padding: '10px 16px'
+    },
+    disabled: !mileage || !gas || saving,
+    onClick: submitReassign
+  }, saving ? 'Reassigning...' : 'Confirm Reassignment')));
 }
-
-function RentalReportSide({title,report}){
-  if(!report) return <div><div style={{fontWeight:600, marginBottom:4}}>{title}</div><p className="muted">Not recorded.</p></div>;
-  return (
-    <div>
-      <div style={{fontWeight:600, marginBottom:4}}>{title}</div>
-      <div className="muted">Mileage: {report.mileage ?? '—'} · Gas: {report.gas ?? '—'}%</div>
-      <div className="muted">Interior clean: {report.clean===true ? 'Yes' : report.clean===false ? 'No' : '—'}</div>
-      {report.warningLightsOn?.length>0 && (
-        <div className="muted" style={{color:'var(--danger)'}}>Warning lights: {report.warningLightsOn.join(', ')}</div>
-      )}
-      {report.otherLightReported && report.otherLightDesc && (
-        <div className="muted" style={{color:'var(--danger)'}}>Other light: {report.otherLightDesc}</div>
-      )}
-      {report.problems && (
-        <div className="muted" style={{color:'var(--danger)'}}>Problem reported: {report.problemDetails||'(no details given)'}</div>
-      )}
-      <div style={{display:'flex', gap:8, marginTop:8, flexWrap:'wrap'}}>
-        {report.dashPhoto && (
-          <a href={report.dashPhoto} target="_blank" rel="noopener">
-            <img src={report.dashPhoto} alt="Dashboard/mileage photo" style={{maxWidth:160, borderRadius:8}} />
-          </a>
-        )}
-        {report.cleanPhoto && (
-          <a href={report.cleanPhoto} target="_blank" rel="noopener">
-            <img src={report.cleanPhoto} alt="Interior photo" style={{maxWidth:160, borderRadius:8}} />
-          </a>
-        )}
-      </div>
-    </div>
-  );
+function RentalReportSide({
+  title,
+  report
+}) {
+  if (!report) return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      marginBottom: 4
+    }
+  }, title), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Not recorded."));
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      marginBottom: 4
+    }
+  }, title), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "Mileage: ", report.mileage ?? '—', " · Gas: ", report.gas ?? '—', "%"), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "Interior clean: ", report.clean === true ? 'Yes' : report.clean === false ? 'No' : '—'), report.warningLightsOn?.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      color: 'var(--danger)'
+    }
+  }, "Warning lights: ", report.warningLightsOn.join(', ')), report.otherLightReported && report.otherLightDesc && /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      color: 'var(--danger)'
+    }
+  }, "Other light: ", report.otherLightDesc), report.problems && /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      color: 'var(--danger)'
+    }
+  }, "Problem reported: ", report.problemDetails || '(no details given)'), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 8,
+      flexWrap: 'wrap'
+    }
+  }, report.dashPhoto && /*#__PURE__*/React.createElement("a", {
+    href: report.dashPhoto,
+    target: "_blank",
+    rel: "noopener"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: report.dashPhoto,
+    alt: "Dashboard/mileage photo",
+    style: {
+      maxWidth: 160,
+      borderRadius: 8
+    }
+  })), report.cleanPhoto && /*#__PURE__*/React.createElement("a", {
+    href: report.cleanPhoto,
+    target: "_blank",
+    rel: "noopener"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: report.cleanPhoto,
+    alt: "Interior photo",
+    style: {
+      maxWidth: 160,
+      borderRadius: 8
+    }
+  }))));
 }
-
-function RentalHistoryAdmin({vans,rentals,allUsers}){
-  const [search,setSearch] = useState('');
-  const [expandedId,setExpandedId] = useState(null);
-  const completed = rentals.filter(r=>r.status==='completed').sort((a,b)=>(b.return?.at||0)-(a.return?.at||0));
-
-  function nameFor(uid_){
-    if(!uid_) return 'Unknown';
-    const u = allUsers.find(u=>u.id===uid_);
+function RentalHistoryAdmin({
+  vans,
+  rentals,
+  allUsers
+}) {
+  const [search, setSearch] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
+  const completed = rentals.filter(r => r.status === 'completed').sort((a, b) => (b.return?.at || 0) - (a.return?.at || 0));
+  function nameFor(uid_) {
+    if (!uid_) return 'Unknown';
+    const u = allUsers.find(u => u.id === uid_);
     return u?.name || u?.email || 'Unknown';
   }
-
-  const filtered = completed.filter(r=>{
-    if(!search) return true;
-    const van = vans.find(v=>v.id===r.vanId);
+  const filtered = completed.filter(r => {
+    if (!search) return true;
+    const van = vans.find(v => v.id === r.vanId);
     const q = search.toLowerCase();
-    return (van?.name||'').toLowerCase().includes(q)
-      || nameFor(r.driverId).toLowerCase().includes(q)
-      || nameFor(r.return?.completedBy).toLowerCase().includes(q);
+    return (van?.name || '').toLowerCase().includes(q) || nameFor(r.driverId).toLowerCase().includes(q) || nameFor(r.return?.completedBy).toLowerCase().includes(q);
   });
-
-  return (
-    <div className="card">
-      <h3>Rental History</h3>
-      <p className="muted">Who checked each van out, and who checked it back in.</p>
-      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by van or driver name..." style={{marginBottom:14}} />
-
-      {filtered.length===0 && <p className="muted">No completed rentals{search?' matching that search':''}.</p>}
-      {filtered.map(r=>{
-        const van = vans.find(v=>v.id===r.vanId);
-        const checkoutBy = nameFor(r.driverId);
-        const checkinBy = nameFor(r.return?.completedBy);
-        const differentPerson = r.return?.completedBy && r.return.completedBy !== r.driverId;
-        const adminCompleted = r.checkout?.completedByAdmin;
-        const wasReassigned = r.return?.reassigned;
-        return (
-          <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-            <div><strong>{van?.name}</strong> {wasReassigned && <span className="badge admin">reassigned</span>}</div>
-            <div className="muted">{r.date} {r.time} → {r.endDate} {r.endTime}</div>
-            <div className="muted">Checked out by: {checkoutBy}{adminCompleted && ' (checkout completed by admin)'}</div>
-            {wasReassigned ? (
-              <div className="muted">
-                Reassigned to {nameFor(r.return.reassignedTo?.driverId)}
-                {r.return.reassignedTo?.vanId && r.return.reassignedTo.vanId!==r.vanId ? ` on ${vans.find(v=>v.id===r.return.reassignedTo.vanId)?.name||'another van'}` : ''}
-              </div>
-            ) : (
-              <div className="muted">
-                Checked in by: {checkinBy}
-                {differentPerson && <span style={{color:'var(--blue)', fontWeight:600}}> — different from who checked it out</span>}
-              </div>
-            )}
-            {r.return?.problems && <div className="muted" style={{color:'var(--danger)'}}>Problems reported at return</div>}
-            <button
-              className="secondary"
-              style={{marginTop:8, width:'auto', padding:'6px 12px', fontSize:13}}
-              onClick={()=>setExpandedId(expandedId===r.id ? null : r.id)}
-            >
-              {expandedId===r.id ? 'Hide Full Report' : 'View Full Report'}
-            </button>
-            {expandedId===r.id && (
-              <div style={{display:'flex', gap:20, marginTop:10, paddingTop:10, borderTop:'1px solid var(--border)', flexWrap:'wrap'}}>
-                <div style={{flex:'1 1 220px'}}><RentalReportSide title="At checkout" report={r.checkout} /></div>
-                <div style={{flex:'1 1 220px'}}><RentalReportSide title="At return" report={r.return} /></div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Rental History"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Who checked each van out, and who checked it back in."), /*#__PURE__*/React.createElement("input", {
+    value: search,
+    onChange: e => setSearch(e.target.value),
+    placeholder: "Search by van or driver name...",
+    style: {
+      marginBottom: 14
+    }
+  }), filtered.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "No completed rentals", search ? ' matching that search' : '', "."), filtered.map(r => {
+    const van = vans.find(v => v.id === r.vanId);
+    const checkoutBy = nameFor(r.driverId);
+    const checkinBy = nameFor(r.return?.completedBy);
+    const differentPerson = r.return?.completedBy && r.return.completedBy !== r.driverId;
+    const adminCompleted = r.checkout?.completedByAdmin;
+    const wasReassigned = r.return?.reassigned;
+    return /*#__PURE__*/React.createElement("div", {
+      key: r.id,
+      className: "list-item",
+      style: {
+        flexDirection: 'column',
+        alignItems: 'stretch'
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, van?.name), " ", wasReassigned && /*#__PURE__*/React.createElement("span", {
+      className: "badge admin"
+    }, "reassigned")), /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, r.date, " ", r.time, " → ", r.endDate, " ", r.endTime), /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, "Checked out by: ", checkoutBy, adminCompleted && ' (checkout completed by admin)'), wasReassigned ? /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, "Reassigned to ", nameFor(r.return.reassignedTo?.driverId), r.return.reassignedTo?.vanId && r.return.reassignedTo.vanId !== r.vanId ? ` on ${vans.find(v => v.id === r.return.reassignedTo.vanId)?.name || 'another van'}` : '') : /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, "Checked in by: ", checkinBy, differentPerson && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--blue)',
+        fontWeight: 600
+      }
+    }, " — different from who checked it out")), r.return?.problems && /*#__PURE__*/React.createElement("div", {
+      className: "muted",
+      style: {
+        color: 'var(--danger)'
+      }
+    }, "Problems reported at return"), /*#__PURE__*/React.createElement("button", {
+      className: "secondary",
+      style: {
+        marginTop: 8,
+        width: 'auto',
+        padding: '6px 12px',
+        fontSize: 13
+      },
+      onClick: () => setExpandedId(expandedId === r.id ? null : r.id)
+    }, expandedId === r.id ? 'Hide Full Report' : 'View Full Report'), expandedId === r.id && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 20,
+        marginTop: 10,
+        paddingTop: 10,
+        borderTop: '1px solid var(--border)',
+        flexWrap: 'wrap'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: '1 1 220px'
+      }
+    }, /*#__PURE__*/React.createElement(RentalReportSide, {
+      title: "At checkout",
+      report: r.checkout
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: '1 1 220px'
+      }
+    }, /*#__PURE__*/React.createElement(RentalReportSide, {
+      title: "At return",
+      report: r.return
+    }))));
+  }));
 }
-
-function ScheduleAdmin({vans,approvedDrivers,rentals,onAdd,onCancel}){
-  const [vanId,setVanId] = useState(vans[0]?.id||'');
-  const [driverId,setDriverId] = useState('');
-  const [date,setDate] = useState('');
-  const [time,setTime] = useState('');
-  const [endDate,setEndDate] = useState('');
-  const [endTime,setEndTime] = useState('');
-  const [purpose,setPurpose] = useState('');
-  const [error,setError] = useState('');
-  const activeRentals = rentals.filter(r=>r.status!=='completed' && r.status!=='cancelled');
-
-  async function submit(){
+function ScheduleAdmin({
+  vans,
+  approvedDrivers,
+  rentals,
+  onAdd,
+  onCancel
+}) {
+  const [vanId, setVanId] = useState(vans[0]?.id || '');
+  const [driverId, setDriverId] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [purpose, setPurpose] = useState('');
+  const [error, setError] = useState('');
+  const activeRentals = rentals.filter(r => r.status !== 'completed' && r.status !== 'cancelled');
+  async function submit() {
     setError('');
-    if(!vanId || !date || !time || !endDate || !endTime){ setError('Fill in van, start, and end.'); return; }
+    if (!vanId || !date || !time || !endDate || !endTime) {
+      setError('Fill in van, start, and end.');
+      return;
+    }
     const start = new Date(`${date}T${time}`);
     const end = new Date(`${endDate}T${endTime}`);
-    if(!(start < end)){ setError('End date/time must be after start date/time.'); return; }
-    const conflict = activeRentals.some(r=>{
-      if(r.vanId!==vanId || !r.date || !r.time) return false;
+    if (!(start < end)) {
+      setError('End date/time must be after start date/time.');
+      return;
+    }
+    const conflict = activeRentals.some(r => {
+      if (r.vanId !== vanId || !r.date || !r.time) return false;
       const rStart = new Date(`${r.date}T${r.time}`);
-      const rEnd = r.endDate && r.endTime ? new Date(`${r.endDate}T${r.endTime}`) : new Date(rStart.getTime()+4*60*60*1000);
+      const rEnd = r.endDate && r.endTime ? new Date(`${r.endDate}T${r.endTime}`) : new Date(rStart.getTime() + 4 * 60 * 60 * 1000);
       return start < rEnd && rStart < end;
     });
-    if(conflict){ setError('That van already has an overlapping reservation for this window.'); return; }
-    await onAdd({vanId,driverId:driverId||null,date,time,endDate,endTime,purpose});
-    setDate('');setTime('');setEndDate('');setEndTime('');setPurpose('');setDriverId('');
+    if (conflict) {
+      setError('That van already has an overlapping reservation for this window.');
+      return;
+    }
+    await onAdd({
+      vanId,
+      driverId: driverId || null,
+      date,
+      time,
+      endDate,
+      endTime,
+      purpose
+    });
+    setDate('');
+    setTime('');
+    setEndDate('');
+    setEndTime('');
+    setPurpose('');
+    setDriverId('');
   }
-
-  const upcoming = activeRentals.slice().sort((a,b)=> new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
-
-  return (
-    <div className="card">
-      <h3>Upcoming Reservations</h3>
-      {upcoming.length===0 && <p className="muted">Nothing scheduled.</p>}
-      {upcoming.map(r=>{
-        const van = vans.find(v=>v.id===r.vanId);
-        const driver = approvedDrivers.find(d=>d.id===r.driverId);
-        return (
-          <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-            <div><strong>{van?.name}</strong> {r.createdByAdmin && <span className="badge admin">admin-scheduled</span>}</div>
-            <div className="muted">{driver ? driver.name : (r.purpose||'No driver linked')}</div>
-            <div className="muted">{r.date} {r.time} → {r.endDate} {r.endTime}</div>
-            <button className="secondary" style={{marginTop:8}} onClick={()=>onCancel(r.id)}>Cancel Reservation</button>
-          </div>
-        );
-      })}
-
-      <h3 style={{marginTop:24}}>Add a Reservation / Block Dates</h3>
-      <p className="muted">Use this to book a van on someone's behalf, or to block a van out (e.g. for maintenance) so it won't be auto-assigned during that window.</p>
-      <label>Van</label>
-      <select value={vanId} onChange={e=>setVanId(e.target.value)}>{vans.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select>
-      <label>Driver (optional — leave blank to just block the dates)</label>
-      <select value={driverId} onChange={e=>setDriverId(e.target.value)}>
-        <option value="">No driver / blackout dates</option>
-        {approvedDrivers.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
-      </select>
-      <label>Start Date</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} />
-      <label>Start Time</label><input type="time" value={time} onChange={e=>setTime(e.target.value)} />
-      <label>End Date</label><input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} />
-      <label>End Time</label><input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} />
-      <label>Purpose / Notes (optional)</label><input value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="e.g. Oil change appointment" />
-      {error && <div className="banner-danger">{error}</div>}
-      <button className="primary" onClick={submit}>Add to Schedule</button>
-    </div>
-  );
+  const upcoming = activeRentals.slice().sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Upcoming Reservations"), upcoming.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Nothing scheduled."), upcoming.map(r => {
+    const van = vans.find(v => v.id === r.vanId);
+    const driver = approvedDrivers.find(d => d.id === r.driverId);
+    return /*#__PURE__*/React.createElement("div", {
+      key: r.id,
+      className: "list-item",
+      style: {
+        flexDirection: 'column',
+        alignItems: 'stretch'
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, van?.name), " ", r.createdByAdmin && /*#__PURE__*/React.createElement("span", {
+      className: "badge admin"
+    }, "admin-scheduled")), /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, driver ? driver.name : r.purpose || 'No driver linked'), /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, r.date, " ", r.time, " → ", r.endDate, " ", r.endTime), /*#__PURE__*/React.createElement("button", {
+      className: "secondary",
+      style: {
+        marginTop: 8
+      },
+      onClick: () => onCancel(r.id)
+    }, "Cancel Reservation"));
+  }), /*#__PURE__*/React.createElement("h3", {
+    style: {
+      marginTop: 24
+    }
+  }, "Add a Reservation / Block Dates"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Use this to book a van on someone's behalf, or to block a van out (e.g. for maintenance) so it won't be auto-assigned during that window."), /*#__PURE__*/React.createElement("label", null, "Van"), /*#__PURE__*/React.createElement("select", {
+    value: vanId,
+    onChange: e => setVanId(e.target.value)
+  }, vans.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v.id,
+    value: v.id
+  }, v.name))), /*#__PURE__*/React.createElement("label", null, "Driver (optional — leave blank to just block the dates)"), /*#__PURE__*/React.createElement("select", {
+    value: driverId,
+    onChange: e => setDriverId(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "No driver / blackout dates"), approvedDrivers.map(d => /*#__PURE__*/React.createElement("option", {
+    key: d.id,
+    value: d.id
+  }, d.name))), /*#__PURE__*/React.createElement("label", null, "Start Date"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: date,
+    onChange: e => setDate(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Start Time"), /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    value: time,
+    onChange: e => setTime(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "End Date"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: endDate,
+    onChange: e => setEndDate(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "End Time"), /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    value: endTime,
+    onChange: e => setEndTime(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Purpose / Notes (optional)"), /*#__PURE__*/React.createElement("input", {
+    value: purpose,
+    onChange: e => setPurpose(e.target.value),
+    placeholder: "e.g. Oil change appointment"
+  }), error && /*#__PURE__*/React.createElement("div", {
+    className: "banner-danger"
+  }, error), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    onClick: submit
+  }, "Add to Schedule"));
 }
-
-function RepairsAdmin({vans,repairLog,onAdd}){
-  const [vanId,setVanId] = useState(vans[0]?.id||'');
-  const [date,setDate] = useState('');
-  const [serviceType,setServiceType] = useState('');
-  const [customType,setCustomType] = useState('');
-  const [notes,setNotes] = useState('');
-  const [performedBy,setPerformedBy] = useState('');
-  const commonTypes = ['Oil Change','Tire Rotation','Check Engine Light Diagnosis','Brake Service','Battery Replacement','Inspection','Other'];
-
-  async function submit(){
-    const type = serviceType==='Other' ? customType : serviceType;
-    await onAdd(vanId,date,type,notes,performedBy);
-    setDate('');setServiceType('');setCustomType('');setNotes('');setPerformedBy('');
+function RepairsAdmin({
+  vans,
+  repairLog,
+  onAdd
+}) {
+  const [vanId, setVanId] = useState(vans[0]?.id || '');
+  const [date, setDate] = useState('');
+  const [serviceType, setServiceType] = useState('');
+  const [customType, setCustomType] = useState('');
+  const [notes, setNotes] = useState('');
+  const [performedBy, setPerformedBy] = useState('');
+  const commonTypes = ['Oil Change', 'Tire Rotation', 'Check Engine Light Diagnosis', 'Brake Service', 'Battery Replacement', 'Inspection', 'Other'];
+  async function submit() {
+    const type = serviceType === 'Other' ? customType : serviceType;
+    await onAdd(vanId, date, type, notes, performedBy);
+    setDate('');
+    setServiceType('');
+    setCustomType('');
+    setNotes('');
+    setPerformedBy('');
   }
-  const canSubmit = vanId && date && (serviceType && (serviceType!=='Other' || customType));
-  const sorted = repairLog.slice().sort((a,b)=>b.createdAt-a.createdAt);
-
-  return (
-    <div className="card">
-      <h3>Repair History</h3>
-      {sorted.length===0 && <p className="muted">No repair records yet.</p>}
-      {sorted.map(r=>{
-        const van = vans.find(v=>v.id===r.vanId);
-        return (
-          <div key={r.id} className="list-item" style={{flexDirection:'column',alignItems:'stretch'}}>
-            <div><strong>{van?.name}</strong> — {r.date}</div>
-            <div className="muted">{r.serviceType}{r.performedBy ? ` · by ${r.performedBy}` : ''}</div>
-            {r.notes && <div className="muted">{r.notes}</div>}
-          </div>
-        );
-      })}
-      <h3 style={{marginTop:20}}>Log a Repair</h3>
-      <label>Van</label>
-      <select value={vanId} onChange={e=>setVanId(e.target.value)}>{vans.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select>
-      <label>Date</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} />
-      <label>What was done?</label>
-      <select value={serviceType} onChange={e=>setServiceType(e.target.value)}>
-        <option value="">Select...</option>
-        {commonTypes.map(t=><option key={t} value={t}>{t}</option>)}
-      </select>
-      {serviceType==='Other' && (<><label>Describe the service</label><input value={customType} onChange={e=>setCustomType(e.target.value)} /></>)}
-      <label>Notes (optional)</label><textarea value={notes} onChange={e=>setNotes(e.target.value)} />
-      <label>Performed By (optional)</label><input value={performedBy} onChange={e=>setPerformedBy(e.target.value)} placeholder="Shop name or staff member" />
-      <button className="primary" disabled={!canSubmit} onClick={submit}>Add Repair Record</button>
-    </div>
-  );
+  const canSubmit = vanId && date && serviceType && (serviceType !== 'Other' || customType);
+  const sorted = repairLog.slice().sort((a, b) => b.createdAt - a.createdAt);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Repair History"), sorted.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "No repair records yet."), sorted.map(r => {
+    const van = vans.find(v => v.id === r.vanId);
+    return /*#__PURE__*/React.createElement("div", {
+      key: r.id,
+      className: "list-item",
+      style: {
+        flexDirection: 'column',
+        alignItems: 'stretch'
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, van?.name), " — ", r.date), /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, r.serviceType, r.performedBy ? ` · by ${r.performedBy}` : ''), r.notes && /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, r.notes));
+  }), /*#__PURE__*/React.createElement("h3", {
+    style: {
+      marginTop: 20
+    }
+  }, "Log a Repair"), /*#__PURE__*/React.createElement("label", null, "Van"), /*#__PURE__*/React.createElement("select", {
+    value: vanId,
+    onChange: e => setVanId(e.target.value)
+  }, vans.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v.id,
+    value: v.id
+  }, v.name))), /*#__PURE__*/React.createElement("label", null, "Date"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: date,
+    onChange: e => setDate(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "What was done?"), /*#__PURE__*/React.createElement("select", {
+    value: serviceType,
+    onChange: e => setServiceType(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select..."), commonTypes.map(t => /*#__PURE__*/React.createElement("option", {
+    key: t,
+    value: t
+  }, t))), serviceType === 'Other' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Describe the service"), /*#__PURE__*/React.createElement("input", {
+    value: customType,
+    onChange: e => setCustomType(e.target.value)
+  })), /*#__PURE__*/React.createElement("label", null, "Notes (optional)"), /*#__PURE__*/React.createElement("textarea", {
+    value: notes,
+    onChange: e => setNotes(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Performed By (optional)"), /*#__PURE__*/React.createElement("input", {
+    value: performedBy,
+    onChange: e => setPerformedBy(e.target.value),
+    placeholder: "Shop name or staff member"
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: !canSubmit,
+    onClick: submit
+  }, "Add Repair Record"));
 }
-
-function WarningLightsAdmin({vans,warningLights,onAdd}){
-  const [name,setName] = useState('');
-  const [safety,setSafety] = useState(false);
-  const [feedback,setFeedback] = useState('');
-  const [vanId,setVanId] = useState('');
-  return (
-    <div className="card">
-      <h3>Known Warning Lights</h3>
-      {warningLights.map(l=>(
-        <div key={l.id} className="list-item">
-          <div><div>{l.name}</div>{l.van && <div className="muted">Van-specific</div>}</div>
-          <span className={`badge ${l.safety?'maintenance':'available'}`}>{l.safety?'safety':'non-safety'}</span>
-        </div>
-      ))}
-      <h3 style={{marginTop:20}}>Add New Light</h3>
-      <label>Light Name</label><input value={name} onChange={e=>setName(e.target.value)} />
-      <label>Is this a safety issue?</label>
-      <YesNo value={safety} onChange={setSafety} />
-      {!safety && (<><label>Feedback to show drivers</label><textarea value={feedback} onChange={e=>setFeedback(e.target.value)} /></>)}
-      <label>Specific to one van? (optional)</label>
-      <select value={vanId} onChange={e=>setVanId(e.target.value)}>
-        <option value="">All vans</option>
-        {vans.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
-      </select>
-      <button className="primary" disabled={!name} onClick={()=>{onAdd(name,safety,feedback,vanId); setName('');setFeedback('');setVanId('');setSafety(false);}}>Add Light</button>
-    </div>
-  );
+function WarningLightsAdmin({
+  vans,
+  warningLights,
+  onAdd
+}) {
+  const [name, setName] = useState('');
+  const [safety, setSafety] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [vanId, setVanId] = useState('');
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Known Warning Lights"), warningLights.map(l => /*#__PURE__*/React.createElement("div", {
+    key: l.id,
+    className: "list-item"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", null, l.name), l.van && /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "Van-specific")), /*#__PURE__*/React.createElement("span", {
+    className: `badge ${l.safety ? 'maintenance' : 'available'}`
+  }, l.safety ? 'safety' : 'non-safety'))), /*#__PURE__*/React.createElement("h3", {
+    style: {
+      marginTop: 20
+    }
+  }, "Add New Light"), /*#__PURE__*/React.createElement("label", null, "Light Name"), /*#__PURE__*/React.createElement("input", {
+    value: name,
+    onChange: e => setName(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Is this a safety issue?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: safety,
+    onChange: setSafety
+  }), !safety && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Feedback to show drivers"), /*#__PURE__*/React.createElement("textarea", {
+    value: feedback,
+    onChange: e => setFeedback(e.target.value)
+  })), /*#__PURE__*/React.createElement("label", null, "Specific to one van? (optional)"), /*#__PURE__*/React.createElement("select", {
+    value: vanId,
+    onChange: e => setVanId(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "All vans"), vans.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v.id,
+    value: v.id
+  }, v.name))), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: !name,
+    onClick: () => {
+      onAdd(name, safety, feedback, vanId);
+      setName('');
+      setFeedback('');
+      setVanId('');
+      setSafety(false);
+    }
+  }, "Add Light"));
 }
 
 // ---------- Root App ----------
-function LoginScreen(){
-  function signIn(){
+function LoginScreen() {
+  function signIn() {
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(err=>alert('Sign-in failed: '+err.message));
+    auth.signInWithPopup(provider).catch(err => alert('Sign-in failed: ' + err.message));
   }
-  return (
-    <div className="content">
-      <div className="login-mark">🚐</div>
-      <div className="login-title">RCC Van Admin</div>
-      <p className="login-sub">Sign in to manage the fleet and driver approvals.</p>
-      <button id="googleSignInBtn" onClick={signIn}>
-        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-        Sign in with Google
-      </button>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "content"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "login-mark"
+  }, "🚐"), /*#__PURE__*/React.createElement("div", {
+    className: "login-title"
+  }, "RCC Van Admin"), /*#__PURE__*/React.createElement("p", {
+    className: "login-sub"
+  }, "Sign in to manage the fleet and driver approvals."), /*#__PURE__*/React.createElement("button", {
+    id: "googleSignInBtn",
+    onClick: signIn
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "18",
+    height: "18",
+    viewBox: "0 0 48 48"
+  }, /*#__PURE__*/React.createElement("path", {
+    fill: "#EA4335",
+    d: "M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+  }), /*#__PURE__*/React.createElement("path", {
+    fill: "#4285F4",
+    d: "M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+  }), /*#__PURE__*/React.createElement("path", {
+    fill: "#FBBC05",
+    d: "M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+  }), /*#__PURE__*/React.createElement("path", {
+    fill: "#34A853",
+    d: "M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+  })), "Sign in with Google"));
 }
 
 // Loads admin-only collections (maintenance, repairs, alerts, all
@@ -1524,110 +2686,170 @@ function LoginScreen(){
 // on every sign-in. Shows a brief loading state the first time, then
 // stays subscribed for the rest of the session so switching tabs is
 // instant afterward.
-function AdminDataLoader({vans,rentals,warningLights}){
-  const [maintenanceNotes,setMaintenanceNotes] = useState([]);
-  const [repairLog,setRepairLog] = useState([]);
-  const [alerts,setAlerts] = useState([]);
-  const [allUsers,setAllUsers] = useState([]);
-  const [recurringRequests,setRecurringRequests] = useState([]);
-  const [ready,setReady] = useState(false);
-
-  useEffect(()=>{
+function AdminDataLoader({
+  vans,
+  rentals,
+  warningLights
+}) {
+  const [maintenanceNotes, setMaintenanceNotes] = useState([]);
+  const [repairLog, setRepairLog] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [recurringRequests, setRecurringRequests] = useState([]);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
     const unsubs = [];
-    unsubs.push(db.collection('vanMaintenanceNotes').onSnapshot(s=>setMaintenanceNotes(s.docs.map(d=>({id:d.id,...d.data()})))));
-    unsubs.push(db.collection('vanRepairLog').onSnapshot(s=>setRepairLog(s.docs.map(d=>({id:d.id,...d.data()})))));
-    unsubs.push(db.collection('vanAlerts').onSnapshot(s=>setAlerts(s.docs.map(d=>({id:d.id,...d.data()})))));
-    unsubs.push(db.collection('vanRecurringRequests').onSnapshot(s=>setRecurringRequests(s.docs.map(d=>({id:d.id,...d.data()})))));
-    unsubs.push(db.collection('users').onSnapshot(s=>{setAllUsers(s.docs.map(d=>({id:d.id,...d.data()}))); setReady(true);}));
-    return ()=>unsubs.forEach(u=>u());
-  },[]);
-
-  if(!ready){
-    return <div className="content"><div className="loading">Loading admin data...</div></div>;
+    unsubs.push(db.collection('vanMaintenanceNotes').onSnapshot(s => setMaintenanceNotes(s.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })))));
+    unsubs.push(db.collection('vanRepairLog').onSnapshot(s => setRepairLog(s.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })))));
+    unsubs.push(db.collection('vanAlerts').onSnapshot(s => setAlerts(s.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })))));
+    unsubs.push(db.collection('vanRecurringRequests').onSnapshot(s => setRecurringRequests(s.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })))));
+    unsubs.push(db.collection('users').onSnapshot(s => {
+      setAllUsers(s.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      })));
+      setReady(true);
+    }));
+    return () => unsubs.forEach(u => u());
+  }, []);
+  if (!ready) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "content"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "loading"
+    }, "Loading admin data..."));
   }
-  return <AdminDashboard allUsers={allUsers} vans={vans} rentals={rentals} warningLights={warningLights} maintenanceNotes={maintenanceNotes} repairLog={repairLog} alerts={alerts} recurringRequests={recurringRequests} />;
+  return /*#__PURE__*/React.createElement(AdminDashboard, {
+    allUsers: allUsers,
+    vans: vans,
+    rentals: rentals,
+    warningLights: warningLights,
+    maintenanceNotes: maintenanceNotes,
+    repairLog: repairLog,
+    alerts: alerts,
+    recurringRequests: recurringRequests
+  });
 }
-
-function App(){
-  const [user,setUser] = useState(undefined); // undefined = checking, null = signed out
-  const [canAccessAdmin,setCanAccessAdmin] = useState(false);
-  const [checkedAccess,setCheckedAccess] = useState(false);
-  const [vans,setVans] = useState([]);
-  const [rentals,setRentals] = useState([]);
-  const [warningLights,setWarningLights] = useState([]);
-  const [loadingData,setLoadingData] = useState(true);
-
-  useEffect(()=>{
-    auth.onAuthStateChanged(async u=>{
+function App() {
+  const [user, setUser] = useState(undefined); // undefined = checking, null = signed out
+  const [canAccessAdmin, setCanAccessAdmin] = useState(false);
+  const [checkedAccess, setCheckedAccess] = useState(false);
+  const [vans, setVans] = useState([]);
+  const [rentals, setRentals] = useState([]);
+  const [warningLights, setWarningLights] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+  useEffect(() => {
+    auth.onAuthStateChanged(async u => {
       setUser(u);
-      if(u){
+      if (u) {
         await ensureVansSeeded();
         await ensureWarningLightsSeeded();
         const doc = await db.collection('users').doc(u.uid).get();
         const data = doc.exists ? doc.data() : {};
-        setCanAccessAdmin(data.isAdmin===true || (data.roles && data.roles.vanAdmin===true));
+        setCanAccessAdmin(data.isAdmin === true || data.roles && data.roles.vanAdmin === true);
       } else {
         setCanAccessAdmin(false);
       }
       setCheckedAccess(true);
     });
-  },[]);
-
-  useEffect(()=>{
-    if(!user || !canAccessAdmin) return;
+  }, []);
+  useEffect(() => {
+    if (!user || !canAccessAdmin) return;
     const unsubs = [];
-    unsubs.push(db.collection('vans').onSnapshot(s=>setVans(s.docs.map(d=>({id:d.id,...d.data()})))));
-    unsubs.push(db.collection('vanRentals').onSnapshot(s=>setRentals(s.docs.map(d=>({id:d.id,...d.data()})))));
-    unsubs.push(db.collection('vanWarningLights').onSnapshot(s=>setWarningLights(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vans').onSnapshot(s => setVans(s.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })))));
+    unsubs.push(db.collection('vanRentals').onSnapshot(s => setRentals(s.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })))));
+    unsubs.push(db.collection('vanWarningLights').onSnapshot(s => setWarningLights(s.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })))));
     setLoadingData(false);
-    return ()=>unsubs.forEach(u=>u());
-  },[user,canAccessAdmin]);
-
-  if(user===undefined || !checkedAccess){
-    return <div className="app"><div className="loading">Loading...</div></div>;
+    return () => unsubs.forEach(u => u());
+  }, [user, canAccessAdmin]);
+  if (user === undefined || !checkedAccess) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "app"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "loading"
+    }, "Loading..."));
   }
-  if(!user){
-    return (
-      <div className="app">
-        <TopBar title="RCC Van Admin" hubLink />
-        <LoginScreen />
-      </div>
-    );
+  if (!user) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "app"
+    }, /*#__PURE__*/React.createElement(TopBar, {
+      title: "RCC Van Admin",
+      hubLink: true
+    }), /*#__PURE__*/React.createElement(LoginScreen, null));
   }
-  if(!canAccessAdmin){
-    return (
-      <div className="app">
-        <TopBar title="Van Admin" hubLink right={<button className="plain" onClick={()=>auth.signOut()}>Sign out</button>} />
-        <div className="content">
-          <div className="card center">
-            <h2>Access Restricted</h2>
-            <p className="muted">This page is limited to Van Usage admins. Ask an owner or admin if you believe this is a mistake.</p>
-            <a className="link-btn" href="index.html">← Back to Van Usage</a>
-          </div>
-        </div>
-      </div>
-    );
+  if (!canAccessAdmin) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "app"
+    }, /*#__PURE__*/React.createElement(TopBar, {
+      title: "Van Admin",
+      hubLink: true,
+      right: /*#__PURE__*/React.createElement("button", {
+        className: "plain",
+        onClick: () => auth.signOut()
+      }, "Sign out")
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "content"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "card center"
+    }, /*#__PURE__*/React.createElement("h2", null, "Access Restricted"), /*#__PURE__*/React.createElement("p", {
+      className: "muted"
+    }, "This page is limited to Van Usage admins. Ask an owner or admin if you believe this is a mistake."), /*#__PURE__*/React.createElement("a", {
+      className: "link-btn",
+      href: "index.html"
+    }, "← Back to Van Usage"))));
   }
-  if(loadingData){
-    return <div className="app"><div className="loading">Loading admin data...</div></div>;
+  if (loadingData) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "app"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "loading"
+    }, "Loading admin data..."));
   }
-
-  return (
-    <div className="app">
-      <TopBar
-        title="Van Admin"
-        hubLink
-        right={<>
-          <a className="plain" href="index.html" style={{textDecoration:'none', display:'inline-block', textAlign:'center'}}>Driver view</a>
-          <button className="plain" onClick={()=>auth.signOut()}>Sign out</button>
-        </>}
-      />
-      <AdminDataLoader vans={vans} rentals={rentals} warningLights={warningLights} />
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "app"
+  }, /*#__PURE__*/React.createElement(TopBar, {
+    title: "Van Admin",
+    hubLink: true,
+    right: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("a", {
+      className: "plain",
+      href: "index.html",
+      style: {
+        textDecoration: 'none',
+        display: 'inline-block',
+        textAlign: 'center'
+      }
+    }, "Driver view"), /*#__PURE__*/React.createElement("button", {
+      className: "plain",
+      onClick: () => auth.signOut()
+    }, "Sign out"))
+  }), /*#__PURE__*/React.createElement(AdminDataLoader, {
+    vans: vans,
+    rentals: rentals,
+    warningLights: warningLights
+  }));
 }
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+ReactDOM.createRoot(document.getElementById('root')).render(/*#__PURE__*/React.createElement(App, null));
 </script>
 </body>
 </html>

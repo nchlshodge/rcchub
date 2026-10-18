@@ -192,6 +192,7 @@
   };
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth(), db = firebase.firestore();
+  try { db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* keep going with the default connection */ }
   const RL = RoomLogic;
 
   /* ---------- the floor plan: where each room sits on rcc-floor-plan.jpg (1236 x 1600) ---------- */

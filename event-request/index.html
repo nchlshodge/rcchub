@@ -323,6 +323,8 @@
   var fbApp; try { fbApp=firebase.app(); } catch(e) { fbApp=firebase.initializeApp(firebaseConfig); }
   var auth = firebase.auth();
   var db = firebase.firestore();
+  // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
+  try { db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* keep going with the default connection */ }
   function $(id){ return document.getElementById(id); }
 
   auth.onAuthStateChanged(function(user){

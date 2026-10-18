@@ -488,6 +488,8 @@
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore();
+  // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
+  try { db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* keep going with the default connection */ }
   let currentUser = null;
 
   document.getElementById('googleSignInBtn').addEventListener('click', () => {

@@ -10,7 +10,6 @@
 
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
@@ -114,21 +113,36 @@
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel" data-presets="react">
-const {useState,useEffect,useRef} = React;
+<script>
+const {
+  useState,
+  useEffect,
+  useRef
+} = React;
 
 // ---------- Firebase ----------
 const firebaseConfig = {
-  apiKey:            "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
-  authDomain:        "bedsidercc.firebaseapp.com",
-  projectId:         "bedsidercc",
-  storageBucket:     "bedsidercc.firebasestorage.app",
+  apiKey: "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+  authDomain: "bedsidercc.firebaseapp.com",
+  projectId: "bedsidercc",
+  storageBucket: "bedsidercc.firebasestorage.app",
   messagingSenderId: "950958384975",
-  appId:             "1:950958384975:web:6f43dec5a7ba842c69c73a"
+  appId: "1:950958384975:web:6f43dec5a7ba842c69c73a"
 };
-try { firebase.app(); } catch(e) { firebase.initializeApp(firebaseConfig); }
+try {
+  firebase.app();
+} catch (e) {
+  firebase.initializeApp(firebaseConfig);
+}
 const auth = firebase.auth();
 const db = firebase.firestore();
+// If a network blocks Firestore's streaming connection, quietly fall back to one that works.
+try {
+  db.settings({
+    experimentalAutoDetectLongPolling: true,
+    merge: true
+  });
+} catch (e) {/* keep going with the default connection */}
 const storage = firebase.storage();
 
 // Public key identifying this app to the browser's push service — not
@@ -141,16 +155,16 @@ const VAPID_PUBLIC_KEY = "BBmeZ0dXYXp4_3N8q76N7_teXTbVjY7KoVshMf0rWnNe9-j9GylIXM
 // been added to the home screen).
 async function enablePushNotifications() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
-
   try {
-    const registration = await navigator.serviceWorker.register('../firebase-messaging-sw.js', { scope: '../' });
+    const registration = await navigator.serviceWorker.register('../firebase-messaging-sw.js', {
+      scope: '../'
+    });
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return null;
-
     const messaging = firebase.messaging();
     const token = await messaging.getToken({
       vapidKey: VAPID_PUBLIC_KEY,
-      serviceWorkerRegistration: registration,
+      serviceWorkerRegistration: registration
     });
     return token || null;
   } catch (e) {
@@ -158,98 +172,181 @@ async function enablePushNotifications() {
     return null;
   }
 }
-
-function uid(){ return Math.random().toString(36).slice(2,10); }
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
 
 // Seed vans once if the collection is empty (first-run convenience only)
-async function ensureVansSeeded(){
+async function ensureVansSeeded() {
   const snap = await db.collection('vans').limit(1).get();
-  if(!snap.empty) return;
-  const seed = [
-    {name:'White Chevy Van (low priority use)', mileage:52310, gas:75, status:'available', lowPriority:true},
-    {name:'Brown GMC Van', mileage:88120, gas:40, status:'available', lowPriority:false},
-    {name:'White Ford Van', mileage:31200, gas:90, status:'available', lowPriority:false},
-  ];
+  if (!snap.empty) return;
+  const seed = [{
+    name: 'White Chevy Van (low priority use)',
+    mileage: 52310,
+    gas: 75,
+    status: 'available',
+    lowPriority: true
+  }, {
+    name: 'Brown GMC Van',
+    mileage: 88120,
+    gas: 40,
+    status: 'available',
+    lowPriority: false
+  }, {
+    name: 'White Ford Van',
+    mileage: 31200,
+    gas: 90,
+    status: 'available',
+    lowPriority: false
+  }];
   const batch = db.batch();
-  seed.forEach(v=>{ const ref = db.collection('vans').doc(); batch.set(ref, v); });
+  seed.forEach(v => {
+    const ref = db.collection('vans').doc();
+    batch.set(ref, v);
+  });
   await batch.commit();
 }
-async function ensureWarningLightsSeeded(){
+async function ensureWarningLightsSeeded() {
   const snap = await db.collection('vanWarningLights').limit(1).get();
-  if(!snap.empty) return;
-  const seed = [
-    {name:'Tire Pressure Light', safety:false, feedback:"That's the tire pressure light — we know about it, low priority. Thanks for flagging it, no need to call anyone."},
-    {name:'Check Engine Light (known emissions sensor)', safety:false, feedback:"That's a known issue — not a safety concern. Go ahead and drive.", van:null},
-    {name:'Brake Warning Light', safety:true, feedback:null},
-    {name:'Oil Pressure Light', safety:true, feedback:null},
-  ];
+  if (!snap.empty) return;
+  const seed = [{
+    name: 'Tire Pressure Light',
+    safety: false,
+    feedback: "That's the tire pressure light — we know about it, low priority. Thanks for flagging it, no need to call anyone."
+  }, {
+    name: 'Check Engine Light (known emissions sensor)',
+    safety: false,
+    feedback: "That's a known issue — not a safety concern. Go ahead and drive.",
+    van: null
+  }, {
+    name: 'Brake Warning Light',
+    safety: true,
+    feedback: null
+  }, {
+    name: 'Oil Pressure Light',
+    safety: true,
+    feedback: null
+  }];
   const batch = db.batch();
-  seed.forEach(l=>{ const ref = db.collection('vanWarningLights').doc(); batch.set(ref, l); });
+  seed.forEach(l => {
+    const ref = db.collection('vanWarningLights').doc();
+    batch.set(ref, l);
+  });
   await batch.commit();
 }
 
 // ---------- Small components ----------
-function TopBar({title,onBack,right,hubLink}){
-  return (
-    <div className="topbar">
-      <h1>
-        {hubLink && <a className="backlink" href="../index.html">← All apps</a>}
-        {onBack && <button className="plain" onClick={onBack}>← Back</button>}
-        {title}
-      </h1>
-      <div className="topbar-right">{right}</div>
-    </div>
-  );
+function TopBar({
+  title,
+  onBack,
+  right,
+  hubLink
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "topbar"
+  }, /*#__PURE__*/React.createElement("h1", null, hubLink && /*#__PURE__*/React.createElement("a", {
+    className: "backlink",
+    href: "../index.html"
+  }, "← All apps"), onBack && /*#__PURE__*/React.createElement("button", {
+    className: "plain",
+    onClick: onBack
+  }, "← Back"), title), /*#__PURE__*/React.createElement("div", {
+    className: "topbar-right"
+  }, right));
 }
-
-function YesNo({value,onChange,yesLabel="Yes",noLabel="No"}){
-  return (
-    <div className="toggle-row">
-      <button type="button" className={value===true?'active-yes':''} onClick={()=>onChange(true)}>{yesLabel}</button>
-      <button type="button" className={value===false?'active-no':''} onClick={()=>onChange(false)}>{noLabel}</button>
-    </div>
-  );
+function YesNo({
+  value,
+  onChange,
+  yesLabel = "Yes",
+  noLabel = "No"
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "toggle-row"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: value === true ? 'active-yes' : '',
+    onClick: () => onChange(true)
+  }, yesLabel), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: value === false ? 'active-no' : '',
+    onClick: () => onChange(false)
+  }, noLabel));
 }
-
-function CameraCapture({label, onCapture, photoUrl, uploading}){
+function CameraCapture({
+  label,
+  onCapture,
+  photoUrl,
+  uploading
+}) {
   const inputRef = useRef();
-  return (
-    <div className="camera-box">
-      <div className="muted">{label}</div>
-      <input ref={inputRef} type="file" accept="image/*" capture="environment" style={{display:'none'}}
-        onChange={e=>{ const file = e.target.files[0]; if(file) onCapture(file); }} />
-      <button type="button" className="secondary" style={{marginTop:10}} onClick={()=>inputRef.current.click()} disabled={uploading}>
-        📷 {uploading ? 'Uploading...' : (photoUrl ? 'Retake Photo' : 'Open Camera')}
-      </button>
-      {uploading && <div className="upload-progress">Uploading photo…</div>}
-      {photoUrl && !uploading && <img src={photoUrl} alt="capture" />}
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "camera-box"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, label), /*#__PURE__*/React.createElement("input", {
+    ref: inputRef,
+    type: "file",
+    accept: "image/*",
+    capture: "environment",
+    style: {
+      display: 'none'
+    },
+    onChange: e => {
+      const file = e.target.files[0];
+      if (file) onCapture(file);
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "secondary",
+    style: {
+      marginTop: 10
+    },
+    onClick: () => inputRef.current.click(),
+    disabled: uploading
+  }, "📷 ", uploading ? 'Uploading...' : photoUrl ? 'Retake Photo' : 'Open Camera'), uploading && /*#__PURE__*/React.createElement("div", {
+    className: "upload-progress"
+  }, "Uploading photo…"), photoUrl && !uploading && /*#__PURE__*/React.createElement("img", {
+    src: photoUrl,
+    alt: "capture"
+  }));
 }
 
 // Uploads a File to Firebase Storage under a given path, returns download URL
-async function uploadPhoto(file, path){
+async function uploadPhoto(file, path) {
   const ref = storage.ref().child(path);
   await ref.put(file);
   return await ref.getDownloadURL();
 }
 
 // ---------- Driver Application ----------
-function DriverApply({user,onDone,prefill,prefillName,prefillPhone}){
-  const [form,setForm] = useState({
-    birthdate:'',licenseExp: prefill?.licenseExp || '',cdl:null,
-    atFaultAccidents3yr:null,atFaultAccidentsDetails:'',
-    movingViolations3yr:null,movingViolationsDetails:'',
-    insuranceCancelled:null,licenseRevokedSuspended:null,
+function DriverApply({
+  user,
+  onDone,
+  prefill,
+  prefillName,
+  prefillPhone
+}) {
+  const [form, setForm] = useState({
+    birthdate: '',
+    licenseExp: prefill?.licenseExp || '',
+    cdl: null,
+    atFaultAccidents3yr: null,
+    atFaultAccidentsDetails: '',
+    movingViolations3yr: null,
+    movingViolationsDetails: '',
+    insuranceCancelled: null,
+    licenseRevokedSuspended: null
   });
-  const [phone,setPhone] = useState(prefillPhone || '');
-  const [saving,setSaving] = useState(false);
-  function set(field,val){ setForm(f=>({...f,[field]:val})); }
-  const canSubmit = phone && form.birthdate && form.licenseExp && form.cdl!==null
-    && form.atFaultAccidents3yr!==null && form.movingViolations3yr!==null
-    && form.insuranceCancelled!==null && form.licenseRevokedSuspended!==null && !saving;
-
-  async function submit(){
+  const [phone, setPhone] = useState(prefillPhone || '');
+  const [saving, setSaving] = useState(false);
+  function set(field, val) {
+    setForm(f => ({
+      ...f,
+      [field]: val
+    }));
+  }
+  const canSubmit = phone && form.birthdate && form.licenseExp && form.cdl !== null && form.atFaultAccidents3yr !== null && form.movingViolations3yr !== null && form.insuranceCancelled !== null && form.licenseRevokedSuspended !== null && !saving;
+  async function submit() {
     setSaving(true);
     await db.collection('users').doc(user.uid).set({
       name: prefillName || user.displayName || '',
@@ -257,232 +354,335 @@ function DriverApply({user,onDone,prefill,prefillName,prefillPhone}){
       phone,
       uid: user.uid,
       vanRentalProfile: {
-        ...form, licenseVerifiedInPerson: prefill?.licenseVerifiedInPerson || false, status:'pending', createdAt: Date.now(),
+        ...form,
+        licenseVerifiedInPerson: prefill?.licenseVerifiedInPerson || false,
+        status: 'pending',
+        createdAt: Date.now()
       }
-    }, {merge:true});
+    }, {
+      merge: true
+    });
     setSaving(false);
     onDone();
   }
-  return (
-    <div className="content">
-      <div className="card">
-        <h2>Driver Application</h2>
-        {prefill && (
-          <div className="banner-safe" style={{marginBottom:10}}>
-            An admin already added some of your info. Just finish the rest below.
-          </div>
-        )}
-        <div className="banner-safe" style={{marginBottom:6}}>
-          Before you can be approved to drive, please bring a copy of your driver's license to the main office. An admin will confirm it's on file and mark your application verified.
-        </div>
-        <p className="muted">Fill out the rest below. You'll see your approval status once both this form and the license copy are on file.</p>
-
-        <label>Phone Number</label>
-        <input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" />
-        <label>Date of Birth</label>
-        <input type="date" value={form.birthdate} onChange={e=>set('birthdate',e.target.value)} />
-        <label>License Expiration Date</label>
-        <input type="date" value={form.licenseExp} onChange={e=>set('licenseExp',e.target.value)} />
-        <label>Do you hold a CDL?</label>
-        <YesNo value={form.cdl} onChange={v=>set('cdl',v)} />
-
-        <label>In the past 3 years, have you had any at-fault accidents?</label>
-        <YesNo value={form.atFaultAccidents3yr} onChange={v=>set('atFaultAccidents3yr',v)} />
-        {form.atFaultAccidents3yr && (<><label>Please explain</label><textarea value={form.atFaultAccidentsDetails} onChange={e=>set('atFaultAccidentsDetails',e.target.value)} /></>)}
-
-        <label>In the past 3 years, have you had any moving traffic violations?</label>
-        <YesNo value={form.movingViolations3yr} onChange={v=>set('movingViolations3yr',v)} />
-        {form.movingViolations3yr && (<><label>Please explain</label><textarea value={form.movingViolationsDetails} onChange={e=>set('movingViolationsDetails',e.target.value)} /></>)}
-
-        <label>Has an insurance company ever cancelled or refused to provide you personal auto insurance?</label>
-        <YesNo value={form.insuranceCancelled} onChange={v=>set('insuranceCancelled',v)} />
-
-        <label>Has your driver's license ever been revoked, suspended, or restricted?</label>
-        <YesNo value={form.licenseRevokedSuspended} onChange={v=>set('licenseRevokedSuspended',v)} />
-
-        <button className="primary" disabled={!canSubmit} onClick={submit}>{saving?'Submitting...':'Submit Application'}</button>
-      </div>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "content"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h2", null, "Driver Application"), prefill && /*#__PURE__*/React.createElement("div", {
+    className: "banner-safe",
+    style: {
+      marginBottom: 10
+    }
+  }, "An admin already added some of your info. Just finish the rest below."), /*#__PURE__*/React.createElement("div", {
+    className: "banner-safe",
+    style: {
+      marginBottom: 6
+    }
+  }, "Before you can be approved to drive, please bring a copy of your driver's license to the main office. An admin will confirm it's on file and mark your application verified."), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Fill out the rest below. You'll see your approval status once both this form and the license copy are on file."), /*#__PURE__*/React.createElement("label", null, "Phone Number"), /*#__PURE__*/React.createElement("input", {
+    value: phone,
+    onChange: e => setPhone(e.target.value),
+    type: "tel"
+  }), /*#__PURE__*/React.createElement("label", null, "Date of Birth"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: form.birthdate,
+    onChange: e => set('birthdate', e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "License Expiration Date"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: form.licenseExp,
+    onChange: e => set('licenseExp', e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Do you hold a CDL?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: form.cdl,
+    onChange: v => set('cdl', v)
+  }), /*#__PURE__*/React.createElement("label", null, "In the past 3 years, have you had any at-fault accidents?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: form.atFaultAccidents3yr,
+    onChange: v => set('atFaultAccidents3yr', v)
+  }), form.atFaultAccidents3yr && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Please explain"), /*#__PURE__*/React.createElement("textarea", {
+    value: form.atFaultAccidentsDetails,
+    onChange: e => set('atFaultAccidentsDetails', e.target.value)
+  })), /*#__PURE__*/React.createElement("label", null, "In the past 3 years, have you had any moving traffic violations?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: form.movingViolations3yr,
+    onChange: v => set('movingViolations3yr', v)
+  }), form.movingViolations3yr && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Please explain"), /*#__PURE__*/React.createElement("textarea", {
+    value: form.movingViolationsDetails,
+    onChange: e => set('movingViolationsDetails', e.target.value)
+  })), /*#__PURE__*/React.createElement("label", null, "Has an insurance company ever cancelled or refused to provide you personal auto insurance?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: form.insuranceCancelled,
+    onChange: v => set('insuranceCancelled', v)
+  }), /*#__PURE__*/React.createElement("label", null, "Has your driver's license ever been revoked, suspended, or restricted?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: form.licenseRevokedSuspended,
+    onChange: v => set('licenseRevokedSuspended', v)
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: !canSubmit,
+    onClick: submit
+  }, saving ? 'Submitting...' : 'Submit Application')));
 }
 
 // ---------- License Renewal ----------
-function LicenseRenewal({user,profile,onDone}){
+function LicenseRenewal({
+  user,
+  profile,
+  onDone
+}) {
   const vr = profile.vanRentalProfile || {};
-  const [licenseExp,setLicenseExp] = useState('');
-  const [cdl,setCdl] = useState(vr.cdl ?? null);
-  const [atFaultAccidents1yr,setAtFaultAccidents1yr] = useState(null);
-  const [atFaultDetails,setAtFaultDetails] = useState('');
-  const [movingViolations1yr,setMovingViolations1yr] = useState(null);
-  const [movingDetails,setMovingDetails] = useState('');
-  const [licenseRevokedSuspended,setLicenseRevokedSuspended] = useState(null);
-  const [saving,setSaving] = useState(false);
-  const canSubmit = licenseExp && cdl!==null && atFaultAccidents1yr!==null && movingViolations1yr!==null && licenseRevokedSuspended!==null && !saving;
-
-  async function submit(){
+  const [licenseExp, setLicenseExp] = useState('');
+  const [cdl, setCdl] = useState(vr.cdl ?? null);
+  const [atFaultAccidents1yr, setAtFaultAccidents1yr] = useState(null);
+  const [atFaultDetails, setAtFaultDetails] = useState('');
+  const [movingViolations1yr, setMovingViolations1yr] = useState(null);
+  const [movingDetails, setMovingDetails] = useState('');
+  const [licenseRevokedSuspended, setLicenseRevokedSuspended] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const canSubmit = licenseExp && cdl !== null && atFaultAccidents1yr !== null && movingViolations1yr !== null && licenseRevokedSuspended !== null && !saving;
+  async function submit() {
     setSaving(true);
     await db.collection('users').doc(user.uid).set({
       vanRentalProfile: {
-        ...vr, licenseExp, cdl, atFaultAccidents1yr, atFaultDetails,
-        movingViolations1yr, movingDetails, licenseRevokedSuspended,
-        lastRenewed: Date.now(),
+        ...vr,
+        licenseExp,
+        cdl,
+        atFaultAccidents1yr,
+        atFaultDetails,
+        movingViolations1yr,
+        movingDetails,
+        licenseRevokedSuspended,
+        lastRenewed: Date.now()
       }
-    }, {merge:true});
+    }, {
+      merge: true
+    });
     setSaving(false);
     onDone();
   }
-  return (
-    <div className="content">
-      <div className="card">
-        <h2>Renew Your License</h2>
-        <label>New Expiration Date</label>
-        <input type="date" value={licenseExp} onChange={e=>setLicenseExp(e.target.value)} />
-        <label>Do you hold a CDL?</label>
-        <YesNo value={cdl} onChange={setCdl} />
-
-        <label>In the past year, have you had any at-fault accidents?</label>
-        <YesNo value={atFaultAccidents1yr} onChange={setAtFaultAccidents1yr} />
-        {atFaultAccidents1yr && (<><label>Please explain</label><textarea value={atFaultDetails} onChange={e=>setAtFaultDetails(e.target.value)} /></>)}
-
-        <label>In the past year, have you had any moving traffic violations?</label>
-        <YesNo value={movingViolations1yr} onChange={setMovingViolations1yr} />
-        {movingViolations1yr && (<><label>Please explain</label><textarea value={movingDetails} onChange={e=>setMovingDetails(e.target.value)} /></>)}
-
-        <label>Has your driver's license been revoked, suspended, or restricted since your last renewal?</label>
-        <YesNo value={licenseRevokedSuspended} onChange={setLicenseRevokedSuspended} />
-
-        <button className="primary" disabled={!canSubmit} onClick={submit}>{saving?'Saving...':'Save Renewal'}</button>
-      </div>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "content"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h2", null, "Renew Your License"), /*#__PURE__*/React.createElement("label", null, "New Expiration Date"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: licenseExp,
+    onChange: e => setLicenseExp(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Do you hold a CDL?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: cdl,
+    onChange: setCdl
+  }), /*#__PURE__*/React.createElement("label", null, "In the past year, have you had any at-fault accidents?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: atFaultAccidents1yr,
+    onChange: setAtFaultAccidents1yr
+  }), atFaultAccidents1yr && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Please explain"), /*#__PURE__*/React.createElement("textarea", {
+    value: atFaultDetails,
+    onChange: e => setAtFaultDetails(e.target.value)
+  })), /*#__PURE__*/React.createElement("label", null, "In the past year, have you had any moving traffic violations?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: movingViolations1yr,
+    onChange: setMovingViolations1yr
+  }), movingViolations1yr && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Please explain"), /*#__PURE__*/React.createElement("textarea", {
+    value: movingDetails,
+    onChange: e => setMovingDetails(e.target.value)
+  })), /*#__PURE__*/React.createElement("label", null, "Has your driver's license been revoked, suspended, or restricted since your last renewal?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: licenseRevokedSuspended,
+    onChange: setLicenseRevokedSuspended
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: !canSubmit,
+    onClick: submit
+  }, saving ? 'Saving...' : 'Save Renewal')));
 }
 
 // ---------- Request Rental (auto-assign) ----------
-function rentalOverlaps(aStart,aEnd,bStart,bEnd){ return aStart < bEnd && bStart < aEnd; }
-
-function RequestRental({user,vans,rentals,onAssigned}){
-  const [date,setDate] = useState('');
-  const [time,setTime] = useState('');
-  const [endDate,setEndDate] = useState('');
-  const [endTime,setEndTime] = useState('');
-  const [purpose,setPurpose] = useState('');
-  const [error,setError] = useState('');
-  const [saving,setSaving] = useState(false);
-  const [isRecurring,setIsRecurring] = useState(false);
-  const [recurringDay,setRecurringDay] = useState('');
-
-  async function autoAssign(){
-    setError(''); setSaving(true);
+function rentalOverlaps(aStart, aEnd, bStart, bEnd) {
+  return aStart < bEnd && bStart < aEnd;
+}
+function RequestRental({
+  user,
+  vans,
+  rentals,
+  onAssigned
+}) {
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [purpose, setPurpose] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringDay, setRecurringDay] = useState('');
+  async function autoAssign() {
+    setError('');
+    setSaving(true);
     const start = new Date(`${date}T${time}`);
     const end = new Date(`${endDate}T${endTime}`);
-    if(!(start < end)){ setError('End date/time must be after the start date/time.'); setSaving(false); return; }
-
-    const activeRentals = rentals.filter(r=>r.status!=='completed' && r.status!=='cancelled');
-    const vansWithConflict = new Set(
-      activeRentals.filter(r=>{
-        if(!r.date || !r.time) return false;
-        const rStart = new Date(`${r.date}T${r.time}`);
-        const rEnd = r.endDate && r.endTime ? new Date(`${r.endDate}T${r.endTime}`) : new Date(rStart.getTime()+4*60*60*1000);
-        return rentalOverlaps(start,end,rStart,rEnd);
-      }).map(r=>r.vanId)
-    );
-
-    const available = vans.filter(v=>v.status!=='maintenance' && !vansWithConflict.has(v.id));
-    if(available.length===0){ setError('No vans are free for that time window. An admin will follow up.'); setSaving(false); return; }
-
-    const van = [...available].sort((a,b)=>{
-      if(!!a.lowPriority !== !!b.lowPriority) return a.lowPriority ? 1 : -1;
-      return a.mileage-b.mileage;
+    if (!(start < end)) {
+      setError('End date/time must be after the start date/time.');
+      setSaving(false);
+      return;
+    }
+    const activeRentals = rentals.filter(r => r.status !== 'completed' && r.status !== 'cancelled');
+    const vansWithConflict = new Set(activeRentals.filter(r => {
+      if (!r.date || !r.time) return false;
+      const rStart = new Date(`${r.date}T${r.time}`);
+      const rEnd = r.endDate && r.endTime ? new Date(`${r.endDate}T${r.endTime}`) : new Date(rStart.getTime() + 4 * 60 * 60 * 1000);
+      return rentalOverlaps(start, end, rStart, rEnd);
+    }).map(r => r.vanId));
+    const available = vans.filter(v => v.status !== 'maintenance' && !vansWithConflict.has(v.id));
+    if (available.length === 0) {
+      setError('No vans are free for that time window. An admin will follow up.');
+      setSaving(false);
+      return;
+    }
+    const van = [...available].sort((a, b) => {
+      if (!!a.lowPriority !== !!b.lowPriority) return a.lowPriority ? 1 : -1;
+      return a.mileage - b.mileage;
     })[0];
-
     const rentalRef = db.collection('vanRentals').doc();
     await rentalRef.set({
-      driverId: user.uid, vanId: van.id, date, time, endDate, endTime, purpose,
-      status: 'assigned', createdAt: Date.now(),
+      driverId: user.uid,
+      vanId: van.id,
+      date,
+      time,
+      endDate,
+      endTime,
+      purpose,
+      status: 'assigned',
+      createdAt: Date.now()
     });
-    await db.collection('vans').doc(van.id).update({status:'inuse'});
+    await db.collection('vans').doc(van.id).update({
+      status: 'inuse'
+    });
     setSaving(false);
     onAssigned();
   }
-
-  async function submitRecurring(){
-    setError(''); setSaving(true);
-    if(!recurringDay || !time || !endTime || !date){
-      setError('Please fill in the day, start date, and times.'); setSaving(false); return;
+  async function submitRecurring() {
+    setError('');
+    setSaving(true);
+    if (!recurringDay || !time || !endTime || !date) {
+      setError('Please fill in the day, start date, and times.');
+      setSaving(false);
+      return;
     }
     const windowStart = date;
     const windowEnd = addMonths(date, 3);
     await db.collection('vanRecurringRequests').add({
-      driverId: user.uid, dayOfWeek: recurringDay, time, endTime, purpose,
-      windowStart, windowEnd,
-      status: 'pending', // pending | active | renewal_requested | ended | denied
-      createdAt: Date.now(),
+      driverId: user.uid,
+      dayOfWeek: recurringDay,
+      time,
+      endTime,
+      purpose,
+      windowStart,
+      windowEnd,
+      status: 'pending',
+      // pending | active | renewal_requested | ended | denied
+      createdAt: Date.now()
     });
     setSaving(false);
     onAssigned();
   }
-
-  function addMonths(dateStr, months){
-    const d = new Date(dateStr+'T00:00:00');
-    d.setMonth(d.getMonth()+months);
+  function addMonths(dateStr, months) {
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setMonth(d.getMonth() + months);
     return d.toISOString().split('T')[0];
   }
-
   const canSubmitOneTime = date && time && endDate && endTime && !saving;
   const canSubmitRecurring = recurringDay && date && time && endTime && !saving;
-
-  return (
-    <div className="content">
-      <div className="card">
-        <h2>Request a Van</h2>
-
-        <div className="card" style={{background:'var(--blue-dim)', border:'1px solid var(--blue-glow)', padding:14, marginBottom:0}}>
-          <label style={{marginTop:0, display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer'}}>
-            <input type="checkbox" checked={isRecurring} onChange={e=>setIsRecurring(e.target.checked)} style={{width:'auto', marginTop:3}} />
-            <span style={{fontWeight:400, fontSize:14}}>Make this a weekly reservation (e.g. same time every week for a season). An admin approves this before it starts.</span>
-          </label>
-        </div>
-
-        {!isRecurring && (<>
-          <label>Start Date</label>
-          <input type="date" value={date} onChange={e=>setDate(e.target.value)} />
-          <label>Start Time</label>
-          <input type="time" value={time} onChange={e=>setTime(e.target.value)} />
-          <label>Return Date</label>
-          <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} />
-          <label>Return Time</label>
-          <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} />
-        </>)}
-
-        {isRecurring && (<>
-          <label>Which day of the week?</label>
-          <select value={recurringDay} onChange={e=>setRecurringDay(e.target.value)}>
-            <option value="">Select a day...</option>
-            <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
-            <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
-          </select>
-          <label>Starting From</label>
-          <input type="date" value={date} onChange={e=>setDate(e.target.value)} />
-          <label>Time</label>
-          <input type="time" value={time} onChange={e=>setTime(e.target.value)} />
-          <label>Return Time (same day, each week)</label>
-          <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} />
-          <p className="muted">This requests the same day/time every week for 3 months. An admin will review and approve it, then you'll be prompted to renew before it runs out.</p>
-        </>)}
-
-        <label>Purpose / Destination</label>
-        <input value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="e.g. Youth group retreat" />
-        {error && <div className="banner-danger">{error}</div>}
-
-        {!isRecurring && (
-          <button className="primary" disabled={!canSubmitOneTime} onClick={autoAssign}>{saving?'Finding a van...':'Find Me a Van'}</button>
-        )}
-        {isRecurring && (
-          <button className="primary" disabled={!canSubmitRecurring} onClick={submitRecurring}>{saving?'Submitting...':'Request Weekly Reservation'}</button>
-        )}
-      </div>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "content"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h2", null, "Request a Van"), /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      background: 'var(--blue-dim)',
+      border: '1px solid var(--blue-glow)',
+      padding: 14,
+      marginBottom: 0
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      marginTop: 0,
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: 10,
+      cursor: 'pointer'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: isRecurring,
+    onChange: e => setIsRecurring(e.target.checked),
+    style: {
+      width: 'auto',
+      marginTop: 3
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 400,
+      fontSize: 14
+    }
+  }, "Make this a weekly reservation (e.g. same time every week for a season). An admin approves this before it starts."))), !isRecurring && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Start Date"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: date,
+    onChange: e => setDate(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Start Time"), /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    value: time,
+    onChange: e => setTime(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Return Date"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: endDate,
+    onChange: e => setEndDate(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Return Time"), /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    value: endTime,
+    onChange: e => setEndTime(e.target.value)
+  })), isRecurring && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Which day of the week?"), /*#__PURE__*/React.createElement("select", {
+    value: recurringDay,
+    onChange: e => setRecurringDay(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select a day..."), /*#__PURE__*/React.createElement("option", {
+    value: "0"
+  }, "Sunday"), /*#__PURE__*/React.createElement("option", {
+    value: "1"
+  }, "Monday"), /*#__PURE__*/React.createElement("option", {
+    value: "2"
+  }, "Tuesday"), /*#__PURE__*/React.createElement("option", {
+    value: "3"
+  }, "Wednesday"), /*#__PURE__*/React.createElement("option", {
+    value: "4"
+  }, "Thursday"), /*#__PURE__*/React.createElement("option", {
+    value: "5"
+  }, "Friday"), /*#__PURE__*/React.createElement("option", {
+    value: "6"
+  }, "Saturday")), /*#__PURE__*/React.createElement("label", null, "Starting From"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: date,
+    onChange: e => setDate(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Time"), /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    value: time,
+    onChange: e => setTime(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Return Time (same day, each week)"), /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    value: endTime,
+    onChange: e => setEndTime(e.target.value)
+  }), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "This requests the same day/time every week for 3 months. An admin will review and approve it, then you'll be prompted to renew before it runs out.")), /*#__PURE__*/React.createElement("label", null, "Purpose / Destination"), /*#__PURE__*/React.createElement("input", {
+    value: purpose,
+    onChange: e => setPurpose(e.target.value),
+    placeholder: "e.g. Youth group retreat"
+  }), error && /*#__PURE__*/React.createElement("div", {
+    className: "banner-danger"
+  }, error), !isRecurring && /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: !canSubmitOneTime,
+    onClick: autoAssign
+  }, saving ? 'Finding a van...' : 'Find Me a Van'), isRecurring && /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: !canSubmitRecurring,
+    onClick: submitRecurring
+  }, saving ? 'Submitting...' : 'Request Weekly Reservation')));
 }
 
 // ---------- Checkout Flow ----------
@@ -490,442 +690,616 @@ function RequestRental({user,vans,rentals,onAssigned}){
 // zones. Picking a zone sets the needle to that position. Drivers pick
 // the closest reading at or below the actual needle (e.g. if it's
 // between 3/4 and Full, they pick 3/4).
-const GAS_LEVELS = [
-  {key:'empty', label:'Empty', angle:-90, value:5},
-  {key:'quarter', label:'1/4', angle:-45, value:25},
-  {key:'half', label:'1/2', angle:0, value:50},
-  {key:'threequarter', label:'3/4', angle:45, value:75},
-  {key:'full', label:'Full', angle:90, value:100},
-];
-function GasGauge({value, onChange}){
-  const selected = GAS_LEVELS.find(l=>l.value===value);
+const GAS_LEVELS = [{
+  key: 'empty',
+  label: 'Empty',
+  angle: -90,
+  value: 5
+}, {
+  key: 'quarter',
+  label: '1/4',
+  angle: -45,
+  value: 25
+}, {
+  key: 'half',
+  label: '1/2',
+  angle: 0,
+  value: 50
+}, {
+  key: 'threequarter',
+  label: '3/4',
+  angle: 45,
+  value: 75
+}, {
+  key: 'full',
+  label: 'Full',
+  angle: 90,
+  value: 100
+}];
+function GasGauge({
+  value,
+  onChange
+}) {
+  const selected = GAS_LEVELS.find(l => l.value === value);
   const needleAngle = selected ? selected.angle : -90;
-  const rad = (needleAngle-90) * Math.PI/180;
-  const cx=100, cy=100, r=70;
-  const needleX = cx + r*0.85*Math.cos(rad);
-  const needleY = cy + r*0.85*Math.sin(rad);
-
-  return (
-    <div style={{textAlign:'center'}}>
-      <svg viewBox="0 0 200 130" style={{width:'100%',maxWidth:280,margin:'0 auto',display:'block'}}>
-        <path d="M 30 100 A 70 70 0 0 1 170 100" fill="none" stroke="var(--border)" strokeWidth="14" strokeLinecap="round" />
-        <path d="M 30 100 A 70 70 0 0 1 170 100" fill="none" stroke="var(--blue)" strokeWidth="14" strokeLinecap="round"
-          strokeDasharray={`${selected ? (GAS_LEVELS.indexOf(selected)/4)*220 : 0} 999`} />
-        <line x1={cx} y1={cy} x2={needleX} y2={needleY} stroke="var(--danger)" strokeWidth="3" strokeLinecap="round" />
-        <circle cx={cx} cy={cy} r="6" fill="var(--danger)" />
-        <text x="30" y="118" fontSize="11" fill="var(--muted)" textAnchor="middle">E</text>
-        <text x="170" y="118" fontSize="11" fill="var(--muted)" textAnchor="middle">F</text>
-      </svg>
-      <div style={{display:'flex',gap:6,justifyContent:'center',flexWrap:'wrap',marginTop:10}}>
-        {GAS_LEVELS.map(l=>(
-          <button key={l.key} type="button"
-            onClick={()=>onChange(l.value)}
-            style={{
-              padding:'10px 14px', fontSize:14, fontWeight:600, borderRadius:10, cursor:'pointer',
-              border: value===l.value ? '2px solid var(--blue)' : '2px solid var(--border)',
-              background: value===l.value ? 'var(--blue-dim)' : '#fff',
-              color: value===l.value ? 'var(--blue)' : 'var(--text)',
-            }}>
-            {l.label}
-          </button>
-        ))}
-      </div>
-      <p className="muted" style={{marginTop:8}}>Pick the closest mark at or below the needle — e.g. between 3/4 and Full, pick 3/4.</p>
-    </div>
-  );
+  const rad = (needleAngle - 90) * Math.PI / 180;
+  const cx = 100,
+    cy = 100,
+    r = 70;
+  const needleX = cx + r * 0.85 * Math.cos(rad);
+  const needleY = cy + r * 0.85 * Math.sin(rad);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 200 130",
+    style: {
+      width: '100%',
+      maxWidth: 280,
+      margin: '0 auto',
+      display: 'block'
+    }
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M 30 100 A 70 70 0 0 1 170 100",
+    fill: "none",
+    stroke: "var(--border)",
+    strokeWidth: "14",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 30 100 A 70 70 0 0 1 170 100",
+    fill: "none",
+    stroke: "var(--blue)",
+    strokeWidth: "14",
+    strokeLinecap: "round",
+    strokeDasharray: `${selected ? GAS_LEVELS.indexOf(selected) / 4 * 220 : 0} 999`
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: cx,
+    y1: cy,
+    x2: needleX,
+    y2: needleY,
+    stroke: "var(--danger)",
+    strokeWidth: "3",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: cx,
+    cy: cy,
+    r: "6",
+    fill: "var(--danger)"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: "30",
+    y: "118",
+    fontSize: "11",
+    fill: "var(--muted)",
+    textAnchor: "middle"
+  }, "E"), /*#__PURE__*/React.createElement("text", {
+    x: "170",
+    y: "118",
+    fontSize: "11",
+    fill: "var(--muted)",
+    textAnchor: "middle"
+  }, "F")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 6,
+      justifyContent: 'center',
+      flexWrap: 'wrap',
+      marginTop: 10
+    }
+  }, GAS_LEVELS.map(l => /*#__PURE__*/React.createElement("button", {
+    key: l.key,
+    type: "button",
+    onClick: () => onChange(l.value),
+    style: {
+      padding: '10px 14px',
+      fontSize: 14,
+      fontWeight: 600,
+      borderRadius: 10,
+      cursor: 'pointer',
+      border: value === l.value ? '2px solid var(--blue)' : '2px solid var(--border)',
+      background: value === l.value ? 'var(--blue-dim)' : '#fff',
+      color: value === l.value ? 'var(--blue)' : 'var(--text)'
+    }
+  }, l.label))), /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      marginTop: 8
+    }
+  }, "Pick the closest mark at or below the needle — e.g. between 3/4 and Full, pick 3/4."));
 }
-
-function CheckoutFlow({user,van,rental,warningLights,onDone}){
+function CheckoutFlow({
+  user,
+  van,
+  rental,
+  warningLights,
+  onDone
+}) {
   const draft = rental.checkoutDraft || {};
-  const [keysConfirmed,setKeysConfirmed] = useState(true); // once a draft exists they've already gotten the keys
-  const [mileage,setMileage] = useState(draft.mileage || '');
-  const [gas,setGas] = useState(draft.gas ?? null);
-  const [dashPhoto,setDashPhoto] = useState(draft.dashPhoto || null);
-  const [dashUploading,setDashUploading] = useState(false);
-  const [checkedLights,setCheckedLights] = useState(draft.checkedLights || []);
-  const [otherLightChecked,setOtherLightChecked] = useState(draft.otherLightChecked || false);
-  const [otherLightDesc,setOtherLightDesc] = useState(draft.otherLightDesc || '');
-  const [clean,setClean] = useState(null);
-  const [cleanPhoto,setCleanPhoto] = useState(null);
-  const [cleanUploading,setCleanUploading] = useState(false);
-  const [saving,setSaving] = useState(false);
-  const [confirmed,setConfirmed] = useState(false);
-
-  const relevantLights = warningLights.filter(l=>!l.van || l.van===van.id);
+  const [keysConfirmed, setKeysConfirmed] = useState(true); // once a draft exists they've already gotten the keys
+  const [mileage, setMileage] = useState(draft.mileage || '');
+  const [gas, setGas] = useState(draft.gas ?? null);
+  const [dashPhoto, setDashPhoto] = useState(draft.dashPhoto || null);
+  const [dashUploading, setDashUploading] = useState(false);
+  const [checkedLights, setCheckedLights] = useState(draft.checkedLights || []);
+  const [otherLightChecked, setOtherLightChecked] = useState(draft.otherLightChecked || false);
+  const [otherLightDesc, setOtherLightDesc] = useState(draft.otherLightDesc || '');
+  const [clean, setClean] = useState(null);
+  const [cleanPhoto, setCleanPhoto] = useState(null);
+  const [cleanUploading, setCleanUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const relevantLights = warningLights.filter(l => !l.van || l.van === van.id);
   const safetyLightsOn = checkedLights.filter(id => {
-    const l = relevantLights.find(x=>x.id===id);
+    const l = relevantLights.find(x => x.id === id);
     return l && l.safety;
   });
   const nonSafetyLightsOn = checkedLights.filter(id => {
-    const l = relevantLights.find(x=>x.id===id);
+    const l = relevantLights.find(x => x.id === id);
     return l && !l.safety;
   });
-
   const isBlocked = rental.checkoutBlocked && !rental.checkoutCleared;
   const wasCleared = rental.checkoutBlocked && rental.checkoutCleared;
-
-  async function handlePhoto(file, setPhoto, setUploading){
+  async function handlePhoto(file, setPhoto, setUploading) {
     setUploading(true);
     const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/${uid()}.jpg`);
     setPhoto(url);
     setUploading(false);
   }
-
-  function toggleLight(id){
-    const next = checkedLights.includes(id) ? checkedLights.filter(x=>x!==id) : [...checkedLights, id];
+  function toggleLight(id) {
+    const next = checkedLights.includes(id) ? checkedLights.filter(x => x !== id) : [...checkedLights, id];
     setCheckedLights(next);
-    const stillHasSafety = next.some(lid => relevantLights.find(l=>l.id===lid)?.safety);
-    if(stillHasSafety) saveDraftAndBlock(next);
+    const stillHasSafety = next.some(lid => relevantLights.find(l => l.id === lid)?.safety);
+    if (stillHasSafety) saveDraftAndBlock(next);
   }
 
   // Saves everything entered so far and flags the rental as blocked,
   // so an admin can see exactly what the driver already recorded and
   // either clear them to continue or finish checkout on their behalf.
-  async function saveDraftAndBlock(lightsOverride){
+  async function saveDraftAndBlock(lightsOverride) {
     const lightIds = lightsOverride || checkedLights;
     await db.collection('vanRentals').doc(rental.id).update({
-      checkoutDraft: { mileage, gas, dashPhoto, checkedLights: lightIds, otherLightChecked, otherLightDesc },
-      checkoutBlocked: true, checkoutCleared: false,
+      checkoutDraft: {
+        mileage,
+        gas,
+        dashPhoto,
+        checkedLights: lightIds,
+        otherLightChecked,
+        otherLightDesc
+      },
+      checkoutBlocked: true,
+      checkoutCleared: false
     });
-    const lightNames = lightIds.map(id => relevantLights.find(l=>l.id===id)?.name).filter(Boolean);
+    const lightNames = lightIds.map(id => relevantLights.find(l => l.id === id)?.name).filter(Boolean);
     await db.collection('vanAlerts').add({
-      type:'safety_light_block', driverId:user.uid, vanId:van.id, rentalId:rental.id,
-      description:`Safety light(s) checked during checkout: ${lightNames.join(', ')}`,
-      createdAt:Date.now(), resolved:false,
+      type: 'safety_light_block',
+      driverId: user.uid,
+      vanId: van.id,
+      rentalId: rental.id,
+      description: `Safety light(s) checked during checkout: ${lightNames.join(', ')}`,
+      createdAt: Date.now(),
+      resolved: false
     });
   }
-
-  const canSubmit = keysConfirmed && mileage && gas!==null && dashPhoto
-    && safetyLightsOn.length===0
-    && (!otherLightChecked || otherLightDesc)
-    && clean!==null && cleanPhoto && confirmed && !saving;
-
-  async function finishCheckout(){
+  const canSubmit = keysConfirmed && mileage && gas !== null && dashPhoto && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && clean !== null && cleanPhoto && confirmed && !saving;
+  async function finishCheckout() {
     setSaving(true);
-    const lightNames = checkedLights.map(id => relevantLights.find(l=>l.id===id)?.name).filter(Boolean);
+    const lightNames = checkedLights.map(id => relevantLights.find(l => l.id === id)?.name).filter(Boolean);
     await db.collection('vanRentals').doc(rental.id).update({
       checkout: {
-        mileage, gas, dashPhoto,
+        mileage,
+        gas,
+        dashPhoto,
         warningLightsOn: lightNames,
-        otherLightReported: otherLightChecked, otherLightDesc,
-        clean, cleanPhoto, at: Date.now(),
+        otherLightReported: otherLightChecked,
+        otherLightDesc,
+        clean,
+        cleanPhoto,
+        at: Date.now()
       },
       checkoutDraft: firebase.firestore.FieldValue.delete(),
-      checkoutBlocked: false, checkoutCleared: false,
+      checkoutBlocked: false,
+      checkoutCleared: false
     });
     await db.collection('vans').doc(van.id).update({
-      mileage: Number(mileage)||van.mileage, gas,
+      mileage: Number(mileage) || van.mileage,
+      gas
     });
-    if(otherLightChecked && otherLightDesc){
+    if (otherLightChecked && otherLightDesc) {
       await db.collection('vanAlerts').add({
-        type:'unknown_safety_light', driverId:user.uid, vanId:van.id, rentalId:rental.id,
-        description:otherLightDesc, createdAt:Date.now(), resolved:false,
+        type: 'unknown_safety_light',
+        driverId: user.uid,
+        vanId: van.id,
+        rentalId: rental.id,
+        description: otherLightDesc,
+        createdAt: Date.now(),
+        resolved: false
       });
     }
     setSaving(false);
     onDone();
   }
-
-  if(isBlocked){
-    return (
-      <div className="content">
-        <div className="card">
-          <h2>Waiting on Admin</h2>
-          <div className="banner-danger">
-            A safety warning light was flagged during your dashboard check. An admin has been notified and needs to clear this before you can finish checking out. Please call Nicholas if you haven't already.
-          </div>
-          <p className="muted" style={{marginTop:14}}>What you entered so far is saved — once an admin clears this, you'll be able to pick up right where you left off.</p>
-        </div>
-      </div>
-    );
+  if (isBlocked) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "content"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "card"
+    }, /*#__PURE__*/React.createElement("h2", null, "Waiting on Admin"), /*#__PURE__*/React.createElement("div", {
+      className: "banner-danger"
+    }, "A safety warning light was flagged during your dashboard check. An admin has been notified and needs to clear this before you can finish checking out. Please call Nicholas if you haven't already."), /*#__PURE__*/React.createElement("p", {
+      className: "muted",
+      style: {
+        marginTop: 14
+      }
+    }, "What you entered so far is saved — once an admin clears this, you'll be able to pick up right where you left off.")));
   }
-
-  if(!keysConfirmed){
-    return (
-      <div className="content">
-        <div className="card">
-          <h2>Get Your Keys</h2>
-          <p>You've been assigned <strong>{van.name}</strong>.</p>
-          <p>Keys are located in the church office key box, labeled with the van name. If the office is locked, keys are in the lockbox by the side door — ask an admin for the code if you don't have it.</p>
-          <button className="primary" onClick={()=>setKeysConfirmed(true)}>I Have the Keys</button>
-        </div>
-      </div>
-    );
+  if (!keysConfirmed) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "content"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "card"
+    }, /*#__PURE__*/React.createElement("h2", null, "Get Your Keys"), /*#__PURE__*/React.createElement("p", null, "You've been assigned ", /*#__PURE__*/React.createElement("strong", null, van.name), "."), /*#__PURE__*/React.createElement("p", null, "Keys are located in the church office key box, labeled with the van name. If the office is locked, keys are in the lockbox by the side door — ask an admin for the code if you don't have it."), /*#__PURE__*/React.createElement("button", {
+      className: "primary",
+      onClick: () => setKeysConfirmed(true)
+    }, "I Have the Keys")));
   }
-
-  return (
-    <div className="content">
-      <div className="card">
-        <h2>Dashboard Check</h2>
-        <p className="muted">One photo of the full dashboard, then confirm what it shows below.</p>
-        <CameraCapture label="Take a photo of the full dashboard" photoUrl={dashPhoto} uploading={dashUploading} onCapture={f=>handlePhoto(f,setDashPhoto,setDashUploading)} />
-
-        <label>Current Odometer Reading</label>
-        <input type="number" value={mileage} onChange={e=>setMileage(e.target.value)} placeholder={`Last known: ${van.mileage}`} />
-
-        <label>Gas Level</label>
-        <GasGauge value={gas} onChange={setGas} />
-
-        <label>Warning Lights — check off anything lit on the dash</label>
-        {relevantLights.map(l=>{
-          const isChecked = checkedLights.includes(l.id);
-          return (
-            <div key={l.id} className="toggle-row" style={{marginTop:8}}>
-              <button type="button"
-                onClick={()=>toggleLight(l.id)}
-                style={{
-                  flex:1, textAlign:'left', padding:'12px 14px', borderRadius:10, cursor:'pointer',
-                  border: isChecked ? (l.safety ? '2px solid var(--danger)' : '2px solid var(--safe)') : '2px solid var(--border)',
-                  background: isChecked ? (l.safety ? 'var(--danger-dim)' : 'var(--safe-dim)') : '#fff',
-                  color: isChecked ? (l.safety ? 'var(--danger)' : 'var(--safe)') : 'var(--text)',
-                  fontWeight: isChecked ? 700 : 500, fontSize:15,
-                }}>
-                {isChecked ? '☑' : '☐'} {l.name}
-              </button>
-            </div>
-          );
-        })}
-        <div className="toggle-row" style={{marginTop:8}}>
-          <button type="button"
-            onClick={()=>setOtherLightChecked(v=>!v)}
-            style={{
-              flex:1, textAlign:'left', padding:'12px 14px', borderRadius:10, cursor:'pointer',
-              border: otherLightChecked ? '2px solid var(--danger)' : '2px solid var(--border)',
-              background: otherLightChecked ? 'var(--danger-dim)' : '#fff',
-              color: otherLightChecked ? 'var(--danger)' : 'var(--text)',
-              fontWeight: otherLightChecked ? 700 : 500, fontSize:15,
-            }}>
-            {otherLightChecked ? '☑' : '☐'} Something else / not on this list
-          </button>
-        </div>
-        {otherLightChecked && (
-          <>
-            <label>Describe what you see</label>
-            <textarea value={otherLightDesc} onChange={e=>setOtherLightDesc(e.target.value)} placeholder="Describe the light or symbol" />
-            {otherLightDesc && <div className="banner-danger">We don't have this one on file. Please call Nicholas right now before driving. We've also notified the admin team.</div>}
-          </>
-        )}
-        {nonSafetyLightsOn.length>0 && (
-          <div className="banner-safe">
-            {nonSafetyLightsOn.map(id => relevantLights.find(l=>l.id===id)?.feedback).filter(Boolean).join(' ')}
-          </div>
-        )}
-        {safetyLightsOn.length>0 && (
-          <div className="banner-danger">
-            {safetyLightsOn.map(id=>relevantLights.find(l=>l.id===id)?.name).join(', ')} — this is a known safety issue. Please call Nicholas right now before taking the van.
-          </div>
-        )}
-
-        <label style={{marginTop:20}}>Is the van clean?</label>
-        <YesNo value={clean} onChange={setClean} />
-        <CameraCapture label="Take a photo of the van interior" photoUrl={cleanPhoto} uploading={cleanUploading} onCapture={f=>handlePhoto(f,setCleanPhoto,setCleanUploading)} />
-
-        <div className="card" style={{background:'var(--blue-dim)', border:'1px solid var(--blue-glow)', marginTop:20, padding:14}}>
-          <label style={{marginTop:0, display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer'}}>
-            <input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)} style={{width:'auto', marginTop:3}} />
-            <span style={{fontWeight:400, fontSize:14}}>I confirm the mileage, gas level, and warning lights above match what I see on the dashboard.</span>
-          </label>
-        </div>
-
-        <button className="primary" disabled={!canSubmit} onClick={finishCheckout}>
-          {saving ? 'Saving...' : (safetyLightsOn.length>0 ? 'Call Nicholas before continuing' : 'Confirm & Drive Safely')}
-        </button>
-      </div>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "content"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h2", null, "Dashboard Check"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "One photo of the full dashboard, then confirm what it shows below."), /*#__PURE__*/React.createElement(CameraCapture, {
+    label: "Take a photo of the full dashboard",
+    photoUrl: dashPhoto,
+    uploading: dashUploading,
+    onCapture: f => handlePhoto(f, setDashPhoto, setDashUploading)
+  }), /*#__PURE__*/React.createElement("label", null, "Current Odometer Reading"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: mileage,
+    onChange: e => setMileage(e.target.value),
+    placeholder: `Last known: ${van.mileage}`
+  }), /*#__PURE__*/React.createElement("label", null, "Gas Level"), /*#__PURE__*/React.createElement(GasGauge, {
+    value: gas,
+    onChange: setGas
+  }), /*#__PURE__*/React.createElement("label", null, "Warning Lights — check off anything lit on the dash"), relevantLights.map(l => {
+    const isChecked = checkedLights.includes(l.id);
+    return /*#__PURE__*/React.createElement("div", {
+      key: l.id,
+      className: "toggle-row",
+      style: {
+        marginTop: 8
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => toggleLight(l.id),
+      style: {
+        flex: 1,
+        textAlign: 'left',
+        padding: '12px 14px',
+        borderRadius: 10,
+        cursor: 'pointer',
+        border: isChecked ? l.safety ? '2px solid var(--danger)' : '2px solid var(--safe)' : '2px solid var(--border)',
+        background: isChecked ? l.safety ? 'var(--danger-dim)' : 'var(--safe-dim)' : '#fff',
+        color: isChecked ? l.safety ? 'var(--danger)' : 'var(--safe)' : 'var(--text)',
+        fontWeight: isChecked ? 700 : 500,
+        fontSize: 15
+      }
+    }, isChecked ? '☑' : '☐', " ", l.name));
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "toggle-row",
+    style: {
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setOtherLightChecked(v => !v),
+    style: {
+      flex: 1,
+      textAlign: 'left',
+      padding: '12px 14px',
+      borderRadius: 10,
+      cursor: 'pointer',
+      border: otherLightChecked ? '2px solid var(--danger)' : '2px solid var(--border)',
+      background: otherLightChecked ? 'var(--danger-dim)' : '#fff',
+      color: otherLightChecked ? 'var(--danger)' : 'var(--text)',
+      fontWeight: otherLightChecked ? 700 : 500,
+      fontSize: 15
+    }
+  }, otherLightChecked ? '☑' : '☐', " Something else / not on this list")), otherLightChecked && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Describe what you see"), /*#__PURE__*/React.createElement("textarea", {
+    value: otherLightDesc,
+    onChange: e => setOtherLightDesc(e.target.value),
+    placeholder: "Describe the light or symbol"
+  }), otherLightDesc && /*#__PURE__*/React.createElement("div", {
+    className: "banner-danger"
+  }, "We don't have this one on file. Please call Nicholas right now before driving. We've also notified the admin team.")), nonSafetyLightsOn.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "banner-safe"
+  }, nonSafetyLightsOn.map(id => relevantLights.find(l => l.id === id)?.feedback).filter(Boolean).join(' ')), safetyLightsOn.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "banner-danger"
+  }, safetyLightsOn.map(id => relevantLights.find(l => l.id === id)?.name).join(', '), " — this is a known safety issue. Please call Nicholas right now before taking the van."), /*#__PURE__*/React.createElement("label", {
+    style: {
+      marginTop: 20
+    }
+  }, "Is the van clean?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: clean,
+    onChange: setClean
+  }), /*#__PURE__*/React.createElement(CameraCapture, {
+    label: "Take a photo of the van interior",
+    photoUrl: cleanPhoto,
+    uploading: cleanUploading,
+    onCapture: f => handlePhoto(f, setCleanPhoto, setCleanUploading)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      background: 'var(--blue-dim)',
+      border: '1px solid var(--blue-glow)',
+      marginTop: 20,
+      padding: 14
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      marginTop: 0,
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: 10,
+      cursor: 'pointer'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: confirmed,
+    onChange: e => setConfirmed(e.target.checked),
+    style: {
+      width: 'auto',
+      marginTop: 3
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 400,
+      fontSize: 14
+    }
+  }, "I confirm the mileage, gas level, and warning lights above match what I see on the dashboard."))), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: !canSubmit,
+    onClick: finishCheckout
+  }, saving ? 'Saving...' : safetyLightsOn.length > 0 ? 'Call Nicholas before continuing' : 'Confirm & Drive Safely')));
 }
 
 // ---------- Return Flow ----------
-function ReturnFlow({user,van,rental,warningLights,onDone}){
-  const [mileage,setMileage] = useState('');
-  const [gas,setGas] = useState(null);
-  const [clean,setClean] = useState(null);
-  const [cleanPhoto,setCleanPhoto] = useState(null);
-  const [cleanUploading,setCleanUploading] = useState(false);
-  const [checkedLights,setCheckedLights] = useState([]);
-  const [otherLightChecked,setOtherLightChecked] = useState(false);
-  const [otherLightDesc,setOtherLightDesc] = useState('');
-  const [problems,setProblems] = useState(null);
-  const [problemDetails,setProblemDetails] = useState('');
-  const [saving,setSaving] = useState(false);
-
-  const relevantLights = warningLights.filter(l=>!l.van || l.van===van.id);
-  const safetyLightsOn = checkedLights.filter(id => relevantLights.find(x=>x.id===id)?.safety);
+function ReturnFlow({
+  user,
+  van,
+  rental,
+  warningLights,
+  onDone
+}) {
+  const [mileage, setMileage] = useState('');
+  const [gas, setGas] = useState(null);
+  const [clean, setClean] = useState(null);
+  const [cleanPhoto, setCleanPhoto] = useState(null);
+  const [cleanUploading, setCleanUploading] = useState(false);
+  const [checkedLights, setCheckedLights] = useState([]);
+  const [otherLightChecked, setOtherLightChecked] = useState(false);
+  const [otherLightDesc, setOtherLightDesc] = useState('');
+  const [problems, setProblems] = useState(null);
+  const [problemDetails, setProblemDetails] = useState('');
+  const [saving, setSaving] = useState(false);
+  const relevantLights = warningLights.filter(l => !l.van || l.van === van.id);
+  const safetyLightsOn = checkedLights.filter(id => relevantLights.find(x => x.id === id)?.safety);
   const nonSafetyLightsOn = checkedLights.filter(id => {
-    const l = relevantLights.find(x=>x.id===id);
+    const l = relevantLights.find(x => x.id === id);
     return l && !l.safety;
   });
-
-  function toggleLight(id){
-    setCheckedLights(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
+  function toggleLight(id) {
+    setCheckedLights(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
-
-  const canSubmit = mileage && gas!==null && clean!==null && cleanPhoto
-    && safetyLightsOn.length===0
-    && (!otherLightChecked || otherLightDesc)
-    && problems!==null && !saving;
-
-  async function handlePhoto(file){
+  const canSubmit = mileage && gas !== null && clean !== null && cleanPhoto && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && problems !== null && !saving;
+  async function handlePhoto(file) {
     setCleanUploading(true);
     const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/return-${uid()}.jpg`);
     setCleanPhoto(url);
     setCleanUploading(false);
   }
-
-  async function finishReturn(){
+  async function finishReturn() {
     setSaving(true);
-    const lightNames = checkedLights.map(id => relevantLights.find(l=>l.id===id)?.name).filter(Boolean);
+    const lightNames = checkedLights.map(id => relevantLights.find(l => l.id === id)?.name).filter(Boolean);
     await db.collection('vanRentals').doc(rental.id).update({
-      status:'completed',
+      status: 'completed',
       return: {
-        mileage, gas, clean, cleanPhoto,
-        warningLightsOn: lightNames, otherLightReported: otherLightChecked, otherLightDesc,
-        completedBy: user.uid, problems, problemDetails, at: Date.now(),
+        mileage,
+        gas,
+        clean,
+        cleanPhoto,
+        warningLightsOn: lightNames,
+        otherLightReported: otherLightChecked,
+        otherLightDesc,
+        completedBy: user.uid,
+        problems,
+        problemDetails,
+        at: Date.now()
       }
     });
     await db.collection('vans').doc(van.id).update({
-      mileage: Number(mileage)||van.mileage, gas, status:'available',
+      mileage: Number(mileage) || van.mileage,
+      gas,
+      status: 'available'
     });
-    if(problems && problemDetails){
+    if (problems && problemDetails) {
       await db.collection('vanMaintenanceNotes').add({
-        vanId:van.id, note:problemDetails, reportedBy:rental.driverId, rentalId:rental.id,
-        createdAt:Date.now(), resolved:false,
+        vanId: van.id,
+        note: problemDetails,
+        reportedBy: rental.driverId,
+        rentalId: rental.id,
+        createdAt: Date.now(),
+        resolved: false
       });
     }
-    if(otherLightChecked && otherLightDesc){
+    if (otherLightChecked && otherLightDesc) {
       await db.collection('vanAlerts').add({
-        type:'unknown_safety_light', driverId:user.uid, vanId:van.id, rentalId:rental.id,
-        description:otherLightDesc, createdAt:Date.now(), resolved:false,
+        type: 'unknown_safety_light',
+        driverId: user.uid,
+        vanId: van.id,
+        rentalId: rental.id,
+        description: otherLightDesc,
+        createdAt: Date.now(),
+        resolved: false
       });
     }
     setSaving(false);
     onDone();
   }
-
-  return (
-    <div className="content">
-      <div className="card">
-        <h2>Return the Van</h2>
-        <p className="muted">Any approved driver can complete this check-in — doesn't have to be whoever originally checked it out.</p>
-
-        <label>Final Odometer Reading</label>
-        <input type="number" value={mileage} onChange={e=>setMileage(e.target.value)} />
-
-        <label>Final Gas Level</label>
-        <GasGauge value={gas} onChange={setGas} />
-
-        <label>Is the van clean?</label>
-        <YesNo value={clean} onChange={setClean} />
-        <CameraCapture label="Take a photo of the van interior at turn-in" photoUrl={cleanPhoto} uploading={cleanUploading} onCapture={handlePhoto} />
-
-        <label>Warning Lights — check off anything lit on the dash</label>
-        {relevantLights.map(l=>{
-          const isChecked = checkedLights.includes(l.id);
-          return (
-            <div key={l.id} className="toggle-row" style={{marginTop:8}}>
-              <button type="button"
-                onClick={()=>toggleLight(l.id)}
-                style={{
-                  flex:1, textAlign:'left', padding:'12px 14px', borderRadius:10, cursor:'pointer',
-                  border: isChecked ? (l.safety ? '2px solid var(--danger)' : '2px solid var(--safe)') : '2px solid var(--border)',
-                  background: isChecked ? (l.safety ? 'var(--danger-dim)' : 'var(--safe-dim)') : '#fff',
-                  color: isChecked ? (l.safety ? 'var(--danger)' : 'var(--safe)') : 'var(--text)',
-                  fontWeight: isChecked ? 700 : 500, fontSize:15,
-                }}>
-                {isChecked ? '☑' : '☐'} {l.name}
-              </button>
-            </div>
-          );
-        })}
-        <div className="toggle-row" style={{marginTop:8}}>
-          <button type="button"
-            onClick={()=>setOtherLightChecked(v=>!v)}
-            style={{
-              flex:1, textAlign:'left', padding:'12px 14px', borderRadius:10, cursor:'pointer',
-              border: otherLightChecked ? '2px solid var(--danger)' : '2px solid var(--border)',
-              background: otherLightChecked ? 'var(--danger-dim)' : '#fff',
-              color: otherLightChecked ? 'var(--danger)' : 'var(--text)',
-              fontWeight: otherLightChecked ? 700 : 500, fontSize:15,
-            }}>
-            {otherLightChecked ? '☑' : '☐'} Something else / not on this list
-          </button>
-        </div>
-        {otherLightChecked && (
-          <>
-            <label>Describe what you see</label>
-            <textarea value={otherLightDesc} onChange={e=>setOtherLightDesc(e.target.value)} placeholder="Describe the light or symbol" />
-            {otherLightDesc && <div className="banner-danger">We don't have this one on file. This will be flagged for an admin to review.</div>}
-          </>
-        )}
-        {nonSafetyLightsOn.length>0 && (
-          <div className="banner-safe">
-            {nonSafetyLightsOn.map(id => relevantLights.find(l=>l.id===id)?.feedback).filter(Boolean).join(' ')}
-          </div>
-        )}
-        {safetyLightsOn.length>0 && (
-          <div className="banner-danger">
-            {safetyLightsOn.map(id=>relevantLights.find(l=>l.id===id)?.name).join(', ')} — please call Nicholas and report this before finishing the return.
-          </div>
-        )}
-
-        <label style={{marginTop:20}}>Were there any other problems?</label>
-        <YesNo value={problems} onChange={setProblems} />
-        {problems && (<><label>Please describe</label><textarea value={problemDetails} onChange={e=>setProblemDetails(e.target.value)} /></>)}
-
-        <button className="primary" disabled={!canSubmit} onClick={finishReturn}>
-          {saving ? 'Saving...' : (safetyLightsOn.length>0 ? 'Resolve safety light first' : 'Complete Return')}
-        </button>
-      </div>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "content"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h2", null, "Return the Van"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Any approved driver can complete this check-in — doesn't have to be whoever originally checked it out."), /*#__PURE__*/React.createElement("label", null, "Final Odometer Reading"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: mileage,
+    onChange: e => setMileage(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Final Gas Level"), /*#__PURE__*/React.createElement(GasGauge, {
+    value: gas,
+    onChange: setGas
+  }), /*#__PURE__*/React.createElement("label", null, "Is the van clean?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: clean,
+    onChange: setClean
+  }), /*#__PURE__*/React.createElement(CameraCapture, {
+    label: "Take a photo of the van interior at turn-in",
+    photoUrl: cleanPhoto,
+    uploading: cleanUploading,
+    onCapture: handlePhoto
+  }), /*#__PURE__*/React.createElement("label", null, "Warning Lights — check off anything lit on the dash"), relevantLights.map(l => {
+    const isChecked = checkedLights.includes(l.id);
+    return /*#__PURE__*/React.createElement("div", {
+      key: l.id,
+      className: "toggle-row",
+      style: {
+        marginTop: 8
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => toggleLight(l.id),
+      style: {
+        flex: 1,
+        textAlign: 'left',
+        padding: '12px 14px',
+        borderRadius: 10,
+        cursor: 'pointer',
+        border: isChecked ? l.safety ? '2px solid var(--danger)' : '2px solid var(--safe)' : '2px solid var(--border)',
+        background: isChecked ? l.safety ? 'var(--danger-dim)' : 'var(--safe-dim)' : '#fff',
+        color: isChecked ? l.safety ? 'var(--danger)' : 'var(--safe)' : 'var(--text)',
+        fontWeight: isChecked ? 700 : 500,
+        fontSize: 15
+      }
+    }, isChecked ? '☑' : '☐', " ", l.name));
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "toggle-row",
+    style: {
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setOtherLightChecked(v => !v),
+    style: {
+      flex: 1,
+      textAlign: 'left',
+      padding: '12px 14px',
+      borderRadius: 10,
+      cursor: 'pointer',
+      border: otherLightChecked ? '2px solid var(--danger)' : '2px solid var(--border)',
+      background: otherLightChecked ? 'var(--danger-dim)' : '#fff',
+      color: otherLightChecked ? 'var(--danger)' : 'var(--text)',
+      fontWeight: otherLightChecked ? 700 : 500,
+      fontSize: 15
+    }
+  }, otherLightChecked ? '☑' : '☐', " Something else / not on this list")), otherLightChecked && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Describe what you see"), /*#__PURE__*/React.createElement("textarea", {
+    value: otherLightDesc,
+    onChange: e => setOtherLightDesc(e.target.value),
+    placeholder: "Describe the light or symbol"
+  }), otherLightDesc && /*#__PURE__*/React.createElement("div", {
+    className: "banner-danger"
+  }, "We don't have this one on file. This will be flagged for an admin to review.")), nonSafetyLightsOn.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "banner-safe"
+  }, nonSafetyLightsOn.map(id => relevantLights.find(l => l.id === id)?.feedback).filter(Boolean).join(' ')), safetyLightsOn.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "banner-danger"
+  }, safetyLightsOn.map(id => relevantLights.find(l => l.id === id)?.name).join(', '), " — please call Nicholas and report this before finishing the return."), /*#__PURE__*/React.createElement("label", {
+    style: {
+      marginTop: 20
+    }
+  }, "Were there any other problems?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: problems,
+    onChange: setProblems
+  }), problems && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Please describe"), /*#__PURE__*/React.createElement("textarea", {
+    value: problemDetails,
+    onChange: e => setProblemDetails(e.target.value)
+  })), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: !canSubmit,
+    onClick: finishReturn
+  }, saving ? 'Saving...' : safetyLightsOn.length > 0 ? 'Resolve safety light first' : 'Complete Return')));
 }
 
 // ---------- Driver Home ----------
-function DriverHome({user,profile,vans,rentals,warningLights,refreshProfile}){
-  const [view,setView] = useState('home');
-  const [selectedReturnId,setSelectedReturnId] = useState(null);
-  const [myRecurring,setMyRecurring] = useState([]);
-  const [enablingReminders,setEnablingReminders] = useState(false);
+function DriverHome({
+  user,
+  profile,
+  vans,
+  rentals,
+  warningLights,
+  refreshProfile
+}) {
+  const [view, setView] = useState('home');
+  const [selectedReturnId, setSelectedReturnId] = useState(null);
+  const [myRecurring, setMyRecurring] = useState([]);
+  const [enablingReminders, setEnablingReminders] = useState(false);
   const vr = profile.vanRentalProfile || {};
-  const myRentals = rentals.filter(r=>r.driverId===user.uid);
-  const remindersEnabled = typeof Notification!=='undefined' && Notification.permission==='granted';
-
-  async function enableReminders(){
+  const myRentals = rentals.filter(r => r.driverId === user.uid);
+  const remindersEnabled = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+  async function enableReminders() {
     setEnablingReminders(true);
     const token = await enablePushNotifications();
-    if(token){
+    if (token) {
       await db.collection('users').doc(user.uid).set({
         pushTokens: firebase.firestore.FieldValue.arrayUnion(token)
-      }, {merge:true});
-      if(refreshProfile) refreshProfile();
+      }, {
+        merge: true
+      });
+      if (refreshProfile) refreshProfile();
     }
     setEnablingReminders(false);
   }
-
-  useEffect(()=>{
-    const unsub = db.collection('vanRecurringRequests').where('driverId','==',user.uid).onSnapshot(s=>{
-      setMyRecurring(s.docs.map(d=>({id:d.id,...d.data()})));
+  useEffect(() => {
+    const unsub = db.collection('vanRecurringRequests').where('driverId', '==', user.uid).onSnapshot(s => {
+      setMyRecurring(s.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      })));
     });
     return unsub;
-  },[user.uid]);
+  }, [user.uid]);
 
   // A recurring reservation is "renewal due" once its window ends
   // within the next 7 days and the driver hasn't already asked to
   // continue (or let it end). Since there's no backend scheduler,
   // this only gets checked whenever the driver happens to open the
   // app — there's no proactive email/text reminder.
-  const oneWeekFromNow = new Date(); oneWeekFromNow.setDate(oneWeekFromNow.getDate()+7);
-  const renewalDue = myRecurring.find(r=>{
-    if(r.status!=='active') return false;
-    const windowEnd = new Date(r.windowEnd+'T00:00:00');
+  const oneWeekFromNow = new Date();
+  oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+  const renewalDue = myRecurring.find(r => {
+    if (r.status !== 'active') return false;
+    const windowEnd = new Date(r.windowEnd + 'T00:00:00');
     return windowEnd <= oneWeekFromNow;
   });
-
-  async function requestRenewal(reqId){
-    await db.collection('vanRecurringRequests').doc(reqId).update({status:'renewal_requested', renewalRequestedAt: Date.now()});
+  async function requestRenewal(reqId) {
+    await db.collection('vanRecurringRequests').doc(reqId).update({
+      status: 'renewal_requested',
+      renewalRequestedAt: Date.now()
+    });
   }
-  async function declineRenewal(reqId){
-    await db.collection('vanRecurringRequests').doc(reqId).update({status:'ended', endedAt: Date.now()});
+  async function declineRenewal(reqId) {
+    await db.collection('vanRecurringRequests').doc(reqId).update({
+      status: 'ended',
+      endedAt: Date.now()
+    });
   }
 
   // Checkout is personal — only the driver who requested the van sees
@@ -934,194 +1308,258 @@ function DriverHome({user,profile,vans,rentals,warningLights,refreshProfile}){
   // currently out, since the person bringing it back (e.g. a
   // department head wrapping up a group trip) isn't always the same
   // person who originally checked it out.
-  const myPendingCheckout = myRentals.find(r=>r.status==='assigned' && !r.checkout);
-  const anyOutstandingReturn = selectedReturnId
-    ? rentals.find(r=>r.id===selectedReturnId)
-    : null;
+  const myPendingCheckout = myRentals.find(r => r.status === 'assigned' && !r.checkout);
+  const anyOutstandingReturn = selectedReturnId ? rentals.find(r => r.id === selectedReturnId) : null;
   // If the driver explicitly clicked "Check It In" on a specific van
   // (selectedReturnId is set), that takes priority — otherwise a
   // stray pending checkout of their own would silently block them
   // from ever completing someone else's return.
-  const activeRental = selectedReturnId ? anyOutstandingReturn : (myPendingCheckout || anyOutstandingReturn);
-  const activeVan = activeRental ? vans.find(v=>v.id===activeRental.vanId) : null;
-  const outstandingReturns = rentals.filter(r=>r.checkout && !r.return);
-
-
-  if(!vr.status){
-    return <DriverApply user={user} onDone={refreshProfile} />;
+  const activeRental = selectedReturnId ? anyOutstandingReturn : myPendingCheckout || anyOutstandingReturn;
+  const activeVan = activeRental ? vans.find(v => v.id === activeRental.vanId) : null;
+  const outstandingReturns = rentals.filter(r => r.checkout && !r.return);
+  if (!vr.status) {
+    return /*#__PURE__*/React.createElement(DriverApply, {
+      user: user,
+      onDone: refreshProfile
+    });
   }
-  if(vr.status==='needs_info'){
-    return <DriverApply user={user} onDone={refreshProfile} prefill={vr} prefillName={profile.name} prefillPhone={profile.phone} />;
+  if (vr.status === 'needs_info') {
+    return /*#__PURE__*/React.createElement(DriverApply, {
+      user: user,
+      onDone: refreshProfile,
+      prefill: vr,
+      prefillName: profile.name,
+      prefillPhone: profile.phone
+    });
   }
-  if(vr.status==='pending'){
-    return (
-      <div className="content">
-        <div className="card center">
-          <h2>Application Pending</h2>
-          {vr.licenseVerifiedInPerson ? (
-            <p className="muted">Thanks! Your license is on file. An admin will finish reviewing your application shortly.</p>
-          ) : (
-            <div className="banner-safe" style={{textAlign:'left'}}>
-              Almost there — please bring a copy of your driver's license to the main office so an admin can confirm it's on file. Your application won't be approved until that's done.
-            </div>
-          )}
-        </div>
-      </div>
-    );
+  if (vr.status === 'pending') {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "content"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "card center"
+    }, /*#__PURE__*/React.createElement("h2", null, "Application Pending"), vr.licenseVerifiedInPerson ? /*#__PURE__*/React.createElement("p", {
+      className: "muted"
+    }, "Thanks! Your license is on file. An admin will finish reviewing your application shortly.") : /*#__PURE__*/React.createElement("div", {
+      className: "banner-safe",
+      style: {
+        textAlign: 'left'
+      }
+    }, "Almost there — please bring a copy of your driver's license to the main office so an admin can confirm it's on file. Your application won't be approved until that's done.")));
   }
-  if(vr.status==='denied'){
-    return (
-      <div className="content">
-        <div className="card center">
-          <h2>Application Not Approved</h2>
-          <p className="muted">Please reach out to an admin if you have questions.</p>
-        </div>
-      </div>
-    );
+  if (vr.status === 'denied') {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "content"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "card center"
+    }, /*#__PURE__*/React.createElement("h2", null, "Application Not Approved"), /*#__PURE__*/React.createElement("p", {
+      className: "muted"
+    }, "Please reach out to an admin if you have questions.")));
   }
-
-  if(view==='renew') return <LicenseRenewal user={user} profile={profile} onDone={()=>{setView('home'); refreshProfile();}} />;
-  if(view==='request') return <RequestRental user={user} vans={vans} rentals={rentals} onAssigned={()=>setView('home')} />;
-
-  if(activeRental && activeVan && !activeRental.checkout){
-    return <CheckoutFlow user={user} van={activeVan} rental={activeRental} warningLights={warningLights} onDone={()=>{setSelectedReturnId(null); setView('home');}} />;
+  if (view === 'renew') return /*#__PURE__*/React.createElement(LicenseRenewal, {
+    user: user,
+    profile: profile,
+    onDone: () => {
+      setView('home');
+      refreshProfile();
+    }
+  });
+  if (view === 'request') return /*#__PURE__*/React.createElement(RequestRental, {
+    user: user,
+    vans: vans,
+    rentals: rentals,
+    onAssigned: () => setView('home')
+  });
+  if (activeRental && activeVan && !activeRental.checkout) {
+    return /*#__PURE__*/React.createElement(CheckoutFlow, {
+      user: user,
+      van: activeVan,
+      rental: activeRental,
+      warningLights: warningLights,
+      onDone: () => {
+        setSelectedReturnId(null);
+        setView('home');
+      }
+    });
   }
-  if(activeRental && activeVan && activeRental.checkout && !activeRental.return){
-    return <ReturnFlow user={user} van={activeVan} rental={activeRental} warningLights={warningLights} onDone={()=>{setSelectedReturnId(null); setView('home');}} />;
+  if (activeRental && activeVan && activeRental.checkout && !activeRental.return) {
+    return /*#__PURE__*/React.createElement(ReturnFlow, {
+      user: user,
+      van: activeVan,
+      rental: activeRental,
+      warningLights: warningLights,
+      onDone: () => {
+        setSelectedReturnId(null);
+        setView('home');
+      }
+    });
   }
-
-  return (
-    <div className="content">
-      {renewalDue && (
-        <div className="card" style={{background:'var(--blue-dim)', border:'1px solid var(--blue-glow)'}}>
-          <h3 style={{marginTop:0}}>Weekly Reservation Ending Soon</h3>
-          <p className="muted">Your {DAY_NAMES[renewalDue.dayOfWeek]} {renewalDue.time}–{renewalDue.endTime} reservation runs through {renewalDue.windowEnd}. Want to continue for another 3 months?</p>
-          <div style={{display:'flex',gap:8,marginTop:10}}>
-            <button className="primary" style={{marginTop:0}} onClick={()=>requestRenewal(renewalDue.id)}>Yes, Continue</button>
-            <button className="secondary" style={{marginTop:0}} onClick={()=>declineRenewal(renewalDue.id)}>No, Let It End</button>
-          </div>
-        </div>
-      )}
-      <div className="card">
-        <h2>Welcome, {(profile.name||user.displayName||'').split(' ')[0]}</h2>
-        <p className="muted">License expires {vr.licenseExp}</p>
-        <button className="primary" onClick={()=>setView('request')}>Request a Van</button>
-        <button className="secondary" onClick={()=>setView('renew')}>Renew My License</button>
-        {!remindersEnabled && (
-          <button className="secondary" disabled={enablingReminders} onClick={enableReminders}>
-            {enablingReminders ? 'Enabling…' : 'Enable Reservation Reminders'}
-          </button>
-        )}
-      </div>
-
-      {outstandingReturns.length>0 && (
-        <div className="card">
-          <h3>Vans Still Out</h3>
-          <p className="muted">Anyone approved to drive can check one of these back in — doesn't have to be who checked it out.</p>
-          {outstandingReturns.map(r=>{
-            const van = vans.find(v=>v.id===r.vanId);
-            return (
-              <div key={r.id} className="list-item">
-                <div><div>{van?.name}</div><div className="muted">Out since {r.date} {r.time}</div></div>
-                <button className="secondary" style={{marginTop:0, width:'auto', padding:'8px 14px'}} onClick={()=>setSelectedReturnId(r.id)}>Check It In</button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="card">
-        <h3>My Rental History</h3>
-        {myRentals.length===0 && <p className="muted">No rentals yet.</p>}
-        {myRentals.slice().reverse().map(r=>{
-          const van = vans.find(v=>v.id===r.vanId);
-          return (
-            <div key={r.id} className="list-item">
-              <div><div>{van?.name}</div><div className="muted">{r.date} {r.time}</div></div>
-              <span className={`badge ${r.status==='completed'?'available':'inuse'}`}>{r.status}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "content"
+  }, renewalDue && /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      background: 'var(--blue-dim)',
+      border: '1px solid var(--blue-glow)'
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      marginTop: 0
+    }
+  }, "Weekly Reservation Ending Soon"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Your ", DAY_NAMES[renewalDue.dayOfWeek], " ", renewalDue.time, "–", renewalDue.endTime, " reservation runs through ", renewalDue.windowEnd, ". Want to continue for another 3 months?"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    style: {
+      marginTop: 0
+    },
+    onClick: () => requestRenewal(renewalDue.id)
+  }, "Yes, Continue"), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0
+    },
+    onClick: () => declineRenewal(renewalDue.id)
+  }, "No, Let It End"))), /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h2", null, "Welcome, ", (profile.name || user.displayName || '').split(' ')[0]), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "License expires ", vr.licenseExp), /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    onClick: () => setView('request')
+  }, "Request a Van"), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    onClick: () => setView('renew')
+  }, "Renew My License"), !remindersEnabled && /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    disabled: enablingReminders,
+    onClick: enableReminders
+  }, enablingReminders ? 'Enabling…' : 'Enable Reservation Reminders')), outstandingReturns.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Vans Still Out"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Anyone approved to drive can check one of these back in — doesn't have to be who checked it out."), outstandingReturns.map(r => {
+    const van = vans.find(v => v.id === r.vanId);
+    return /*#__PURE__*/React.createElement("div", {
+      key: r.id,
+      className: "list-item"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", null, van?.name), /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, "Out since ", r.date, " ", r.time)), /*#__PURE__*/React.createElement("button", {
+      className: "secondary",
+      style: {
+        marginTop: 0,
+        width: 'auto',
+        padding: '8px 14px'
+      },
+      onClick: () => setSelectedReturnId(r.id)
+    }, "Check It In"));
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "My Rental History"), myRentals.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "No rentals yet."), myRentals.slice().reverse().map(r => {
+    const van = vans.find(v => v.id === r.vanId);
+    return /*#__PURE__*/React.createElement("div", {
+      key: r.id,
+      className: "list-item"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", null, van?.name), /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, r.date, " ", r.time)), /*#__PURE__*/React.createElement("span", {
+      className: `badge ${r.status === 'completed' ? 'available' : 'inuse'}`
+    }, r.status));
+  })));
 }
-
-function LoginScreen(){
-  function signIn(){
+function LoginScreen() {
+  function signIn() {
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(err=>alert('Sign-in failed: '+err.message));
+    auth.signInWithPopup(provider).catch(err => alert('Sign-in failed: ' + err.message));
   }
-  return (
-    <div className="content">
-      <div className="login-mark">🚐</div>
-      <div className="login-title">RCC Van Usage</div>
-      <p className="login-sub">Sign in to request a van or check one in/out.</p>
-      <button id="googleSignInBtn" onClick={signIn}>
-        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-        Sign in with Google
-      </button>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "content"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "login-mark"
+  }, "🚐"), /*#__PURE__*/React.createElement("div", {
+    className: "login-title"
+  }, "RCC Van Usage"), /*#__PURE__*/React.createElement("p", {
+    className: "login-sub"
+  }, "Sign in to request a van or check one in/out."), /*#__PURE__*/React.createElement("button", {
+    id: "googleSignInBtn",
+    onClick: signIn
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "18",
+    height: "18",
+    viewBox: "0 0 48 48"
+  }, /*#__PURE__*/React.createElement("path", {
+    fill: "#EA4335",
+    d: "M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+  }), /*#__PURE__*/React.createElement("path", {
+    fill: "#4285F4",
+    d: "M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+  }), /*#__PURE__*/React.createElement("path", {
+    fill: "#FBBC05",
+    d: "M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+  }), /*#__PURE__*/React.createElement("path", {
+    fill: "#34A853",
+    d: "M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+  })), "Sign in with Google"));
 }
-
-function App(){
-  const [user,setUser] = useState(undefined); // undefined = checking, null = signed out
-  const [profile,setProfile] = useState(null);
-  const [canAccessAdmin,setCanAccessAdmin] = useState(false);
-  const [vans,setVans] = useState([]);
-  const [rentals,setRentals] = useState([]);
-  const [warningLights,setWarningLights] = useState([]);
-  const [loadingData,setLoadingData] = useState(true);
-
-  async function refreshProfile(){
-    if(!auth.currentUser) return;
+function App() {
+  const [user, setUser] = useState(undefined); // undefined = checking, null = signed out
+  const [profile, setProfile] = useState(null);
+  const [canAccessAdmin, setCanAccessAdmin] = useState(false);
+  const [vans, setVans] = useState([]);
+  const [rentals, setRentals] = useState([]);
+  const [warningLights, setWarningLights] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+  async function refreshProfile() {
+    if (!auth.currentUser) return;
     const doc = await db.collection('users').doc(auth.currentUser.uid).get();
     setProfile(doc.exists ? doc.data() : {});
   }
-
-  useEffect(()=>{
-    auth.onAuthStateChanged(async u=>{
+  useEffect(() => {
+    auth.onAuthStateChanged(async u => {
       setUser(u);
-      if(u){
+      if (u) {
         await ensureVansSeeded();
         await ensureWarningLightsSeeded();
         await claimDriverInviteIfAny(u);
         const doc = await db.collection('users').doc(u.uid).get();
         const data = doc.exists ? doc.data() : {};
         setProfile(data);
-        setCanAccessAdmin(data.isAdmin===true || (data.roles && data.roles.vanAdmin===true));
+        setCanAccessAdmin(data.isAdmin === true || data.roles && data.roles.vanAdmin === true);
       } else {
-        setProfile(null); setCanAccessAdmin(false);
+        setProfile(null);
+        setCanAccessAdmin(false);
       }
     });
-  },[]);
+  }, []);
 
   // If this person was pre-registered by an admin (via direct invite link,
   // or by matching email), merge that invite's info into their real
   // users/{uid} doc so they land on "pending" or "approved" instead of a
   // blank application. Only runs if they don't already have a vanRentalProfile.
-  async function claimDriverInviteIfAny(u){
+  async function claimDriverInviteIfAny(u) {
     const existing = await db.collection('users').doc(u.uid).get();
-    if(existing.exists && existing.data().vanRentalProfile) return; // already has one, don't overwrite
+    if (existing.exists && existing.data().vanRentalProfile) return; // already has one, don't overwrite
 
     const params = new URLSearchParams(window.location.search);
     const token = params.get('invite');
     let inviteDoc = null;
-
-    if(token){
+    if (token) {
       const doc = await db.collection('vanDriverInvites').doc(token).get();
-      if(doc.exists && !doc.data().claimed) inviteDoc = doc;
+      if (doc.exists && !doc.data().claimed) inviteDoc = doc;
     }
-    if(!inviteDoc && u.email){
-      const snap = await db.collection('vanDriverInvites')
-        .where('email','==',u.email.toLowerCase().trim())
-        .where('claimed','==',false)
-        .limit(1).get();
-      if(!snap.empty) inviteDoc = snap.docs[0];
+    if (!inviteDoc && u.email) {
+      const snap = await db.collection('vanDriverInvites').where('email', '==', u.email.toLowerCase().trim()).where('claimed', '==', false).limit(1).get();
+      if (!snap.empty) inviteDoc = snap.docs[0];
     }
-    if(!inviteDoc) return;
-
+    if (!inviteDoc) return;
     const inv = inviteDoc.data();
     await db.collection('users').doc(u.uid).set({
       name: u.displayName || inv.name || '',
@@ -1129,62 +1567,99 @@ function App(){
       phone: inv.phone || '',
       uid: u.uid,
       vanRentalProfile: {
-        birthdate:'', licenseExp: inv.licenseExp||'', cdl:null,
-        atFaultAccidents3yr:null, atFaultAccidentsDetails:'',
-        movingViolations3yr:null, movingViolationsDetails:'',
-        insuranceCancelled:null, licenseRevokedSuspended:null,
-        licenseVerifiedInPerson: inv.licenseVerifiedInPerson||false,
-        status:'needs_info', createdAt: Date.now(), addedByAdmin:true,
+        birthdate: '',
+        licenseExp: inv.licenseExp || '',
+        cdl: null,
+        atFaultAccidents3yr: null,
+        atFaultAccidentsDetails: '',
+        movingViolations3yr: null,
+        movingViolationsDetails: '',
+        insuranceCancelled: null,
+        licenseRevokedSuspended: null,
+        licenseVerifiedInPerson: inv.licenseVerifiedInPerson || false,
+        status: 'needs_info',
+        createdAt: Date.now(),
+        addedByAdmin: true
       }
-    }, {merge:true});
-    await db.collection('vanDriverInvites').doc(inviteDoc.id).update({claimed:true, claimedBy:u.uid, claimedAt:Date.now()});
-
-    if(token){
+    }, {
+      merge: true
+    });
+    await db.collection('vanDriverInvites').doc(inviteDoc.id).update({
+      claimed: true,
+      claimedBy: u.uid,
+      claimedAt: Date.now()
+    });
+    if (token) {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }
-
-  useEffect(()=>{
-    if(!user) return;
+  useEffect(() => {
+    if (!user) return;
     const unsubs = [];
-    unsubs.push(db.collection('vans').onSnapshot(s=>setVans(s.docs.map(d=>({id:d.id,...d.data()})))));
-    unsubs.push(db.collection('vanRentals').onSnapshot(s=>setRentals(s.docs.map(d=>({id:d.id,...d.data()})))));
-    unsubs.push(db.collection('vanWarningLights').onSnapshot(s=>setWarningLights(s.docs.map(d=>({id:d.id,...d.data()})))));
+    unsubs.push(db.collection('vans').onSnapshot(s => setVans(s.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })))));
+    unsubs.push(db.collection('vanRentals').onSnapshot(s => setRentals(s.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })))));
+    unsubs.push(db.collection('vanWarningLights').onSnapshot(s => setWarningLights(s.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })))));
     setLoadingData(false);
-    return ()=>unsubs.forEach(u=>u());
-  },[user]);
-
-  if(user===undefined){
-    return <div className="app"><div className="loading">Loading...</div></div>;
+    return () => unsubs.forEach(u => u());
+  }, [user]);
+  if (user === undefined) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "app"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "loading"
+    }, "Loading..."));
   }
-  if(!user){
-    return (
-      <div className="app">
-        <TopBar title="RCC Van Usage" hubLink />
-        <LoginScreen />
-      </div>
-    );
+  if (!user) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "app"
+    }, /*#__PURE__*/React.createElement(TopBar, {
+      title: "RCC Van Usage",
+      hubLink: true
+    }), /*#__PURE__*/React.createElement(LoginScreen, null));
   }
-  if(loadingData || profile===null){
-    return <div className="app"><div className="loading">Loading your info...</div></div>;
+  if (loadingData || profile === null) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "app"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "loading"
+    }, "Loading your info..."));
   }
-
-  return (
-    <div className="app">
-      <TopBar
-        title="Van Usage"
-        hubLink
-        right={<>
-          {canAccessAdmin && <a className="plain" href="../admin.html?section=vans" style={{textDecoration:'none', display:'inline-block', textAlign:'center'}}>Admin</a>}
-          <button className="plain" onClick={()=>auth.signOut()}>Sign out</button>
-        </>}
-      />
-      <DriverHome user={user} profile={profile} vans={vans} rentals={rentals} warningLights={warningLights} refreshProfile={refreshProfile} />
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "app"
+  }, /*#__PURE__*/React.createElement(TopBar, {
+    title: "Van Usage",
+    hubLink: true,
+    right: /*#__PURE__*/React.createElement(React.Fragment, null, canAccessAdmin && /*#__PURE__*/React.createElement("a", {
+      className: "plain",
+      href: "../admin.html?section=vans",
+      style: {
+        textDecoration: 'none',
+        display: 'inline-block',
+        textAlign: 'center'
+      }
+    }, "Admin"), /*#__PURE__*/React.createElement("button", {
+      className: "plain",
+      onClick: () => auth.signOut()
+    }, "Sign out"))
+  }), /*#__PURE__*/React.createElement(DriverHome, {
+    user: user,
+    profile: profile,
+    vans: vans,
+    rentals: rentals,
+    warningLights: warningLights,
+    refreshProfile: refreshProfile
+  }));
 }
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+ReactDOM.createRoot(document.getElementById('root')).render(/*#__PURE__*/React.createElement(App, null));
 </script>
 </body>
 </html>

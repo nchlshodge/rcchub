@@ -515,6 +515,8 @@
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db   = firebase.firestore();
+  // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
+  try { db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* keep going with the default connection */ }
 
   const ADMIN_TRIGGER_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
   // Must match CONFIG.WEB_ENDPOINT_TOKEN in apps-script.gs — the web app

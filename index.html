@@ -198,6 +198,8 @@
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db   = firebase.firestore();
+  // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
+  try { db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* keep going with the default connection */ }
 
   // ── MODULE REGISTRY ──
   // Everything on the home page lives here. `key` gates on users/{uid}.modules;
@@ -566,6 +568,35 @@
     }
     btn.disabled = false; btn.textContent = 'Send Request';
   });
+</script>
+
+<script>
+// If the page is still waiting after a while (a blocked or very slow connection, or a browser inside another app),
+// say so plainly and give people something to try instead of leaving "Loading…" on screen forever.
+(function () {
+  setTimeout(function () {
+    var shell = document.getElementById('appShell'), login = document.getElementById('loginScreen'), grid = document.getElementById('moduleGrid');
+    var stuckApps = shell.style.display === 'block' && /Loading your apps/.test(grid.textContent);
+    var stuckSignIn = shell.style.display !== 'block' && login.style.display !== 'flex';
+    if (!stuckApps && !stuckSignIn) return;
+    try { console.warn('RCC Hub: still loading after 12s', { stuckApps: stuckApps, stuckSignIn: stuckSignIn, online: navigator.onLine, ua: navigator.userAgent }); } catch (e) {}
+    var card = document.createElement('div');
+    card.className = 'empty';
+    card.style.cssText = 'max-width:520px;margin:40px auto;text-align:left;';
+    var b = document.createElement('b'); b.textContent = 'This is taking longer than usual'; card.appendChild(b);
+    var intro = document.createElement('div'); intro.textContent = navigator.onLine === false ? 'You seem to be offline. Check your Wi-Fi or data, then try again.' : 'Here are a few things that usually fix it:'; card.appendChild(intro);
+    var ul = document.createElement('ul'); ul.style.cssText = 'margin:10px 0 14px 18px;line-height:1.6;';
+    ['Open this page in Safari or Chrome itself, not inside an email, text-message, Facebook or Gmail app.',
+     'Turn off any VPN or content blocker for this site, or try cellular data instead of Wi-Fi.',
+     'Reload the page.',
+     'If it keeps happening, tell the church office which phone and browser you are using.'].forEach(function (t) { var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+    card.appendChild(ul);
+    var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn primary'; btn.textContent = 'Reload'; btn.addEventListener('click', function () { location.reload(); });
+    card.appendChild(btn);
+    if (stuckApps) { grid.replaceChildren(card); }
+    else { var wrap = document.createElement('div'); wrap.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg);z-index:90;'; wrap.appendChild(card); document.body.appendChild(wrap); }
+  }, 12000);
+})();
 </script>
 </body>
 </html>

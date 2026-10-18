@@ -758,6 +758,8 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
+// If a network blocks Firestore's streaming connection, quietly fall back to one that works.
+try { db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* keep going with the default connection */ }
 
 // Public key identifying this app to the browser's push service — not
 // a secret, safe to be visible in client code (same category as the
