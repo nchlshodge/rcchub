@@ -14,6 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-functions-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js"></script>
 
@@ -1517,6 +1518,9 @@ function App() {
   const [rentals, setRentals] = useState([]);
   const [warningLights, setWarningLights] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [needsApproval, setNeedsApproval] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [slow, setSlow] = useState(false);
   async function refreshProfile() {
     if (!auth.currentUser) return;
     const doc = await db.collection('users').doc(auth.currentUser.uid).get();
@@ -1526,75 +1530,74 @@ function App() {
     auth.onAuthStateChanged(async u => {
       setUser(u);
       if (u) {
-        await ensureVansSeeded();
-        await ensureWarningLightsSeeded();
-        await claimDriverInviteIfAny(u);
-        const doc = await db.collection('users').doc(u.uid).get();
-        const data = doc.exists ? doc.data() : {};
-        setProfile(data);
-        setCanAccessAdmin(data.isAdmin === true || data.roles && data.roles.vanAdmin === true);
+        setNeedsApproval(false);
+        setLoadFailed(false);
+        await claimDriverInviteIfAny(u); // first: an invited driver is approved here
+        let denied = false;
+        try {
+          await ensureVansSeeded();
+          await ensureWarningLightsSeeded();
+        } catch (e) {
+          if (e && e.code === 'permission-denied') denied = true;else console.warn('Setup check skipped:', e && e.message);
+        }
+        if (denied) {
+          setNeedsApproval(true);
+          fileSignupRequest(u);
+        }
+        try {
+          const doc = await db.collection('users').doc(u.uid).get();
+          const data = doc.exists ? doc.data() : {};
+          setProfile(data);
+          setCanAccessAdmin(data.isAdmin === true || data.roles && data.roles.vanAdmin === true);
+        } catch (e) {
+          console.warn('Could not load the profile:', e && e.message);
+          setLoadFailed(true);
+        }
       } else {
         setProfile(null);
         setCanAccessAdmin(false);
+        setNeedsApproval(false);
+        setLoadFailed(false);
       }
     });
+    const t = setTimeout(() => setSlow(true), 12000);
+    return () => clearTimeout(t);
   }, []);
 
-  // If this person was pre-registered by an admin (via direct invite link,
-  // or by matching email), merge that invite's info into their real
-  // users/{uid} doc so they land on "pending" or "approved" instead of a
-  // blank application. Only runs if they don't already have a vanRentalProfile.
+  // If an admin pre-registered this person (invite link, or by their confirmed email), the server merges the
+  // invite into their account and approves them. Never blocks the page: if it fails we just carry on.
   async function claimDriverInviteIfAny(u) {
-    const existing = await db.collection('users').doc(u.uid).get();
-    if (existing.exists && existing.data().vanRentalProfile) return; // already has one, don't overwrite
-
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('invite');
-    let inviteDoc = null;
-    if (token) {
-      const doc = await db.collection('vanDriverInvites').doc(token).get();
-      if (doc.exists && !doc.data().claimed) inviteDoc = doc;
-    }
-    if (!inviteDoc && u.email) {
-      const snap = await db.collection('vanDriverInvites').where('email', '==', u.email.toLowerCase().trim()).where('claimed', '==', false).limit(1).get();
-      if (!snap.empty) inviteDoc = snap.docs[0];
-    }
-    if (!inviteDoc) return;
-    const inv = inviteDoc.data();
-    await db.collection('users').doc(u.uid).set({
-      name: u.displayName || inv.name || '',
-      email: u.email || inv.email || '',
-      phone: inv.phone || '',
-      uid: u.uid,
-      vanRentalProfile: {
-        birthdate: '',
-        licenseExp: inv.licenseExp || '',
-        cdl: null,
-        atFaultAccidents3yr: null,
-        atFaultAccidentsDetails: '',
-        movingViolations3yr: null,
-        movingViolationsDetails: '',
-        insuranceCancelled: null,
-        licenseRevokedSuspended: null,
-        licenseVerifiedInPerson: inv.licenseVerifiedInPerson || false,
-        status: 'needs_info',
-        createdAt: Date.now(),
-        addedByAdmin: true
-      }
-    }, {
-      merge: true
-    });
-    await db.collection('vanDriverInvites').doc(inviteDoc.id).update({
-      claimed: true,
-      claimedBy: u.uid,
-      claimedAt: Date.now()
-    });
-    if (token) {
-      window.history.replaceState({}, '', window.location.pathname);
+    const token = new URLSearchParams(window.location.search).get('invite') || '';
+    try {
+      const res = await firebase.functions().httpsCallable('claimVanDriverInvite')({
+        token
+      });
+      if (token && res.data && res.data.claimed) window.history.replaceState({}, '', window.location.pathname);
+    } catch (e) {
+      console.warn('Invite check skipped:', e && e.message);
     }
   }
+
+  // Tell the admins this person is waiting for approval (one request per person; a repeat write is refused, which is fine).
+  async function fileSignupRequest(u) {
+    try {
+      await db.collection('accessRequests').doc('signup_' + u.uid).set({
+        kind: 'signup',
+        name: u.displayName || u.email || 'New person',
+        email: (u.email || '').toLowerCase(),
+        note: 'New sign-up — waiting for approval to use the hub.',
+        modulesRequested: [],
+        status: 'pending',
+        requestedBy: {
+          uid: u.uid,
+          name: u.displayName || u.email || ''
+        },
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (e) {/* already filed */}
+  }
   useEffect(() => {
-    if (!user) return;
+    if (!user || needsApproval) return;
     const unsubs = [];
     unsubs.push(db.collection('vans').onSnapshot(s => setVans(s.docs.map(d => ({
       id: d.id,
@@ -1610,13 +1613,26 @@ function App() {
     })))));
     setLoadingData(false);
     return () => unsubs.forEach(u => u());
-  }, [user]);
+  }, [user, needsApproval]);
+  const slowHint = slow ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      fontSize: 14,
+      lineHeight: 1.6
+    }
+  }, "This is taking longer than usual. Try opening this page in Safari or Chrome itself (not inside a text-message or email app), check your connection, then ", /*#__PURE__*/React.createElement("a", {
+    href: "",
+    onClick: e => {
+      e.preventDefault();
+      window.location.reload();
+    }
+  }, "reload"), ".") : null;
   if (user === undefined) {
     return /*#__PURE__*/React.createElement("div", {
       className: "app"
     }, /*#__PURE__*/React.createElement("div", {
       className: "loading"
-    }, "Loading..."));
+    }, "Loading...", slowHint));
   }
   if (!user) {
     return /*#__PURE__*/React.createElement("div", {
@@ -1626,12 +1642,50 @@ function App() {
       hubLink: true
     }), /*#__PURE__*/React.createElement(LoginScreen, null));
   }
+  if (needsApproval) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "app"
+    }, /*#__PURE__*/React.createElement(TopBar, {
+      title: "RCC Van Usage",
+      hubLink: true
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "loading",
+      style: {
+        maxWidth: 480,
+        margin: '30px auto',
+        textAlign: 'left',
+        lineHeight: 1.6
+      }
+    }, /*#__PURE__*/React.createElement("b", null, "One more step"), /*#__PURE__*/React.createElement("br", null), "An admin needs to approve your account before you can use the van app. We have let them know, and you will get access as soon as they do. If you were sent an invite link, ask the person who sent it to double-check it, and sign in with the same email address they used."));
+  }
+  if (loadFailed) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "app"
+    }, /*#__PURE__*/React.createElement(TopBar, {
+      title: "RCC Van Usage",
+      hubLink: true
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "loading",
+      style: {
+        maxWidth: 480,
+        margin: '30px auto',
+        textAlign: 'left',
+        lineHeight: 1.6
+      }
+    }, /*#__PURE__*/React.createElement("b", null, "We could not load your info"), /*#__PURE__*/React.createElement("br", null), "Please check your connection and ", /*#__PURE__*/React.createElement("a", {
+      href: "",
+      onClick: e => {
+        e.preventDefault();
+        window.location.reload();
+      }
+    }, "reload"), ". If it keeps happening, tell the church office."));
+  }
   if (loadingData || profile === null) {
     return /*#__PURE__*/React.createElement("div", {
       className: "app"
     }, /*#__PURE__*/React.createElement("div", {
       className: "loading"
-    }, "Loading your info..."));
+    }, "Loading your info...", slowHint));
   }
   return /*#__PURE__*/React.createElement("div", {
     className: "app"
