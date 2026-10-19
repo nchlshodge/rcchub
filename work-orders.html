@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-functions-compat.js"></script>
 <script src="room-logic.js"></script>
 <script src="rcc-audit.js"></script>
 <script src="rcc-shell.js"></script>
@@ -399,6 +400,42 @@
   $('modal').addEventListener('click', function(e){ if (e.target === $('modal')) closeModal(); });
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && $('modal').classList.contains('show')) closeModal(); });
 
+
+  /* ---------- "Email this work order" (staff): sends it to one person with Start / Waiting / Complete buttons ---------- */
+  var teamCache = null;
+  function loadTeam(){
+    if (teamCache) return Promise.resolve(teamCache);
+    return firebase.functions().httpsCallable('workOrderTeam')().then(function(r){ teamCache = (r.data && r.data.team) || []; return teamCache; }).catch(function(){ return []; });
+  }
+  function emailRow(o){
+    var sel = h('select', { id: 'em-to' }, [h('option', { value: '', text: 'Loading…' })]);
+    var other = h('input', { type: 'text', id: 'em-other', maxlength: '120', placeholder: 'name@rochesterchristian.church', style: 'display:none;margin-top:6px;' });
+    var msg = h('input', { type: 'text', id: 'em-msg', maxlength: '500', placeholder: 'Add a note for them (optional)' });
+    var result = h('span', { class: 'help', style: 'align-self:center;' });
+    var already = o.emailedTo ? 'Last emailed to ' + (o.emailedToName || o.emailedTo) + ' on ' + when(o.emailedAt) + '.' : '';
+    loadTeam().then(function(team){
+      sel.replaceChildren();
+      team.forEach(function(m, i){ var op = h('option', { value: m.email, text: (m.name ? m.name + ' — ' : '') + m.email }); if (o.emailedTo ? o.emailedTo === m.email : i === 0) op.selected = true; sel.appendChild(op); });
+      sel.appendChild(h('option', { value: '__other', text: 'Someone else…' }));
+      if (!team.length) { sel.value = '__other'; other.style.display = 'block'; }
+    });
+    sel.addEventListener('change', function(){ other.style.display = sel.value === '__other' ? 'block' : 'none'; });
+    var btn = h('button', { type: 'button', class: 'btn primary', text: 'Email this work order', onclick: function(){
+      var to = sel.value === '__other' ? other.value.trim().toLowerCase() : sel.value;
+      if (!/^[^\s@,;<>]+@rochesterchristian\.church$/.test(to)) { result.textContent = 'Please choose a church email address.'; return; }
+      btn.disabled = true; result.textContent = 'Sending…';
+      firebase.functions().httpsCallable('emailWorkOrder')({ orderId: o.id, to: to, message: msg.value.trim() }).then(function(r){
+        result.textContent = 'Sent to ' + ((r.data && r.data.name) || to) + ' ✓ — they can mark it started or complete from the email.';
+      }).catch(function(e){ result.textContent = 'Could not send: ' + (e && e.message ? e.message : 'please try again.'); }).then(function(){ btn.disabled = false; });
+    } });
+    return h('div', { class: 'staffbox', style: 'grid-template-columns:1fr;' }, [
+      h('div', { class: 'f' }, [h('label', { text: 'Email this work order to' }), sel, other]),
+      h('div', { class: 'f' }, [msg]),
+      h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;' }, [btn, result]),
+      already ? h('div', { class: 'help', text: already + ' The email has one-click buttons to mark it started, waiting, or complete.' }) : h('div', { class: 'help', text: 'They get the details and one-click buttons to mark it started, waiting, or complete — no sign-in needed.' }),
+    ]);
+  }
+
   function drawSheet(o){
     if (commentsUnsub) { commentsUnsub(); commentsUnsub = null; }
     var st = o.status || 'new', sheet = $('sheet'); sheet.replaceChildren();
@@ -438,6 +475,7 @@
           }).catch(function(e){ saved.textContent = 'Could not save: ' + e.message; }).then(function(){ btn.disabled = false; });
         } }), saved]),
       ]));
+      sheet.appendChild(emailRow(o));
     }
 
     var thread = h('div', { class: 'thread' }, [h('h4', { text: 'Conversation' })]), list = h('div', { id: 'cmList' }, [h('div', { class: 'help', text: 'Loading…' })]);
