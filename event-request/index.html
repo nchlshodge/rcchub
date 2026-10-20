@@ -227,6 +227,13 @@
         <span class="grp-err" id="err-size">Choose at least one size.</span>
         <input type="text" id="ev-media-size-other" class="other-input" placeholder="Other size/format" style="width:100%;font:inherit;font-size:16px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);">
       </div>
+      <div class="f" id="f-needby" style="display:none;">
+        <label for="ev-needby">Date you need it by <em>*</em></label>
+        <input type="date" id="ev-needby">
+        <span class="msg">Please choose the date you need it by (today or later).</span>
+        <span style="font-size:13px;color:var(--ink-3);">Please allow at least two weeks for design when you can. The creative team may adjust it with you.</span>
+      </div>
+
 
       <div class="f" style="margin-bottom:0"><label for="ev-media-desc">What's needed? <em>*</em></label><textarea id="ev-media-desc"></textarea><span class="msg">Please describe what you need.</span></div>
     </section>
@@ -348,6 +355,9 @@
   }
   function show(id, on){ $(id).classList.toggle('show', !!on); }
 
+  function todayLocalISO_(){ var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  try { $('ev-needby').min = todayLocalISO_(); } catch(e) {}
+
   function updateVisibleSections(){
     var type = requestType();
     // Church Event: everything. Media Only: just multimedia + marketing.
@@ -356,6 +366,7 @@
     show('ev-section-multimedia',   type==='church_event' || type==='media_only');
     show('ev-section-logistics',    type==='church_event');
     show('ev-section-marketing',    type==='church_event' || type==='media_only');
+    $('f-needby').style.display = type==='media_only' ? '' : 'none';   // graphic-only requests say when they need it
     show('ev-section-wrap', !!type);
     show('ev-submit-wrap', !!type);
     $('err-type').classList.remove('show');
@@ -441,6 +452,7 @@
       flagGroup('err-size', checkedValues('ev-media-size').length === 0, 'f-size');
       flagField('ev-media-desc', !$('ev-media-desc').value.trim());
     }
+    if(type==='media_only'){ var nb = $('ev-needby').value; flagField('ev-needby', !nb || nb < todayLocalISO_()); }
     flagGroup('err-agree', !$('ev-understand').checked, 'f-agree');
     return first;
   }
@@ -463,6 +475,9 @@
     // Staff can always change this later from the Creative Timeline —
     // this is just a sensible starting point, not a locked-in deadline.
     var defaultGraphicDueDate = (mediaSizesVal.length && eventDateVal) ? subtractDays_(eventDateVal, 42) : '';
+    // A graphic-only request has no event to count back from, so the requester's "needed by" date is the due date.
+    var neededBy = type==='media_only' ? $('ev-needby').value : '';
+    if(neededBy) defaultGraphicDueDate = neededBy;
 
     var ticketsChecked = document.querySelector('input[name="tickets"]:checked');
     var request = {
@@ -489,7 +504,7 @@
       marketingOther: $('ev-marketing-other').value,
       status: 'new', // new | approved | denied
       calendarAdded: false,
-      graphicStatus: '', graphicDueDate: defaultGraphicDueDate,
+      graphicStatus: '', graphicDueDate: defaultGraphicDueDate, neededByDate: neededBy,
       marketingStatus: '', marketingDueDate: '',
       vanConfirmed: false,
       submittedAt: firebase.firestore.FieldValue.serverTimestamp(),

@@ -673,6 +673,7 @@
       '<div class="ef" id="edForm">' +
         '<div class="fld"><label class="lbl" for="edTitle">Title</label><input type="text" id="edTitle" value="' + esc(r[titleField(r)] || '') + '"></div>' +
         '<div class="two"><div class="fld"><label class="lbl" for="edDate">Event date</label><input type="date" id="edDate" value="' + esc(r.eventDate || '') + '"></div><div></div></div>' +
+        (hasGraphic(r) ? '<div class="two"><div class="fld"><label class="lbl" for="edGDue">Graphic due date' + (r.neededByDate ? ' <span style="font-weight:400;text-transform:none;letter-spacing:0;">(they asked for ' + esc(fmtDateLine(r.neededByDate)) + ')</span>' : '') + '</label><input type="date" id="edGDue" value="' + esc(r.graphicDueDate || '') + '"></div><div></div></div>' : '') +
         (media ? '' :
           '<div class="two"><div class="fld"><label class="lbl" for="edStart">Start time</label><input type="time" id="edStart" value="' + esc(r.startTime || '') + '"></div>' +
           '<div class="fld"><label class="lbl" for="edEnd">End time</label><input type="time" id="edEnd" value="' + esc(r.endTime || '') + '"></div></div>' +
@@ -722,9 +723,16 @@
         lines.push({ label: 'Room(s)', from: nm(r.onsiteRoom, r.onsiteRoomOther), to: nm(newRooms, newRoomOther) });
       }
     }
+    // a due date typed in directly always wins over the automatic "move it with the event" option
+    const gdEl = $e('edGDue');
+    let manualDue = false;
+    if (gdEl && (gdEl.value || '') !== (r.graphicDueDate || '')) {
+      manualDue = true; changes.graphicDueDate = gdEl.value || '';
+      lines.push({ label: 'Graphic due', from: fmtDateLine(r.graphicDueDate), to: gdEl.value ? fmtDateLine(gdEl.value) : '(none)' });
+    }
     // keep the graphic due date the same distance before the event
     const shift = $e('edShift');
-    if (shift && shift.checked && changes.eventDate && r.eventDate && r.graphicDueDate && newDate) {
+    if (!manualDue && shift && shift.checked && changes.eventDate && r.eventDate && r.graphicDueDate && newDate) {
       const diff = Math.round((parseISO(newDate) - parseISO(r.eventDate)) / DAY);
       if (diff) { const nd = addDays(r.graphicDueDate, diff); changes.graphicDueDate = nd; lines.push({ label: 'Graphic due', from: fmtDateLine(r.graphicDueDate), to: fmtDateLine(nd) }); }
     }
