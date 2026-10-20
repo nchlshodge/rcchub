@@ -104,6 +104,12 @@
   .note-form textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 4px rgba(37,87,184,.12); }
   .row-actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
   .hint { font-size: 12px; color: var(--ink-3); }
+  .due-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .due-row .lbl { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+  .due-row input[type=date] { font: inherit; font-size: 15px; border: 1px solid var(--line-2); border-radius: 10px; padding: 7px 10px; background: #fff; color: var(--ink); }
+  .due-row input[type=date]:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,87,184,.14); }
+  .due-row .ok { color: var(--green-ink); font-weight: 600; }
+  .due-row .miss { color: var(--gold-ink); font-weight: 600; }
 
   dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; font-size: 14px; }
   dl.facts dt { color: var(--ink-3); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding-top: 2px; }
@@ -228,7 +234,7 @@
   let allRequests = [];
   let view = 'cards';
   try { view = localStorage.getItem('eventRequestsView') === 'list' ? 'list' : 'cards'; } catch (e) {}
-  let currentUser = null, isAdmin = false, deepLinkHandled = false;
+  let currentUser = null, isAdmin = false, isGraphics = false, deepLinkHandled = false;
 
   document.getElementById('googleSignInBtn').addEventListener('click', () => {
     auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => alert('Sign-in failed: ' + err.message));
@@ -249,6 +255,7 @@
     const data = doc.exists ? doc.data() : {};
     const roles = data.roles || {};
     isAdmin = data.isAdmin === true;
+    isGraphics = roles.graphics === true;
     RccShell.render(document.getElementById('rccNav'), { active: 'requests', user, onSignOut: () => auth.signOut(), roles: Object.assign({}, roles, { isAdmin }) });
     document.getElementById('accessCheck').hidden = true;
     if (data.isAdmin === true || roles.graphics === true || roles.marketing === true) {
@@ -568,6 +575,17 @@
     return h || '<p class="hint" style="padding:4px 0;">No notes yet. Add the first one below.</p>';
   }
 
+  // The graphic's due date, set right inside Progress (admins and the graphics team). Saves as soon as a date is picked.
+  let dueFlash = null;   // { id, text, until } — a short "Saved" message that survives the panel redrawing
+  function dueRowHtml(r) {
+    if (!hasGraphic(r)) return '';
+    const can = isAdmin || isGraphics;
+    const asked = r.neededByDate && r.neededByDate !== r.graphicDueDate ? ' <span class="hint">(they asked for ' + esc(fmtDateLine(r.neededByDate)) + ')</span>' : '';
+    const flash = dueFlash && dueFlash.id === r.id && dueFlash.until > Date.now() ? '<span class="ok" id="gDueMsg">' + esc(dueFlash.text) + '</span>' : '<span id="gDueMsg"></span>';
+    if (!can) return '<div class="due-row"><span class="lbl">Graphic due</span><span>' + (r.graphicDueDate ? esc(fmtDateLine(r.graphicDueDate)) : '<span class="miss">No date set</span>') + '</span>' + asked + '</div>';
+    return '<div class="due-row"><label class="lbl" for="gDue">Graphic due</label><input type="date" id="gDue" value="' + esc(r.graphicDueDate || '') + '">' + flash + (r.graphicDueDate ? '' : '<span class="miss">No date set yet — pick one</span>') + asked + '</div>';
+  }
+
   function drawDrawer() {
     const r = allRequests.find(x => x.id === openId);
     if (!r) { closeDetail(); return; }
@@ -580,7 +598,7 @@
     body.innerHTML =
       '<div class="p-head"><h2 class="p-title">' + esc(titleOf(r)) + '</h2>' + (isAdmin ? '<button type="button" class="btn small soft" id="editStart">Edit request</button>' : '') + '</div>' +
       '<div class="p-sec"><div class="er-chips">' + statusChip(r) + typeChip(r) + arr(r.department).map(x => '<span class="pill gray">' + esc(x) + '</span>').join('') + '</div></div>' +
-      '<div class="p-sec"><h4>Progress</h4><div class="box">' + stepsHtml(r) + '</div></div>' +
+      '<div class="p-sec"><h4>Progress</h4><div class="box">' + stepsHtml(r) + dueRowHtml(r) + '</div></div>' +
       '<div class="p-sec"><h4>Notes &amp; updates</h4><div class="notes-list" id="notesList">' + notesHtml() + '</div>' +
         '<div class="note-form"><textarea id="noteInput" maxlength="2000" placeholder="Add a note — new details, a change of plans, something to remember…"></textarea>' +
         '<div class="row-actions"><span class="hint">Everyone with access to this page sees notes.</span><button type="button" class="btn primary small" id="noteSave">Add note</button></div></div></div>' +
@@ -641,6 +659,23 @@
       db.collection('eventRequests').doc(openId).collection('notes').doc(del.dataset.delNote).delete()
         .catch(err => alert('Could not delete: ' + err.message));
     }
+  });
+
+  // pick a date -> saved (with a note and a record of who did it)
+  document.getElementById('drawerBody').addEventListener('change', async e => {
+    if (e.target.id !== 'gDue' || !openId) return;
+    const r = allRequests.find(x => x.id === openId); if (!r || !(isAdmin || isGraphics)) return;
+    const v = e.target.value || '', before = r.graphicDueDate || '';
+    if (v === before) return;
+    const msg = document.getElementById('gDueMsg'); if (msg) msg.textContent = 'Saving…';
+    try { await db.collection('eventRequests').doc(openId).update({ graphicDueDate: v }); }
+    catch (err) { e.target.value = before; if (msg) msg.textContent = 'Could not save: ' + err.message; return; }
+    const from = before ? fmtDateLine(before) : '(none)', to = v ? fmtDateLine(v) : '(none)';
+    RccAudit.log('event.edit', 'eventRequest', r.id, '"' + titleOf(r) + '" graphic due date: ' + from + ' → ' + to);
+    const who = currentUser.displayName || currentUser.email || 'Staff';
+    db.collection('eventRequests').doc(r.id).collection('notes').add({ text: ('Graphic due date ' + (v ? 'set to ' + to : 'cleared') + ' by ' + who + (before ? ' (was ' + from + ')' : '')).slice(0, 2000), authorUid: currentUser.uid, authorName: who, createdAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+    dueFlash = { id: r.id, text: v ? 'Saved ✓' : 'Cleared ✓', until: Date.now() + 6000 };
+    if (msg) msg.textContent = dueFlash.text;
   });
 
   /* ---------- admin: edit a request after it was submitted ---------- */
