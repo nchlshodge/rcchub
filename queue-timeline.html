@@ -372,7 +372,7 @@
     const hasMarketing = marketingHasWork(r.marketing);
     const relevant = hasCalendar || hasGraphic || hasMarketing;
 
-    const completed = relevant &&
+    const completed = r.completed === true || relevant &&
       (!hasCalendar || r.calendarAdded === true) &&
       (!hasGraphic || r.graphicStatus === 'Completed') &&
       (!hasMarketing || r.marketingStatus === 'Completed');
@@ -555,7 +555,7 @@
     if (canGraphic && r.hasGraphic && r.graphicStatus !== 'Completed') completable.push('graphicStatus');
     if (canMarketing && r.hasMarketing && r.marketingStatus !== 'Completed') completable.push('marketingStatus');
     const completeLabel = completable.length > 1 ? 'Mark all complete' : completable[0] === 'calendarAdded' ? 'Mark calendar added' : completable[0] === 'graphicStatus' ? 'Mark graphic complete' : completable[0] === 'marketingStatus' ? 'Mark marketing complete' : '';
-    const completeBtn = completable.length && !r.pending ? `<button type="button" class="btn small good" data-action="complete-all" data-id="${r.id}" data-fields="${completable.join(',')}">${completeLabel}</button>` : '';
+    const completeBtn = completable.length && !r.pending && !r.completed ? `<button type="button" class="btn small good" data-action="complete-all" data-id="${r.id}" data-fields="${completable.join(',')}">${completeLabel}</button>` : '';
 
     let pendingBadge = '';
     if (r.pending && !r.completed) {

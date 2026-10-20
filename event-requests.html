@@ -433,6 +433,7 @@
 
   function statusChip(r) {
     const s = statusOf(r);
+    if (r.completed === true && s === 'approved') return '<span class="pill green">✓ Completed</span>';
     return '<span class="pill ' + (s === 'approved' ? 'green' : s === 'denied' ? 'gray' : 'blue') + '">' + (s === 'new' ? 'Needs approval' : s === 'approved' ? 'Approved' : 'Denied') + '</span>';
   }
   function typeChip(r) { return r.requestType ? '<span class="pill gray">' + esc(TYPE_LABELS[r.requestType] || r.requestType) + '</span>' : ''; }
@@ -478,13 +479,16 @@
     const el = document.getElementById('content');
     if (!list.length) { el.innerHTML = '<div class="empty"><b>Nothing here</b>No requests match these filters.</div>'; return; }
 
-    const pastWasOpen = !!el.querySelector('details.past-group[open]');
-    const upcoming = [], past = [], undated = [], overdue = [];
+    const pastWasOpen = !!el.querySelector('details.past-group:not(.done-group)[open]');
+    const doneWasOpen = !!el.querySelector('details.done-group[open]');
+    const upcoming = [], past = [], undated = [], overdue = [], doneList = [];
     list.forEach(r => {
       const d = placeDate(r);
-      if (!d) undated.push(r); else if (graphicOverdue(r)) overdue.push(r); else if (d < TODAY) past.push(r); else upcoming.push(r);
+      if (r.completed === true && statusOf(r) === 'approved') doneList.push(r);
+      else if (!d) undated.push(r); else if (graphicOverdue(r)) overdue.push(r); else if (d < TODAY) past.push(r); else upcoming.push(r);
     });
     overdue.sort(byDate);
+    doneList.sort((a, b) => String(b.completedAt || '').localeCompare(String(a.completedAt || '')));   // most recently completed first
     upcoming.sort(byDate);
     past.sort((a, b) => byDate(b, a)); // most recent past event first
     undated.sort((a, b) => (submittedDate(b) || 0) - (submittedDate(a) || 0));
@@ -508,6 +512,7 @@
     if (!upcoming.length && !overdue.length) html += '<div class="empty" style="padding:24px 0"><b>No upcoming events</b>No dated events match these filters.</div>';
     if (undated.length) html += head('No date yet', undated.length) + draw(undated);
     if (past.length) html += '<details class="past-group"' + (pastWasOpen ? ' open' : '') + '><summary>Past events <span class="n">' + past.length + '</span></summary>' + draw(past) + '</details>';
+    if (doneList.length) html += '<details class="past-group done-group"' + (doneWasOpen ? ' open' : '') + '><summary>Completed <span class="n">' + doneList.length + '</span></summary>' + draw(doneList) + '</details>';
     el.innerHTML = html;
   }
 
@@ -561,6 +566,10 @@
     if (d) {
       const over = d < TODAY;
       steps.push({ state: over ? 'done' : 'todo', title: over ? 'Event has happened' : 'Event day', sub: fmtLong(d) + (whenLabel(d) ? ' · ' + whenLabel(d) : '') });
+    }
+    if (r.completed === true) {
+      const cd = r.completedAt ? new Date(r.completedAt) : null;
+      steps.push({ state: 'done', title: 'Completed', sub: cd && !isNaN(cd) ? cd.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '' });
     }
     return steps;
   }
@@ -616,6 +625,17 @@
     return '<details class="asform box"><summary>The form as submitted</summary><dl>' + rows.join('') + '</dl></details>';
   }
 
+  // Wrap-up: an admin marks the whole request complete (or reopens it). Moves it to "Completed" and takes it off the
+  // Creative Timeline and the reminders; nothing else about it changes.
+  function completeRowHtml(r) {
+    if (!isAdmin || statusOf(r) !== 'approved') return '';
+    if (r.completed === true) {
+      const cd = r.completedAt ? new Date(r.completedAt) : null;
+      return '<div class="p-sec"><div class="box" style="background:var(--green-soft);border-color:transparent;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;"><span><b>✓ Completed</b>' + (cd && !isNaN(cd) ? ' on ' + esc(cd.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) : '') + '</span><button type="button" class="btn small" id="reopenReq">Reopen</button></div></div>';
+    }
+    return '<div class="p-sec"><button type="button" class="btn good" id="markComplete">✓ Mark this request complete</button> <span class="hint">Moves it to Completed and takes it off the Creative Timeline and reminders.</span></div>';
+  }
+
   // The graphic's due date, set right inside Progress (admins and the graphics team). Saves as soon as a date is picked.
   let dueFlash = null;   // { id, text, until } — a short "Saved" message that survives the panel redrawing
   function dueRowHtml(r) {
@@ -639,6 +659,7 @@
     body.innerHTML =
       '<div class="p-head"><h2 class="p-title">' + esc(titleOf(r)) + '</h2>' + (isAdmin ? '<button type="button" class="btn small soft" id="editStart">Edit request</button>' : '') + '</div>' +
       '<div class="p-sec"><div class="er-chips">' + statusChip(r) + typeChip(r) + arr(r.department).map(x => '<span class="pill gray">' + esc(x) + '</span>').join('') + '</div></div>' +
+      completeRowHtml(r) +
       '<div class="p-sec"><h4>Progress</h4><div class="box">' + stepsHtml(r) + dueRowHtml(r) + '</div></div>' +
       '<div class="p-sec"><h4>Notes &amp; updates</h4><div class="notes-list" id="notesList">' + notesHtml() + '</div>' +
         '<div class="note-form"><textarea id="noteInput" maxlength="2000" placeholder="Add a note — new details, a change of plans, something to remember…"></textarea>' +
@@ -694,6 +715,19 @@
         input.value = '';
       } catch (err) { alert('Could not save the note: ' + err.message); }
       btn.disabled = false;
+      return;
+    }
+    if ((e.target.id === 'markComplete' || e.target.id === 'reopenReq') && openId && isAdmin) {
+      const r = allRequests.find(x => x.id === openId); if (!r) return;
+      const done = e.target.id === 'markComplete';
+      if (done && !confirm('Mark "' + titleOf(r) + '" complete?\n\nIt moves to Completed and drops off the Creative Timeline and reminders. You can reopen it any time.')) return;
+      const btn = e.target; btn.disabled = true;
+      const patch = done ? { completed: true, completedAt: new Date().toISOString(), completedBy: currentUser.uid } : { completed: false };
+      try { await db.collection('eventRequests').doc(r.id).update(patch); }
+      catch (err) { btn.disabled = false; alert('Could not save: ' + err.message); return; }
+      const who = currentUser.displayName || currentUser.email || 'An admin';
+      RccAudit.log(done ? 'event.complete' : 'event.reopen', 'eventRequest', r.id, '"' + titleOf(r) + '" ' + (done ? 'marked complete' : 'reopened'));
+      db.collection('eventRequests').doc(r.id).collection('notes').add({ text: (done ? 'Marked complete by ' : 'Reopened by ') + who, authorUid: currentUser.uid, authorName: who, createdAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {});
       return;
     }
     const del = e.target.closest('[data-del-note]');
