@@ -104,6 +104,14 @@
   .note-form textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 4px rgba(37,87,184,.12); }
   .row-actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
   .hint { font-size: 12px; color: var(--ink-3); }
+  details.asform > summary { cursor: pointer; font-weight: 600; font-size: 14px; color: var(--blue-ink); list-style: none; }
+  details.asform > summary::-webkit-details-marker { display: none; }
+  details.asform > summary::before { content: '▸ '; }
+  details.asform[open] > summary::before { content: '▾ '; }
+  .asform dl { display: grid; grid-template-columns: minmax(120px, 36%) 1fr; gap: 8px 14px; margin: 12px 0 0; font-size: 14px; }
+  .asform dt { color: var(--ink-3); font-size: 12.5px; padding-top: 1px; }
+  .asform dd { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  .asform h5 { grid-column: 1 / -1; margin: 10px 0 0; font-family: 'Inter', sans-serif; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
   .due-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
   .due-row .lbl { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
   .due-row input[type=date] { font: inherit; font-size: 15px; border: 1px solid var(--line-2); border-radius: 10px; padding: 7px 10px; background: #fff; color: var(--ink); }
@@ -583,6 +591,31 @@
     return h || '<p class="hint" style="padding:4px 0;">No notes yet. Add the first one below.</p>';
   }
 
+  // Every question on the request form, in order, with what was answered (or "left blank") — for checking what was really submitted.
+  function formAsSubmittedHtml(r) {
+    const t = r.requestType, ev = t === 'church_event' || t === 'facilities', gfx = t === 'church_event' || t === 'media_only';
+    const rows = [];
+    const sec = label => rows.push('<h5>' + esc(label) + '</h5>');
+    const q = (label, val) => { const v = Array.isArray(val) ? val.filter(Boolean).join(', ') : (val == null ? '' : String(val).trim()); rows.push('<dt>' + esc(label) + '</dt><dd>' + (v ? esc(v) : '<span class="hint">left blank</span>') + '</dd>'); };
+    sec('About you');
+    q('Type of request', TYPE_LABELS[t] || t); q('Name', r.requesterName); q('Email', r.email); q('Department(s)', r.department);
+    if (ev) {
+      sec('Event details');
+      q('Event title', r.eventTitle); q('Description', r.eventDesc); q('Date', r.eventDate ? fmtDateLine(r.eventDate) : ''); q('Start time', r.startTime); q('End time', r.endTime);
+      q('Where', r.location); q('Room(s)', arr(r.onsiteRoom).concat(r.onsiteRoomOther ? ['Other: ' + r.onsiteRoomOther] : []));
+    }
+    if (gfx) {
+      sec('Graphics');
+      q('Project / graphic title', r.projectTitle); q('Size(s) needed', arr(r.mediaSizes).concat(r.mediaSizeOther ? ['Other: ' + r.mediaSizeOther] : [])); q("What's needed", r.mediaDesc);
+      if (t === 'media_only') q('Date needed by', r.neededByDate ? fmtDateLine(r.neededByDate) : '');
+    }
+    if (t === 'church_event') { sec('Logistics'); q('Vans needed', r.vansNeeded); q('Tickets', r.ticketsNeeded); q('Ticket price', r.ticketPrice); }
+    if (gfx) { sec('Marketing'); q('Marketing needed', arr(r.marketing).concat(r.marketingOther ? ['Other: ' + r.marketingOther] : [])); }
+    const sd = submittedDate(r);
+    sec('Submitted'); q('Submitted on', sd ? sd.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : '');
+    return '<details class="asform box"><summary>The form as submitted</summary><dl>' + rows.join('') + '</dl></details>';
+  }
+
   // The graphic's due date, set right inside Progress (admins and the graphics team). Saves as soon as a date is picked.
   let dueFlash = null;   // { id, text, until } — a short "Saved" message that survives the panel redrawing
   function dueRowHtml(r) {
@@ -610,7 +643,8 @@
       '<div class="p-sec"><h4>Notes &amp; updates</h4><div class="notes-list" id="notesList">' + notesHtml() + '</div>' +
         '<div class="note-form"><textarea id="noteInput" maxlength="2000" placeholder="Add a note — new details, a change of plans, something to remember…"></textarea>' +
         '<div class="row-actions"><span class="hint">Everyone with access to this page sees notes.</span><button type="button" class="btn primary small" id="noteSave">Add note</button></div></div></div>' +
-      '<div class="p-sec"><h4>Details</h4><div class="box">' + (factsHtml(r) || '<span class="hint">No details.</span>') + '</div></div>';
+      '<div class="p-sec"><h4>Details</h4><div class="box">' + (factsHtml(r) || '<span class="hint">No details.</span>') + '</div></div>' +
+      '<div class="p-sec">' + formAsSubmittedHtml(r) + '</div>';
     const input = document.getElementById('noteInput');
     input.value = draft;
     if (hadFocus) input.focus();
