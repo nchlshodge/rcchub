@@ -957,13 +957,15 @@ function AdminDashboard({
   maintenanceNotes,
   repairLog,
   alerts,
+  mileageFlags,
   recurringRequests
 }) {
-  const [tab, setTab] = useState('approvals');
+  const [tab, setTab] = useState(window.location.hash === '#mileage' ? 'mileage' : 'approvals');
   const driverUsers = allUsers.filter(u => u.vanRentalProfile);
   const pending = driverUsers.filter(u => u.vanRentalProfile.status === 'pending');
   const approved = driverUsers.filter(u => u.vanRentalProfile.status === 'approved');
   const openAlerts = alerts.filter(a => !a.resolved);
+  const openMileage = (mileageFlags || []).filter(f => (f.status || 'open') === 'open');
   const recurringPendingCount = recurringRequests.filter(r => r.status === 'pending' || r.status === 'renewal_requested').length;
   const driverName = uid_ => ((allUsers || []).find(u => u.id === uid_) || {}).name || uid_;
   const vanLabel = id => ((vans || []).find(v => v.id === id) || {}).name || id;
@@ -1083,6 +1085,15 @@ function AdminDashboard({
     await db.collection('vanAlerts').doc(id).update({
       resolved: true
     });
+  }
+  async function explainMileage(id, note) {
+    await db.collection('vanMileageFlags').doc(id).update({
+      status: 'explained',
+      note: note || '',
+      resolvedAt: new Date().toISOString(),
+      resolvedBy: currentUserUid()
+    });
+    RccAudit.log('van.mileageExplained', 'vanMileageFlag', id, 'Marked a van mileage gap explained' + (note ? ': ' + note : ''));
   }
   async function addWarningLight(name, safety, feedback, vanId) {
     await db.collection('vanWarningLights').add({
@@ -1478,6 +1489,9 @@ function AdminDashboard({
     className: tab === 'lights' ? 'active' : '',
     onClick: () => setTab('lights')
   }, "Lights"), /*#__PURE__*/React.createElement("button", {
+    className: tab === 'mileage' ? 'active' : '',
+    onClick: () => setTab('mileage')
+  }, "Mileage", openMileage.length > 0 ? ` (${openMileage.length})` : ''), /*#__PURE__*/React.createElement("button", {
     className: tab === 'alerts' ? 'active' : '',
     onClick: () => setTab('alerts')
   }, "Alerts", openAlerts.length > 0 ? ` (${openAlerts.length})` : ''), /*#__PURE__*/React.createElement("button", {
@@ -1570,6 +1584,9 @@ function AdminDashboard({
     vans: vans,
     repairLog: repairLog,
     onAdd: addRepair
+  }), tab === 'mileage' && /*#__PURE__*/React.createElement(MileageAdmin, {
+    flags: mileageFlags || [],
+    onExplain: explainMileage
   }), tab === 'lights' && /*#__PURE__*/React.createElement(WarningLightsAdmin, {
     vans: vans,
     warningLights: warningLights,
@@ -2514,6 +2531,151 @@ function ScheduleAdmin({
     onClick: submit
   }, "Add to Schedule"));
 }
+
+// Unrecorded miles: the odometer at a check-out was well above the last reading (or lower than it should be).
+function MileageAdmin({
+  flags,
+  onExplain
+}) {
+  const [threshold, setThreshold] = useState('');
+  const [saved, setSaved] = useState('');
+  const [noteFor, setNoteFor] = useState(null);
+  const [note, setNote] = useState('');
+  useEffect(() => {
+    db.collection('settings').doc('vanMileage').get().then(d => setThreshold(d.exists && d.data().threshold != null ? String(d.data().threshold) : '10')).catch(() => setThreshold('10'));
+  }, []);
+  async function saveThreshold() {
+    const n = Number(threshold);
+    if (!Number.isFinite(n) || n < 0) {
+      setSaved('Enter a number of miles.');
+      return;
+    }
+    try {
+      await db.collection('settings').doc('vanMileage').set({
+        threshold: n
+      }, {
+        merge: true
+      });
+      setSaved('Saved ✓');
+      RccAudit.log('van.mileageThreshold', 'settings', 'vanMileage', 'Mileage flag limit set to ' + n + ' miles');
+    } catch (e) {
+      setSaved('Could not save: ' + e.message);
+    }
+  }
+  const stamp = f => {
+    const t = f.createdAt && f.createdAt.toDate ? f.createdAt.toDate() : null;
+    return t ? t.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    }) : '';
+  };
+  const byNewest = (a, b) => (b.cur && b.cur.at || 0) - (a.cur && a.cur.at || 0);
+  const open = flags.filter(f => (f.status || 'open') === 'open').sort(byNewest);
+  const done = flags.filter(f => f.status === 'explained').sort(byNewest);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Unrecorded miles"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Every check-out and check-in records the odometer. When a van's reading at check-out is well above where it was last left, someone drove it without a booking. A reading that is lower than the last one is flagged too (usually a typo). Admins are emailed when one appears."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: 8,
+      alignItems: 'center',
+      margin: '10px 0 16px'
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Flag a gap bigger than"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0",
+    style: {
+      width: 80
+    },
+    value: threshold,
+    onChange: e => {
+      setThreshold(e.target.value);
+      setSaved('');
+    }
+  }), /*#__PURE__*/React.createElement("span", null, "miles"), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    onClick: saveThreshold
+  }, "Save"), /*#__PURE__*/React.createElement("span", {
+    className: "muted"
+  }, saved)), open.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Nothing to review — no unexplained mileage."), open.map(f => /*#__PURE__*/React.createElement("div", {
+    key: f.id,
+    className: "list-item",
+    style: {
+      flexDirection: 'column',
+      alignItems: 'stretch'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, f.vanName || 'A van'), " · ", f.type === 'lower' ? 'odometer went down' : `${f.miles} unrecorded miles`, " ", /*#__PURE__*/React.createElement("span", {
+    className: "muted"
+  }, "· flagged ", stamp(f))), /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      marginTop: 4
+    }
+  }, f.summary), noteFor === f.id ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    style: {
+      flex: '1 1 220px'
+    },
+    placeholder: "What explains it? (optional) e.g. church errand, reading typo",
+    value: note,
+    onChange: e => setNote(e.target.value)
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    onClick: async () => {
+      await onExplain(f.id, note.trim());
+      setNoteFor(null);
+      setNote('');
+    }
+  }, "Save"), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    onClick: () => {
+      setNoteFor(null);
+      setNote('');
+    }
+  }, "Cancel")) : /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 8
+    },
+    onClick: () => {
+      setNoteFor(f.id);
+      setNote('');
+    }
+  }, "Mark explained"))), done.length > 0 && /*#__PURE__*/React.createElement("details", {
+    style: {
+      marginTop: 14
+    }
+  }, /*#__PURE__*/React.createElement("summary", {
+    className: "muted",
+    style: {
+      cursor: 'pointer'
+    }
+  }, "Explained (", done.length, ")"), done.slice(0, 15).map(f => /*#__PURE__*/React.createElement("div", {
+    key: f.id,
+    className: "list-item",
+    style: {
+      flexDirection: 'column',
+      alignItems: 'stretch',
+      opacity: 0.7
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, f.vanName || 'A van'), " · ", f.type === 'lower' ? 'odometer went down' : `${f.miles} miles`), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, f.summary), f.note && /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, /*#__PURE__*/React.createElement("em", null, "Explained: ", f.note))))));
+}
 function RepairsAdmin({
   vans,
   repairLog,
@@ -2694,6 +2856,7 @@ function AdminDataLoader({
   const [maintenanceNotes, setMaintenanceNotes] = useState([]);
   const [repairLog, setRepairLog] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [mileageFlags, setMileageFlags] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [recurringRequests, setRecurringRequests] = useState([]);
   const [ready, setReady] = useState(false);
@@ -2711,6 +2874,10 @@ function AdminDataLoader({
       id: d.id,
       ...d.data()
     })))));
+    unsubs.push(db.collection('vanMileageFlags').onSnapshot(s => setMileageFlags(s.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }))), () => {}));
     unsubs.push(db.collection('vanRecurringRequests').onSnapshot(s => setRecurringRequests(s.docs.map(d => ({
       id: d.id,
       ...d.data()
@@ -2739,6 +2906,7 @@ function AdminDataLoader({
     maintenanceNotes: maintenanceNotes,
     repairLog: repairLog,
     alerts: alerts,
+    mileageFlags: mileageFlags,
     recurringRequests: recurringRequests
   });
 }
