@@ -11,6 +11,7 @@
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 
+<script src="odometer-read.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -317,6 +318,116 @@ async function uploadPhoto(file, path) {
   const ref = storage.ref().child(path);
   await ref.put(file);
   return await ref.getDownloadURL();
+}
+
+// Shrinks a phone photo (often 3-5 MB) before it is saved.
+async function shrinkImage(file, max) {
+  try {
+    if (!window.createImageBitmap) return file;
+    const bmp = await createImageBitmap(file, {
+      imageOrientation: 'from-image'
+    });
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * k);
+    c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise(res => c.toBlob(b => res(b || file), 'image/jpeg', 0.82));
+  } catch (e) {
+    return file;
+  }
+}
+
+// Odometer close-up: the driver photographs the number, the phone reads it (free, on the phone) and suggests it,
+// and the driver confirms or fixes it. Both the photo and what was read are saved.
+function OdometerShot({
+  van,
+  rentalId,
+  prefix,
+  photoUrl,
+  mileage,
+  setMileage,
+  onResult
+}) {
+  const inputRef = useRef();
+  const [phase, setPhase] = useState(photoUrl ? 'saved' : 'idle'); // idle | working | read | unread | error | saved
+  const [read, setRead] = useState(null);
+  async function onFile(file) {
+    setPhase('working');
+    try {
+      const small = await shrinkImage(file, 1600);
+      const saving = uploadPhoto(small, `vanRentalPhotos/${rentalId}/${prefix}odo-${uid()}.jpg`);
+      let value = null;
+      try {
+        value = await window.OdometerRead.readFile(file, van.mileage);
+      } catch (e) {
+        console.warn('Odometer read skipped:', e && e.message);
+      }
+      const url = await saving;
+      setRead(value);
+      onResult(url, value);
+      if (value != null && !mileage) setMileage(String(value));
+      setPhase(value != null ? 'read' : 'unread');
+    } catch (e) {
+      console.warn('Odometer photo failed:', e && e.message);
+      setPhase('error');
+    }
+  }
+  const fmt = n => Number(n).toLocaleString('en-US', {
+    maximumFractionDigits: 1
+  });
+  const differs = phase === 'read' && mileage && Number(mileage) !== read;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "camera-box"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, /*#__PURE__*/React.createElement("strong", null, "Odometer close-up"), " — turn the ignition on so the display is lit, then get close so the mileage fills the photo."), /*#__PURE__*/React.createElement("input", {
+    ref: inputRef,
+    type: "file",
+    accept: "image/*",
+    capture: "environment",
+    style: {
+      display: 'none'
+    },
+    onChange: e => {
+      const f = e.target.files[0];
+      e.target.value = '';
+      if (f) onFile(f);
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "secondary",
+    style: {
+      marginTop: 10
+    },
+    onClick: () => inputRef.current.click(),
+    disabled: phase === 'working'
+  }, "📷 ", phase === 'working' ? 'Reading the photo…' : photoUrl ? 'Retake close-up' : 'Take close-up of the odometer'), phase === 'working' && /*#__PURE__*/React.createElement("div", {
+    className: "upload-progress"
+  }, "Saving and reading the photo — the first time can take a few seconds."), photoUrl && phase !== 'working' && /*#__PURE__*/React.createElement("img", {
+    src: photoUrl,
+    alt: "odometer close-up"
+  }), phase === 'read' && !differs && /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      marginTop: 8
+    }
+  }, "We read ", /*#__PURE__*/React.createElement("strong", null, fmt(read)), " from the photo. Please check that it matches the display, and fix the number below if it doesn't."), differs && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      color: '#7a5a14'
+    }
+  }, "We read ", /*#__PURE__*/React.createElement("strong", null, fmt(read)), " from the photo, but the number below is ", /*#__PURE__*/React.createElement("strong", null, fmt(mileage)), ". Please look at the display again and make sure the number below is right."), phase === 'unread' && /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      marginTop: 8
+    }
+  }, "We couldn't read the number from the photo — please type it below. If the photo is blurry or dark, retake it."), phase === 'error' && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      color: '#a8352f'
+    }
+  }, "The photo didn't save. Please check your connection and try again."));
 }
 
 // ---------- Driver Application ----------
@@ -821,6 +932,8 @@ function CheckoutFlow({
   const [gas, setGas] = useState(draft.gas ?? null);
   const [dashPhoto, setDashPhoto] = useState(draft.dashPhoto || null);
   const [dashUploading, setDashUploading] = useState(false);
+  const [odoPhoto, setOdoPhoto] = useState(draft.odoPhoto || null);
+  const [odoRead, setOdoRead] = useState(draft.odoRead ?? null);
   const [checkedLights, setCheckedLights] = useState(draft.checkedLights || []);
   const [otherLightChecked, setOtherLightChecked] = useState(draft.otherLightChecked || false);
   const [otherLightDesc, setOtherLightDesc] = useState(draft.otherLightDesc || '');
@@ -863,6 +976,8 @@ function CheckoutFlow({
         mileage,
         gas,
         dashPhoto,
+        odoPhoto,
+        odoRead,
         checkedLights: lightIds,
         otherLightChecked,
         otherLightDesc
@@ -881,7 +996,7 @@ function CheckoutFlow({
       resolved: false
     });
   }
-  const canSubmit = keysConfirmed && mileage && gas !== null && dashPhoto && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && clean !== null && cleanPhoto && confirmed && !saving;
+  const canSubmit = keysConfirmed && mileage && gas !== null && dashPhoto && odoPhoto && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && clean !== null && cleanPhoto && confirmed && !saving;
   async function finishCheckout() {
     setSaving(true);
     const lightNames = checkedLights.map(id => relevantLights.find(l => l.id === id)?.name).filter(Boolean);
@@ -890,6 +1005,8 @@ function CheckoutFlow({
         mileage,
         gas,
         dashPhoto,
+        odoPhoto,
+        odoRead,
         warningLightsOn: lightNames,
         otherLightReported: otherLightChecked,
         otherLightDesc,
@@ -954,6 +1071,17 @@ function CheckoutFlow({
     photoUrl: dashPhoto,
     uploading: dashUploading,
     onCapture: f => handlePhoto(f, setDashPhoto, setDashUploading)
+  }), /*#__PURE__*/React.createElement(OdometerShot, {
+    van: van,
+    rentalId: rental.id,
+    prefix: "",
+    photoUrl: odoPhoto,
+    mileage: mileage,
+    setMileage: setMileage,
+    onResult: (u, v) => {
+      setOdoPhoto(u);
+      setOdoRead(v);
+    }
   }), /*#__PURE__*/React.createElement("label", null, "Current Odometer Reading"), /*#__PURE__*/React.createElement("input", {
     type: "number",
     value: mileage,
@@ -1077,6 +1205,8 @@ function ReturnFlow({
   const [clean, setClean] = useState(null);
   const [cleanPhoto, setCleanPhoto] = useState(null);
   const [cleanUploading, setCleanUploading] = useState(false);
+  const [odoPhoto, setOdoPhoto] = useState(null);
+  const [odoRead, setOdoRead] = useState(null);
   const [checkedLights, setCheckedLights] = useState([]);
   const [otherLightChecked, setOtherLightChecked] = useState(false);
   const [otherLightDesc, setOtherLightDesc] = useState('');
@@ -1092,7 +1222,7 @@ function ReturnFlow({
   function toggleLight(id) {
     setCheckedLights(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
-  const canSubmit = mileage && gas !== null && clean !== null && cleanPhoto && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && problems !== null && !saving;
+  const canSubmit = mileage && gas !== null && clean !== null && cleanPhoto && odoPhoto && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && problems !== null && !saving;
   async function handlePhoto(file) {
     setCleanUploading(true);
     const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/return-${uid()}.jpg`);
@@ -1109,6 +1239,8 @@ function ReturnFlow({
         gas,
         clean,
         cleanPhoto,
+        odoPhoto,
+        odoRead,
         warningLightsOn: lightNames,
         otherLightReported: otherLightChecked,
         otherLightDesc,
@@ -1153,7 +1285,18 @@ function ReturnFlow({
     className: "card"
   }, /*#__PURE__*/React.createElement("h2", null, "Return the Van"), /*#__PURE__*/React.createElement("p", {
     className: "muted"
-  }, "Any approved driver can complete this check-in — doesn't have to be whoever originally checked it out."), /*#__PURE__*/React.createElement("label", null, "Final Odometer Reading"), /*#__PURE__*/React.createElement("input", {
+  }, "Any approved driver can complete this check-in — doesn't have to be whoever originally checked it out."), /*#__PURE__*/React.createElement(OdometerShot, {
+    van: van,
+    rentalId: rental.id,
+    prefix: "return-",
+    photoUrl: odoPhoto,
+    mileage: mileage,
+    setMileage: setMileage,
+    onResult: (u, v) => {
+      setOdoPhoto(u);
+      setOdoRead(v);
+    }
+  }), /*#__PURE__*/React.createElement("label", null, "Final Odometer Reading"), /*#__PURE__*/React.createElement("input", {
     type: "number",
     value: mileage,
     onChange: e => setMileage(e.target.value)
