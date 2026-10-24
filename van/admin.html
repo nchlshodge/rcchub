@@ -578,6 +578,79 @@ function AddVanForm({
     onClick: submit
   }, saving ? 'Adding...' : 'Add Van'));
 }
+
+// A ready-written invite/reminder note for someone who hasn't signed in yet, sent from the admin's own email or phone
+// (mailto: / sms:), or copied to paste anywhere.
+// The link a driver opens: the DRIVER app (index.html), never this admin page.
+function driverInviteUrl(token) {
+  const u = new URL(window.location.href);
+  u.pathname = u.pathname.replace(/admin\.html$/, 'index.html');
+  u.search = '';
+  u.hash = '';
+  u.searchParams.set('invite', token);
+  return u.toString();
+}
+function inviteNote(inv, url, isReminder) {
+  const first = String(inv.name || '').trim().split(/\s+/)[0] || 'there';
+  const me = (auth.currentUser && auth.currentUser.displayName || '').split(' ')[0] || 'Rochester Christian Church';
+  return {
+    subject: (isReminder ? 'Reminder: ' : '') + 'Set up your Rochester Christian Church van account',
+    body: `Hi ${first},\n\n${isReminder ? 'Just a quick reminder — you' : 'You'}'ve been set up to use the church van app. To get started, open this link and sign in with your Google account:\n\n${url}\n\nYour driver details are already filled in. Once you've confirmed a few things you'll be able to book a van.\n\nThanks!\n${me}`
+  };
+}
+function InviteSendButtons({
+  inv,
+  url
+}) {
+  const [copied, setCopied] = useState(false);
+  const ageDays = inv.createdAt ? Math.floor((Date.now() - inv.createdAt) / 86400000) : 0;
+  const isReminder = ageDays >= 2;
+  const note = inviteNote(inv, url, isReminder);
+  const mail = 'mailto:' + encodeURIComponent(inv.email || '') + '?subject=' + encodeURIComponent(note.subject) + '&body=' + encodeURIComponent(note.body);
+  const phone = String(inv.phone || '').replace(/[^\d+]/g, '');
+  const sms = phone ? 'sms:' + phone + '?&body=' + encodeURIComponent(note.body) : null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      flexWrap: 'wrap',
+      marginTop: 8
+    }
+  }, inv.email && /*#__PURE__*/React.createElement("a", {
+    href: mail,
+    className: "secondary",
+    style: {
+      textDecoration: 'none',
+      display: 'inline-block',
+      padding: '10px 16px',
+      borderRadius: 10,
+      border: '1px solid var(--line, #ddd)',
+      color: 'inherit'
+    }
+  }, "✉️ ", isReminder ? 'Email a reminder' : 'Email the invite'), sms && /*#__PURE__*/React.createElement("a", {
+    href: sms,
+    className: "secondary",
+    style: {
+      textDecoration: 'none',
+      display: 'inline-block',
+      padding: '10px 16px',
+      borderRadius: 10,
+      border: '1px solid var(--line, #ddd)',
+      color: 'inherit'
+    }
+  }, "💬 ", isReminder ? 'Text a reminder' : 'Text the invite'), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0
+    },
+    onClick: () => {
+      navigator.clipboard.writeText(note.body).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      });
+    }
+  }, copied ? 'Copied ✓' : 'Copy message'));
+}
 function AdminAddDriver() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -586,6 +659,7 @@ function AdminAddDriver() {
   const [licenseVerified, setLicenseVerified] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generatedLink, setGeneratedLink] = useState(null);
+  const [justAdded, setJustAdded] = useState(null);
   const [invites, setInvites] = useState([]);
   useEffect(() => {
     const unsub = db.collection('vanDriverInvites').where('claimed', '==', false).onSnapshot(snap => {
@@ -609,9 +683,14 @@ function AdminAddDriver() {
       claimed: false,
       createdAt: Date.now()
     });
-    const url = new URL(window.location.href);
-    url.searchParams.set('invite', token);
-    setGeneratedLink(url.toString());
+    setGeneratedLink(driverInviteUrl(token));
+    setJustAdded({
+      id: token,
+      name,
+      email: email.toLowerCase().trim(),
+      phone,
+      createdAt: Date.now()
+    });
     setName('');
     setEmail('');
     setPhone('');
@@ -668,15 +747,25 @@ function AdminAddDriver() {
       marginTop: 10
     },
     onClick: () => navigator.clipboard.writeText(generatedLink)
-  }, "Copy Link")), /*#__PURE__*/React.createElement("h3", {
+  }, "Copy Link"), justAdded && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 400
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, "Want to let them know? Send them a ready-written note:"), /*#__PURE__*/React.createElement(InviteSendButtons, {
+    inv: justAdded,
+    url: generatedLink
+  }))), /*#__PURE__*/React.createElement("h3", {
     style: {
       marginTop: 24
     }
   }, "Awaiting First Sign-In"), invites.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "muted"
   }, "None waiting."), invites.map(inv => {
-    const url = new URL(window.location.href);
-    url.searchParams.set('invite', inv.id);
+    const url = new URL(driverInviteUrl(inv.id));
     return /*#__PURE__*/React.createElement("div", {
       key: inv.id,
       className: "list-item",
@@ -684,12 +773,17 @@ function AdminAddDriver() {
         flexDirection: 'column',
         alignItems: 'stretch'
       }
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, inv.name), " — ", inv.email), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, inv.name), " — ", inv.email, " ", /*#__PURE__*/React.createElement("span", {
+      className: "muted"
+    }, "· invited ", inv.createdAt ? Math.floor((Date.now() - inv.createdAt) / 86400000) === 0 ? 'today' : Math.floor((Date.now() - inv.createdAt) / 86400000) + ' days ago' : 'earlier')), /*#__PURE__*/React.createElement("div", {
       className: "muted",
       style: {
         wordBreak: 'break-all'
       }
-    }, url.toString()), /*#__PURE__*/React.createElement("div", {
+    }, url.toString()), /*#__PURE__*/React.createElement(InviteSendButtons, {
+      inv: inv,
+      url: url.toString()
+    }), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         gap: 8,
