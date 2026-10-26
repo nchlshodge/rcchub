@@ -379,6 +379,7 @@
     </nav>
 
     <main>
+      <h1 class="rcc-sr">Bedside admin</h1>
       <!-- PENDING REVIEW -->
       <div class="screen active" id="tab-pending">
         <h2 class="section-title">Pending Review</h2>
@@ -514,6 +515,7 @@
   const db   = firebase.firestore();
   // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
   RCC.tuneFirestore(db);
+  RCC.tabs('.tab');
 
   const ADMIN_TRIGGER_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
   // Must match CONFIG.WEB_ENDPOINT_TOKEN in apps-script.gs — the web app

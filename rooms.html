@@ -192,6 +192,8 @@
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth(), db = firebase.firestore();
   RCC.tuneFirestore(db);
+  RCC.clickable('table.rooms tr.clickable');
+  RCC.clickable('polygon.room[data-room]', { role: 'button' });
   const RL = RoomLogic;
 
   /* ---------- the floor plan: where each room sits on rcc-floor-plan.jpg (1236 x 1600) ---------- */

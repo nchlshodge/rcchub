@@ -123,6 +123,7 @@
   const db = firebase.firestore();
   // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
   RCC.tuneFirestore(db);
+  RCC.tabs('.subtab');
   let currentUser = null;
 
   document.getElementById('googleSignInBtn').addEventListener('click', () => {

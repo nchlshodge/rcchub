@@ -614,6 +614,7 @@
   </nav>
 
   <main>
+    <h1 class="rcc-sr">Bedside visits</h1>
 
     <div class="screen active" id="tab-visits">
       <h2 class="section-title">Who needs a visit</h2>
@@ -757,6 +758,8 @@ const auth = firebase.auth();
 const db   = firebase.firestore();
 // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
 RCC.tuneFirestore(db);
+RCC.tabs('.tab');
+RCC.dialog(document.getElementById('updateModal'), { dialog: document.querySelector('#updateModal .modal'), label: 'Log a visit update' });
 
 // Public key identifying this app to the browser's push service — not
 // a secret, safe to be visible in client code (same category as the

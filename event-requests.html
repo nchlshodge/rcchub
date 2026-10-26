@@ -207,7 +207,7 @@
           <option value="facilities">Facilities Rental</option>
         </select>
         <select id="deptFilter" aria-label="Filter by department"><option value="">All departments</option></select>
-        <span class="count-pill"><b id="statShown">–</b> shown</span>
+        <span class="count-pill" role="status" aria-live="polite"><b id="statShown">–</b> shown</span>
       </div>
 
       <div id="content"><div class="empty">Loading requests…</div></div>
@@ -234,6 +234,7 @@
   const db = firebase.firestore();
   // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
   RCC.tuneFirestore(db);
+  RCC.dialog(document.getElementById('panel'), { label: 'Request details', inert: true });
 
   let allRequests = [];
   let view = 'cards';

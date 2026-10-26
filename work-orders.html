@@ -188,6 +188,7 @@
   var fbApp; try { fbApp = firebase.app(); } catch(e) { fbApp = firebase.initializeApp(firebaseConfig); }
   var auth = firebase.auth(), db = firebase.firestore(), storage = firebase.storage();
   RCC.tuneFirestore(db);
+  RCC.dialog(document.getElementById('modal'), { label: 'Work order', closeButton: '.close' });
   var $ = function(id){ return document.getElementById(id); };
 
   var CATEGORIES = ['Plumbing', 'Electrical / lights', 'Heating & cooling', 'AV / sound / projector', 'Cleaning', 'Grounds & outdoors', 'Furniture & equipment', 'Doors, locks & keys', 'Safety hazard', 'Other'];

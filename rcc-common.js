@@ -68,4 +68,149 @@
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   };
   RCC.escAttr = function (s) { return RCC.esc(s).replace(/'/g, '&#39;'); };
+
+  /* ---------- keyboard and screen-reader help ---------- */
+  var doc = global.document;
+  var FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  function visible(el) { return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length); }
+  function press(el) { el.dispatchEvent(new global.MouseEvent('click', { bubbles: true, cancelable: true, view: global })); }
+
+  // Make a pop-up panel or modal behave like a dialog: announced as one, focus moves in, Tab stays inside,
+  // Escape closes it, and focus goes back to what opened it. The page keeps its own open/close code; this watches
+  // for it (class "show"/"open", or aria-hidden="false") and adds the rest.
+  //   RCC.dialog(panelEl, { label: 'Request details', inert: true })
+  //   RCC.dialog(overlayEl, { dialog: overlayEl.querySelector('.modal'), label: 'Request app access' })
+  RCC.dialog = function (root, opts) {
+    opts = opts || {};
+    var dlg = opts.dialog || root, opener = null, was = null;
+    if (!dlg.getAttribute('role')) dlg.setAttribute('role', 'dialog');
+    dlg.setAttribute('aria-modal', 'true');
+    if (opts.label && !dlg.getAttribute('aria-label') && !dlg.getAttribute('aria-labelledby')) dlg.setAttribute('aria-label', opts.label);
+    if (!dlg.hasAttribute('tabindex')) dlg.setAttribute('tabindex', '-1');
+    dlg.style.outline = 'none';
+    function isOpen() {
+      var ah = root.getAttribute('aria-hidden');
+      if (ah !== null) return ah === 'false';
+      return root.classList.contains('show') || root.classList.contains('open');
+    }
+    function closeIt() {
+      if (opts.close) return opts.close();
+      var b = dlg.querySelector(opts.closeButton || '[aria-label="Close"],.panel-x,.modal-close,.close');
+      if (b) press(b);
+    }
+    function sync() {
+      var open = isOpen();
+      if (open === was) return;
+      var first = was === null; was = open;
+      if (open) {
+        if (opts.inert) root.removeAttribute('inert');
+        opener = doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : null;
+        setTimeout(function () { if (isOpen() && !dlg.contains(doc.activeElement)) dlg.focus({ preventScroll: true }); }, 30);
+      } else {
+        if (opts.inert) root.setAttribute('inert', '');
+        if (!first && opener && doc.contains(opener) && visible(opener)) { try { opener.focus({ preventScroll: true }); } catch (e) { /* element gone */ } }
+        opener = null;
+      }
+    }
+    new global.MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ['class', 'aria-hidden'] });
+    sync();
+    doc.addEventListener('keydown', function (e) {
+      if (!isOpen()) return;
+      if (e.key === 'Escape') { e.preventDefault(); closeIt(); return; }
+      if (e.key !== 'Tab') return;
+      var items = Array.prototype.filter.call(dlg.querySelectorAll(FOCUSABLE), visible);
+      if (!items.length) { e.preventDefault(); dlg.focus(); return; }
+      var first = items[0], last = items[items.length - 1], a = doc.activeElement;
+      if (!dlg.contains(a) || a === dlg) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+      else if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+    });
+  };
+
+  // Things that react to a click but are not buttons (table rows, map areas): reachable with Tab, and Enter/Space act as a click.
+  //   RCC.clickable('table.rooms tr.clickable')                 (a row keeps its row meaning)
+  //   RCC.clickable('polygon.room[data-room]', { role: 'button' })
+  var clickables = [], tabSets = [];
+  RCC.clickable = function (selector, opts) { clickables.push({ sel: selector, role: (opts && opts.role) || null }); scan(); };
+  // Tab bars made of plain divs: real tab semantics, one Tab stop, arrow keys move between tabs. The "active" class marks the selected one.
+  RCC.tabs = function (selector) { tabSets.push(selector); scan(); };
+
+  function hasName(el) {
+    return el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || (el.labels && el.labels.length) || el.getAttribute('title');
+  }
+  function clean(t) { return (t || '').replace(/\s+/g, ' ').trim(); }
+  function scan() {
+    clickables.forEach(function (c) {
+      Array.prototype.forEach.call(doc.querySelectorAll(c.sel), function (el) {
+        if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+        if (c.role && !el.getAttribute('role')) el.setAttribute('role', c.role);
+        if (c.role && !hasName(el)) { var t = el.querySelector('title'); if (t && clean(t.textContent)) el.setAttribute('aria-label', clean(t.textContent)); }
+      });
+    });
+    tabSets.forEach(function (sel) {
+      var byParent = [];
+      Array.prototype.forEach.call(doc.querySelectorAll(sel), function (el) {
+        var p = el.parentElement; if (!p) return;
+        var i = byParent.findIndex(function (g) { return g.p === p; });
+        if (i < 0) byParent.push({ p: p, tabs: [el] }); else byParent[i].tabs.push(el);
+      });
+      byParent.forEach(function (g) {
+        if (!g.p.getAttribute('role')) g.p.setAttribute('role', 'tablist');
+        var shown = g.tabs.filter(visible), anyActive = g.tabs.some(function (t) { return t.classList.contains('active'); });
+        g.tabs.forEach(function (t, k) {
+          t.setAttribute('role', 'tab');
+          var on = t.classList.contains('active') || (!anyActive && t === shown[0]);
+          t.setAttribute('aria-selected', t.classList.contains('active') ? 'true' : 'false');
+          t.setAttribute('tabindex', on ? '0' : '-1');
+        });
+      });
+    });
+    // Fields and icon buttons with no accessible name: borrow a nearby or placeholder label.
+    Array.prototype.forEach.call(doc.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]),select,textarea'), function (i) {
+      if (hasName(i)) return;
+      var t = i.getAttribute('placeholder'), p = i.previousElementSibling, k;
+      for (k = 0; !t && k < 2 && p; k++, p = p.previousElementSibling) if (p.tagName === 'LABEL') t = p.textContent;
+      if (!t && i.parentElement) { var l = i.parentElement.querySelector(':scope > label'); if (l) t = l.textContent; }
+      if (!t && i.type === 'file') t = 'Choose a file';
+      if (t) i.setAttribute('aria-label', clean(t));
+    });
+    Array.prototype.forEach.call(doc.querySelectorAll('button:not([aria-label])'), function (b) {
+      var l = b.querySelector('.lbl'); if (l && clean(l.textContent)) b.setAttribute('aria-label', clean(l.textContent));
+    });
+  }
+  doc.addEventListener('keydown', function (e) {
+    var t = e.target; if (!t || !t.matches) return;
+    var isTab = t.getAttribute('role') === 'tab' && tabSets.some(function (s) { return t.matches(s); });
+    if (isTab && (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'Home' || e.key === 'End')) {
+      var all = Array.prototype.filter.call(t.parentElement.children, function (x) { return x.getAttribute('role') === 'tab' && visible(x); });
+      var i = all.indexOf(t), n = e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + all.length) % all.length;
+      e.preventDefault(); all[n].focus(); press(all[n]); return;
+    }
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (isTab || clickables.some(function (c) { return t.matches(c.sel); })) { e.preventDefault(); press(t); }
+  });
+
+  // On every page: a "Skip to main content" link, and a main landmark if the page doesn't mark one.
+  function initPage() {
+    if (!doc.getElementById('rcc-a11y-style')) {
+      var st = doc.createElement('style'); st.id = 'rcc-a11y-style';
+      st.textContent = '.rcc-sr{position:absolute!important;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}' +
+        '.rcc-skip{position:absolute;left:8px;top:-60px;z-index:1000;background:#183b82;color:#fff;padding:12px 18px;border-radius:10px;font:600 15px Inter,system-ui,sans-serif;text-decoration:none}' +
+        '.rcc-skip:focus{top:8px}#rcc-main:focus{outline:none}';
+      doc.head.appendChild(st);
+    }
+    var main = doc.querySelector('main,[role=main]');
+    if (!main) { main = doc.querySelector('.wrap,.page,#root,.app,.content'); if (main) main.setAttribute('role', 'main'); }
+    if (main && !doc.querySelector('.rcc-skip')) {
+      if (!main.id) main.id = 'rcc-main';
+      if (!main.hasAttribute('tabindex')) main.setAttribute('tabindex', '-1');
+      var a = doc.createElement('a'); a.className = 'rcc-skip'; a.href = '#' + main.id; a.textContent = 'Skip to main content';
+      doc.body.insertBefore(a, doc.body.firstChild);
+    }
+    scan();
+    var queued = false;
+    new global.MutationObserver(function () { if (queued) return; queued = true; global.requestAnimationFrame(function () { queued = false; scan(); }); })
+      .observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+  }
+  if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', initPage); else initPage();
 })(window);
