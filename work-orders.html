@@ -231,14 +231,14 @@
     if (!user) { me = null; $('loginScreen').style.display = 'flex'; $('appShell').style.display = 'none'; return; }
     me = user;
     $('loginScreen').style.display = 'none'; $('appShell').style.display = 'block';
+    watchMine();   // "my orders" only needs who you are, so it loads alongside the role lookup
     db.collection('users').doc(user.uid).get().then(function(doc){
       var data = doc.exists ? doc.data() : {}, roles = data.roles || {};
       var isAdmin = data.isAdmin === true;
       isStaff = isAdmin || roles.facilities === true;
       RccShell.render($('rccNav'), { active: 'workorders', user: user, onSignOut: function(){ auth.signOut(); }, roles: Object.assign({}, roles, { isAdmin: isAdmin }) });
       $('tabBoard').hidden = !isStaff;
-      watchMine();
-      if (isStaff) watchBoard();
+      if (isStaff) { drawMine(); watchBoard(); }   // redraw "my orders" with the staff-only details
       var m = location.hash.match(/#open=([A-Za-z0-9]+)/);
       if (m) { show(isStaff ? 'board' : 'mine'); openOrder(m[1]); }
     }).catch(function(e){ console.error(e); });

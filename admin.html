@@ -816,11 +816,11 @@
       const rows = snap.docs.map(d => d.data().vanRentalProfile).filter(p => p && p.status === 'pending');
       return { count: rows.length, times: rows.map(p => p.createdAt) };
     });
-    watchQueue('events', db.collection('eventRequests'), snap => {
+    watchQueue('events', db.collection('eventRequests').orderBy('submittedAt','desc'), snap => {
       const rows = snap.docs.map(d => d.data()).filter(d => (d.status || 'new') === 'new');
       return { count: rows.length, times: rows.map(r => r.submittedAt) };
     });
-    watchQueue('timeoff', db.collection('timeOffRequests'), snap => {
+    watchQueue('timeoff', db.collection('timeOffRequests').orderBy('submittedAt','desc'), snap => {
       const rows = snap.docs.map(d => d.data()).filter(d => (d.status || 'pending') === 'pending');
       return { count: rows.length, times: rows.map(r => r.submittedAt) };
     });

@@ -232,7 +232,7 @@
   /* ---------- state ---------- */
   let currentUser = null, isAdmin = false;
   let selectedDate = ymd(new Date()), selectedMin = nowMin(), selectedRoom = null;
-  let scheduleDocs = [], bookingDocs = [], unsubSchedule = null, started = false;
+  let scheduleDocs = [], bookingDocs = [], unsubSchedule = null, started = false, confirmStarted = false;
   const roomById = RL.BY_ID;
 
   function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
@@ -249,15 +249,19 @@
     document.getElementById('loginScreen').style.display = user ? 'none' : 'flex';
     document.getElementById('appShell').style.display = user ? 'block' : 'none';
     if (!user) return;
+    // The map and schedule do not depend on who you are, so they start loading right now, alongside the role lookup below.
+    if (!started) {
+      started = true;
+      buildMap(); wireControls(); subscribe(); renderAll();
+      db.collection('roomBookings').onSnapshot(s => { bookingDocs = s.docs.map(d => ({ id: d.id, ...d.data() })); renderAll(); renderBookingList(); },
+        err => { document.getElementById('detail').innerHTML = '<div class="note-empty">Could not load bookings: ' + esc(err.message) + '</div>'; });
+    }
     let roles = {};
     try { const d = await db.collection('users').doc(user.uid).get(); isAdmin = d.exists && d.data().isAdmin === true; roles = d.exists ? (d.data().roles || {}) : {}; } catch (e) { isAdmin = false; }
     RccShell.render(document.getElementById('rccNav'), { active: 'rooms', user, onSignOut: () => auth.signOut(), roles: Object.assign({}, roles, { isAdmin }) });
     document.getElementById('adminBox').style.display = isAdmin ? 'block' : 'none';
-    if (started) return; started = true;
-    buildMap(); wireControls(); subscribe(); renderAll();
-    if (isAdmin) subscribeConfirm();
-    db.collection('roomBookings').onSnapshot(s => { bookingDocs = s.docs.map(d => ({ id: d.id, ...d.data() })); renderAll(); renderBookingList(); },
-      err => { document.getElementById('detail').innerHTML = '<div class="note-empty">Could not load bookings: ' + esc(err.message) + '</div>'; });
+    if (isAdmin && !confirmStarted) { confirmStarted = true; subscribeConfirm(); }
+    renderAll(); renderBookingList();   // the admin-only parts appear now that we know who this is
   });
 
   function subscribe() {

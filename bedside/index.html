@@ -836,12 +836,13 @@ auth.onAuthStateChanged(async user => {
     document.getElementById('appShell').style.display    = 'block';
     document.getElementById('userName').textContent      = user.displayName || user.email;
 
-    const userDoc = await db.collection('users').doc(user.uid).get();
-    const isAdmin = userDoc.exists && userDoc.data().isAdmin === true;
-    document.getElementById('adminTab').style.display    = isAdmin ? '' : 'none';
-
     loadProfile();
     subscribeToVisits();
+    // Only decides whether to show the Admin tab, so it runs alongside the profile and visits instead of before them.
+    db.collection('users').doc(user.uid).get().then(userDoc => {
+      const isAdmin = userDoc.exists && userDoc.data().isAdmin === true;
+      document.getElementById('adminTab').style.display = isAdmin ? '' : 'none';
+    }).catch(() => {});
   } else {
     currentUser = null;
     document.getElementById('loginScreen').style.display = 'flex';

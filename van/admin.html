@@ -3049,8 +3049,8 @@ function App() {
     auth.onAuthStateChanged(async u => {
       setUser(u);
       if (u) {
-        await ensureVansSeeded();
-        await ensureWarningLightsSeeded();
+        // Filling an empty database only matters the very first time, so nothing waits on it.
+        ensureVansSeeded().then(ensureWarningLightsSeeded).catch(() => {});
         const doc = await db.collection('users').doc(u.uid).get();
         const data = doc.exists ? doc.data() : {};
         setCanAccessAdmin(data.isAdmin === true || data.roles && data.roles.vanAdmin === true);

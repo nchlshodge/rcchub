@@ -1764,6 +1764,22 @@ function App() {
       if (u) {
         setNeedsApproval(false);
         setLoadFailed(false);
+        // Fast path: someone who is already an approved driver (or an admin) needs none of the setup checks below,
+        // so they go straight in after one read of their own profile instead of waiting on a server call and two more reads.
+        try {
+          const first = await db.collection('users').doc(u.uid).get();
+          const d0 = first.exists ? first.data() : {};
+          const known = d0.isAdmin === true || d0.roles && d0.roles.vanAdmin === true || d0.vanRentalProfile && d0.vanRentalProfile.status === 'approved';
+          if (known) {
+            setProfile(d0);
+            setCanAccessAdmin(d0.isAdmin === true || d0.roles && d0.roles.vanAdmin === true);
+            if (d0.isAdmin === true || d0.roles && d0.roles.vanAdmin === true) {
+              // an empty database only ever needs filling by an admin, and nobody waits on it
+              ensureVansSeeded().then(ensureWarningLightsSeeded).catch(() => {});
+            }
+            return;
+          }
+        } catch (e) {/* fall through to the full check below */}
         await claimDriverInviteIfAny(u); // first: an invited driver is approved here
         let denied = false;
         try {

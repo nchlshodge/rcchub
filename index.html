@@ -263,6 +263,9 @@
   }
   function signOutHome() { clearHomeCache(); if (typeof auth !== 'undefined') auth.signOut(); }
   window.homeFromCache = null;
+  // Private load-time log (kept only in this browser): when each stage of the page finished, in ms since the page started.
+  const loadMarks = {};
+  function mark(name) { if (!(name in loadMarks)) loadMarks[name] = Math.round(performance.now()); }
   (function () {
     const c = readHomeCache();
     if (!c) return;
@@ -274,6 +277,7 @@
     document.getElementById('welcomeSub').textContent = 'Pick up where you left off, or start something new.';
     document.querySelector('.foot').hidden = false;
     renderModules({ modules: c.modules, roles: c.roles, isAdmin: c.isAdmin });
+    mark('savedCopyShown');
   })();
   // If nothing has appeared after a long wait, say so instead of leaving a blank "Loading…".
   setTimeout(function () {
@@ -286,6 +290,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="room-logic.js"></script>
 <script>
+  mark('scriptsReady');
   const firebaseConfig = RCC.firebaseConfig;
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
@@ -299,6 +304,7 @@
   let isMember = true;
 
   auth.onAuthStateChanged(async user => {
+    mark('signedIn');
     document.getElementById('bootScreen').hidden = true;
     if (user) {
       currentUser = user;
@@ -312,6 +318,9 @@
       document.getElementById('appShell').style.display = 'block';
       setGreeting(user.displayName);
       loadModules(user.uid);
+      // Staff: start the "what needs you" counters now, using the roles saved from the last visit, instead of after the profile arrives.
+      const saved = window.homeFromCache === user.uid ? readHomeCache() : null;
+      if (saved) watchNeeds(Object.assign({}, saved.roles, { isAdmin: saved.isAdmin }));
     } else {
       clearHomeCache();
       currentUser = null;
@@ -419,6 +428,7 @@
       if (!isMember) { clearHomeCache(); watchNeeds({}); renderWaiting(lastUserData); if (lastUserData.approvalDeclined !== true) fileSignupRequest(currentUser); return; }
       document.getElementById('welcomeSub').textContent = 'Pick up where you left off, or start something new.';
       renderModules(lastUserData);
+      mark('liveTiles');
       writeHomeCache({ uid, name: currentUser.displayName || '', email: currentUser.email || '', roles: lastUserData.roles || {}, isAdmin: lastUserData.isAdmin === true, modules: lastUserData.modules || {}, isMember: true });
       watchNeeds(roles);
     }, err => {
@@ -448,6 +458,7 @@
   }
 
   function drawNeeds(reqs, roles) {
+    mark('counters');
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     const t = iso(today);
@@ -643,6 +654,27 @@
     else { var wrap = document.createElement('div'); wrap.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg);z-index:90;'; wrap.appendChild(card); document.body.appendChild(wrap); }
   }, 12000);
 })();
+
+  // After things settle, keep one line per visit (last 10) so a slow load can be looked at afterwards: open this page with ?perf=1
+  setTimeout(function () {
+    try {
+      const fcp = Math.round(((performance.getEntriesByName('first-contentful-paint')[0]) || {}).startTime || 0);
+      const nc = navigator.connection || {};
+      const rec = { at: Date.now(), fcp, marks: loadMarks, saved: !!window.homeFromCache, net: (nc.effectiveType || '?') + (nc.rtt ? ' ' + nc.rtt + 'ms' : '') };
+      const log = (JSON.parse(localStorage.getItem('rcc.perf.v1')) || []).concat([rec]).slice(-10);
+      localStorage.setItem('rcc.perf.v1', JSON.stringify(log));
+    } catch (e) { /* private window: nothing kept */ }
+  }, 8000);
+  if (/[?&]perf=1/.test(location.search)) {
+    window.addEventListener('load', function () {
+      let log = []; try { log = JSON.parse(localStorage.getItem('rcc.perf.v1')) || []; } catch (e) { /* none */ }
+      const box = document.createElement('div');
+      box.style.cssText = 'margin:24px auto;max-width:900px;padding:14px;background:#fff;border:1px solid #d9d1c1;border-radius:12px;font:12px/1.5 ui-monospace,Menlo,monospace;overflow:auto';
+      box.innerHTML = '<b>Load times on this device (ms since the page started)</b><br>' + (log.length ? '<table style="border-collapse:collapse;margin-top:8px"><tr style="text-align:left"><th>When</th><th>First paint</th><th>Saved copy shown</th><th>Scripts ready</th><th>Signed in</th><th>Tiles (live)</th><th>Counters</th><th>Network</th></tr>' +
+        log.slice().reverse().map(function (r) { const m = r.marks || {}, c = function (v) { return '<td style="padding:2px 10px">' + (v == null ? '–' : v) + '</td>'; }; return '<tr><td style="padding:2px 10px">' + new Date(r.at).toLocaleString() + '</td>' + c(r.fcp) + c(m.savedCopyShown) + c(m.scriptsReady) + c(m.signedIn) + c(m.liveTiles) + c(m.counters) + c(r.net) + '</tr>'; }).join('') + '</table>' : 'Nothing recorded yet. Open the home page normally, wait 10 seconds, then come back here.');
+      (document.querySelector('main.page') || document.body).appendChild(box);
+    });
+  }
 </script>
 </body>
 </html>
