@@ -502,21 +502,15 @@
 
 </div>
 
+<script src="../rcc-common.js"></script>
 <script>
-  const firebaseConfig = {
-    apiKey:            "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
-    authDomain:        "bedsidercc.firebaseapp.com",
-    projectId:         "bedsidercc",
-    storageBucket:     "bedsidercc.firebasestorage.app",
-    messagingSenderId: "950958384975",
-    appId:             "1:950958384975:web:6f43dec5a7ba842c69c73a"
-  };
+  const firebaseConfig = RCC.firebaseConfig;
 
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db   = firebase.firestore();
   // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
-  try { db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* keep going with the default connection */ }
+  RCC.tuneFirestore(db);
 
   const ADMIN_TRIGGER_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
   // Must match CONFIG.WEB_ENDPOINT_TOKEN in apps-script.gs — the web app
@@ -1191,9 +1185,7 @@
     setTimeout(() => b.classList.remove('show'), 3200);
   }
 
-  function escHtml(str) {
-    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
+  function escHtml(str) { return RCC.esc(str); }
 </script>
 </body>
 </html>

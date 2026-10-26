@@ -212,21 +212,15 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../rcc-common.js"></script>
 <script>
 (function () {
-  var firebaseConfig = {
-    apiKey: "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
-    authDomain: "bedsidercc.firebaseapp.com",
-    projectId: "bedsidercc",
-    storageBucket: "bedsidercc.firebasestorage.app",
-    messagingSenderId: "950958384975",
-    appId: "1:950958384975:web:6f43dec5a7ba842c69c73a"
-  };
+  var firebaseConfig = RCC.firebaseConfig;
   var fbApp; try { fbApp = firebase.app(); } catch (e) { fbApp = firebase.initializeApp(firebaseConfig); }
   var auth = firebase.auth();
   var db = firebase.firestore();
   // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
-  try { db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* keep going with the default connection */ }
+  RCC.tuneFirestore(db);
   function $(id) { return document.getElementById(id); }
   function pad(n) { return String(n).padStart(2, '0'); }
   function localDate() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }

@@ -115,6 +115,7 @@
 </head>
 <body>
 <div id="root"></div>
+<script src="../rcc-common.js"></script>
 <script>
 const {
   useState,
@@ -123,14 +124,7 @@ const {
 } = React;
 
 // ---------- Firebase ----------
-const firebaseConfig = {
-  apiKey: "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
-  authDomain: "bedsidercc.firebaseapp.com",
-  projectId: "bedsidercc",
-  storageBucket: "bedsidercc.firebasestorage.app",
-  messagingSenderId: "950958384975",
-  appId: "1:950958384975:web:6f43dec5a7ba842c69c73a"
-};
+const firebaseConfig = RCC.firebaseConfig;
 try {
   firebase.app();
 } catch (e) {
@@ -139,15 +133,14 @@ try {
 const auth = firebase.auth();
 const db = firebase.firestore();
 // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
-try {
-  db.settings({
-    experimentalAutoDetectLongPolling: true,
-    merge: true
-  });
-} catch (e) {/* keep going with the default connection */}
+RCC.tuneFirestore(db);
 const storage = firebase.storage();
 function uid() {
   return Math.random().toString(36).slice(2, 10);
+}
+// Two time ranges overlap when each starts before the other ends (same rule as the driver app).
+function rentalOverlaps(aStart, aEnd, bStart, bEnd) {
+  return aStart < bEnd && bStart < aEnd;
 }
 
 // Seed vans once if the collection is empty (first-run convenience only)

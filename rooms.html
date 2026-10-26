@@ -185,14 +185,12 @@
   </main>
 </div>
 
+<script src="rcc-common.js"></script>
 <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE", authDomain: "bedsidercc.firebaseapp.com", projectId: "bedsidercc",
-    storageBucket: "bedsidercc.firebasestorage.app", messagingSenderId: "950958384975", appId: "1:950958384975:web:6f43dec5a7ba842c69c73a"
-  };
+  const firebaseConfig = RCC.firebaseConfig;
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth(), db = firebase.firestore();
-  try { db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* keep going with the default connection */ }
+  RCC.tuneFirestore(db);
   const RL = RoomLogic;
 
   /* ---------- the floor plan: where each room sits on rcc-floor-plan.jpg (1236 x 1600) ---------- */
@@ -232,7 +230,7 @@
   function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
   function nowMin() { const d = new Date(); return Math.floor((d.getHours()*60 + d.getMinutes())/15)*15; }
   function minToInput(m) { return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0'); }
-  function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function esc(s) { return RCC.esc(s); }
   function prettyDate(s) { const [y,m,d] = s.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
   function rangeText(o) { return o.allDay ? 'All day' : RL.fmtMinutes(o.startMin) + ' – ' + RL.fmtMinutes(o.endMin); }
 

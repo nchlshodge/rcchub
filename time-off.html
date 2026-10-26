@@ -161,21 +161,15 @@
   </main>
 </div>
 
+<script src="rcc-common.js"></script>
 <script>
 (function(){
-  var firebaseConfig = {
-    apiKey: "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
-    authDomain: "bedsidercc.firebaseapp.com",
-    projectId: "bedsidercc",
-    storageBucket: "bedsidercc.firebasestorage.app",
-    messagingSenderId: "950958384975",
-    appId: "1:950958384975:web:6f43dec5a7ba842c69c73a"
-  };
+  var firebaseConfig = RCC.firebaseConfig;
   var fbApp; try { fbApp=firebase.app(); } catch(e) { fbApp=firebase.initializeApp(firebaseConfig); }
   var auth = firebase.auth();
   var db = firebase.firestore();
   // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
-  try { db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* keep going with the default connection */ }
+  RCC.tuneFirestore(db);
   var currentUser = null;
   function $(id){ return document.getElementById(id); }
 
