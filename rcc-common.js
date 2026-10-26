@@ -207,6 +207,19 @@
       var a = doc.createElement('a'); a.className = 'rcc-skip'; a.href = '#' + main.id; a.textContent = 'Skip to main content';
       doc.body.insertBefore(a, doc.body.firstChild);
     }
+    // The "Loading…" screen at the top of the page goes away as soon as the page shows its sign-in or its content.
+    var boot = doc.getElementById('rccBoot');
+    if (boot) {
+      var bootDone = false, bootObs = new global.MutationObserver(bootCheck);
+      var bootReady = function () {
+        var l = doc.getElementById('loginScreen'), a = doc.getElementById('appShell');
+        return (l && visible(l)) || (a && visible(a)) || doc.querySelector('.rcc-nav');
+      };
+      function bootCheck() { if (!bootDone && bootReady()) { bootDone = true; boot.hidden = true; bootObs.disconnect(); } }
+      bootObs.observe(doc.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
+      bootCheck();
+      setTimeout(function () { var t = boot.querySelector('span'); if (!bootDone && t) t.textContent = 'This is taking longer than usual. Check your connection, then refresh the page.'; }, 12000);
+    }
     scan();
     var queued = false;
     new global.MutationObserver(function () { if (queued) return; queued = true; global.requestAnimationFrame(function () { queued = false; scan(); }); })

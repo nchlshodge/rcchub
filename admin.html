@@ -3,17 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://www.gstatic.com">
+  <link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/playfair-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="rcc-base.css">
   <title>RCC · Admin</title>
   <meta name="theme-color" content="#2557b8">
 
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-<script src="room-logic.js"></script>
-<script src="rcc-audit.js"></script>
 
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap');
 
     :root {
       --bg:         #f6f2ea;
@@ -306,6 +304,7 @@
   </style>
 </head>
 <body>
+<div id="rccBoot" class="rcc-boot" role="status"><img src="assets/rcc-logo-plain-96.png" width="64" height="64" alt=""><b>RCC</b><span>Loading…</span></div>
 
 <div class="banner" id="banner" role="status" aria-live="polite"></div>
 
@@ -320,7 +319,7 @@
 
 <div id="appShell" style="display:none;">
   <header>
-    <div class="logo"><img src="assets/rcc-logo-plain.png" alt="RCC">RCC <span>· Admin</span></div>
+    <div class="logo"><img src="assets/rcc-logo-plain-96.png" alt="RCC">RCC <span>· Admin</span></div>
     <div class="header-right">
       <a href="index.html">← All apps</a>
       <button id="signOutBtn">Sign out</button>
@@ -498,6 +497,11 @@
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="room-logic.js"></script>
+<script src="rcc-audit.js"></script>
 <script src="rcc-common.js"></script>
 <script>
   const firebaseConfig = RCC.firebaseConfig;

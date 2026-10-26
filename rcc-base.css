@@ -1,0 +1,16 @@
+/* RCC Hub fonts, hosted on this site (latin letters; Inter and Playfair Display, SIL Open Font License).
+   Loaded from the same address as the pages, so there is no extra connection to Google before the page can show. */
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 300 700; font-display: swap;
+  src: url(assets/fonts/inter-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Playfair Display'; font-style: normal; font-weight: 400 600; font-display: swap;
+  src: url(assets/fonts/playfair-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+/* The first thing every page shows while it starts up (before sign-in and data are ready). Plain HTML + this CSS, so it appears at once. */
+.rcc-boot { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 40px; font-family: 'Inter', system-ui, sans-serif; color: #57514a; }
+.rcc-boot img { width: 64px; height: 64px; border-radius: 50%; }
+.rcc-boot b { font: 500 26px 'Playfair Display', Georgia, serif; color: #2557b8; letter-spacing: -.01em; }
+.rcc-boot span { font-size: 15px; }
+.rcc-boot[hidden] { display: none; }
+.embedded .rcc-boot { display: none; }

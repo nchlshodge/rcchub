@@ -28,7 +28,7 @@
     const name = opts.user ? (opts.user.displayName || opts.user.email || '') : '';
     el.className = 'rcc-nav';
     el.innerHTML =
-      `<a class="rcc-brand" href="index.html"><img src="assets/rcc-logo-plain.png" alt=""><b>RCC</b><span>Ministry hub</span></a>` +
+      `<a class="rcc-brand" href="index.html"><img src="assets/rcc-logo-plain-96.png" alt=""><b>RCC</b><span>Ministry hub</span></a>` +
       `<nav class="rcc-links" aria-label="Main">${links}</nav>` +
       `<div class="rcc-user"><span class="who">${esc(name)}</span><button type="button" id="rccSignOut">Sign out</button></div>`;
     const out = el.querySelector('#rccSignOut');

@@ -3,24 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://www.gstatic.com">
+  <link rel="preload" href="../assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../assets/fonts/playfair-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../rcc-base.css">
 <title>RCC Van Usage</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png">
 <meta name="theme-color" content="#2557b8">
 
-<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 
 <script src="odometer-read.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-functions-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js"></script>
 
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
   /* The hub's shared look (same palette as rcc-ui.css). The old variable names are kept because the
      page's inline styles use them. */
   :root{
@@ -125,7 +120,16 @@
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root"><div class="rcc-boot" role="status"><img src="../assets/rcc-logo-plain-96.png" width="64" height="64" alt=""><b>RCC</b><span>Loading…</span></div>
+</div>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-functions-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js"></script>
 <script src="../rcc-common.js"></script>
 <script>
 const {
@@ -1266,6 +1270,14 @@ function ReturnFlow({
   const [problems, setProblems] = useState(null);
   const [problemDetails, setProblemDetails] = useState('');
   const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState(1);
+  function go(n) {
+    setStep(n);
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }
   const relevantLights = warningLights.filter(l => !l.van || l.van === van.id);
   const safetyLightsOn = checkedLights.filter(id => relevantLights.find(x => x.id === id)?.safety);
   const nonSafetyLightsOn = checkedLights.filter(id => {
@@ -1276,14 +1288,17 @@ function ReturnFlow({
     setCheckedLights(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
   const canSubmit = mileage && gas !== null && clean !== null && cleanPhoto && odoPhoto && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && problems !== null && !saving;
-  const missing = [];
-  if (!mileage) missing.push('the mileage');
-  if (gas === null) missing.push('the gas level');
-  if (!odoPhoto) missing.push('the odometer close-up photo');
-  if (clean === null) missing.push('whether the van is clean');
-  if (!cleanPhoto) missing.push('the interior photo');
-  if (otherLightChecked && !otherLightDesc) missing.push('a description of the other warning light');
-  if (problems === null) missing.push('whether there were any problems');
+  const missing1 = [];
+  if (!odoPhoto) missing1.push('the odometer close-up photo');
+  if (!mileage) missing1.push('the mileage');
+  if (gas === null) missing1.push('the gas level');
+  const missing2 = [];
+  if (clean === null) missing2.push('whether the van is clean');
+  if (!cleanPhoto) missing2.push('the interior photo');
+  if (otherLightChecked && !otherLightDesc) missing2.push('a description of the other warning light');
+  const missing3 = [];
+  if (problems === null) missing3.push('whether there were any problems');
+  const missing = step === 1 ? missing1 : step === 2 ? missing2 : missing3;
   async function handlePhoto(file) {
     setCleanUploading(true);
     const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/return-${uid()}.jpg`);
@@ -1344,7 +1359,10 @@ function ReturnFlow({
     className: "content"
   }, /*#__PURE__*/React.createElement("div", {
     className: "card"
-  }, /*#__PURE__*/React.createElement("h2", null, "Return the Van"), /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement(StepBar, {
+    step: step,
+    labels: ['Odometer', 'Van & lights', 'Finish']
+  }), step === 1 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h2", null, "Return the Van · Odometer & gas"), /*#__PURE__*/React.createElement("p", {
     className: "muted"
   }, "Any approved driver can complete this check-in — doesn't have to be whoever originally checked it out."), /*#__PURE__*/React.createElement(OdometerShot, {
     van: van,
@@ -1364,7 +1382,9 @@ function ReturnFlow({
   }), /*#__PURE__*/React.createElement("label", null, "Final Gas Level"), /*#__PURE__*/React.createElement(GasGauge, {
     value: gas,
     onChange: setGas
-  }), /*#__PURE__*/React.createElement("label", null, "Is the van clean?"), /*#__PURE__*/React.createElement(YesNo, {
+  })), step === 2 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h2", null, "Van & warning lights"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Is the van clean, and is anything lit on the dash?"), /*#__PURE__*/React.createElement("label", null, "Is the van clean?"), /*#__PURE__*/React.createElement(YesNo, {
     value: clean,
     onChange: setClean
   }), /*#__PURE__*/React.createElement(CameraCapture, {
@@ -1426,24 +1446,29 @@ function ReturnFlow({
     className: "banner-safe"
   }, nonSafetyLightsOn.map(id => relevantLights.find(l => l.id === id)?.feedback).filter(Boolean).join(' ')), safetyLightsOn.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "banner-danger"
-  }, safetyLightsOn.map(id => relevantLights.find(l => l.id === id)?.name).join(', '), " — please call Nicholas and report this before finishing the return."), /*#__PURE__*/React.createElement("label", {
-    style: {
-      marginTop: 20
-    }
-  }, "Were there any other problems?"), /*#__PURE__*/React.createElement(YesNo, {
+  }, safetyLightsOn.map(id => relevantLights.find(l => l.id === id)?.name).join(', '), " — please call Nicholas and report this before finishing the return.")), step === 3 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h2", null, "Finish"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Last question, then you're done."), /*#__PURE__*/React.createElement("label", null, "Were there any other problems?"), /*#__PURE__*/React.createElement(YesNo, {
     value: problems,
     onChange: setProblems
   }), problems && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Please describe"), /*#__PURE__*/React.createElement("textarea", {
     value: problemDetails,
     onChange: e => setProblemDetails(e.target.value)
-  })), !canSubmit && !saving && safetyLightsOn.length === 0 && missing.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }))), !saving && safetyLightsOn.length === 0 && missing.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "needs-list",
     role: "status"
-  }, "Still needed: ", missing.join(', '), "."), /*#__PURE__*/React.createElement("button", {
+  }, "Still needed: ", missing.join(', '), "."), step < 3 && /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: missing.length > 0 || safetyLightsOn.length > 0,
+    onClick: () => go(step + 1)
+  }, safetyLightsOn.length > 0 ? 'Resolve safety light first' : step === 1 ? 'Next: Van & lights' : 'Next: Finish'), step === 3 && /*#__PURE__*/React.createElement("button", {
     className: "primary",
     disabled: !canSubmit,
     onClick: finishReturn
-  }, saving ? 'Saving...' : safetyLightsOn.length > 0 ? 'Resolve safety light first' : 'Complete Return')));
+  }, saving ? 'Saving...' : safetyLightsOn.length > 0 ? 'Resolve safety light first' : 'Complete Return'), step > 1 && !saving && /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    onClick: () => go(step - 1)
+  }, "Back")));
 }
 
 // ---------- Driver Home ----------

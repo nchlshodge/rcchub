@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://www.gstatic.com">
+  <link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/playfair-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="rcc-base.css">
   <title>RCC · Ministry Hub</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
   <meta name="theme-color" content="#2557b8">
 
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <script src="room-logic.js"></script>
+  <link rel="preconnect" href="https://www.gstatic.com">
   <script src="rcc-shell.js"></script>
   <link rel="stylesheet" href="rcc-ui.css">
 
@@ -106,9 +106,16 @@
 </head>
 <body>
 
+<!-- BOOT: shown at once while the page starts up -->
+<div id="bootScreen" class="rcc-login" role="status">
+  <img src="assets/rcc-logo-144.png" width="72" height="72" alt="">
+  <h1>RCC Ministry Hub</h1>
+  <p>Loading…</p>
+</div>
+
 <!-- LOGIN -->
 <div id="loginScreen" class="rcc-login" style="display:none;">
-  <img src="assets/rcc-logo.png" alt="RCC — Love God. Love People.">
+  <img src="assets/rcc-logo-144.png" alt="RCC — Love God. Love People.">
   <h1>RCC Ministry Hub</h1>
   <p>One sign-in for care, requests, rooms, and everything in between.</p>
 
@@ -188,14 +195,8 @@
 
 <script src="rcc-common.js"></script>
 <script>
-  const firebaseConfig = RCC.firebaseConfig;
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db   = firebase.firestore();
-  // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
-  RCC.tuneFirestore(db);
-  RCC.dialog(document.getElementById('requestModal'), { dialog: document.querySelector('#requestModal .modal'), label: 'Request app access' });
-
+  // Early part of the page: draws the header, greeting and app tiles from the copy this browser saved on the last visit,
+  // before Firebase has even finished downloading. The live data (script below) replaces it a moment later.
   // ── MODULE REGISTRY ──
   // Everything on the home page lives here. `key` gates on users/{uid}.modules;
   // `staff: true` tiles are not module-gated — they follow the person's roles.
@@ -219,23 +220,100 @@
     { group: 'manage', key: 'admin', staff: 'admin', name: 'Admin',    desc: 'Event requests, rooms, Bedside, vans, and access', icon: '🛠️', href: 'admin.html' },
   ];
 
+  function accessFor(m, modules, roles, isAdmin) {
+    if (m.always) return 'open';
+    if (m.staff === 'staff') return (isAdmin || roles.graphics || roles.marketing) ? 'open' : 'hidden';
+    if (m.staff === 'admin') return (isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview || roles.clearances || roles.facilities) ? 'open' : 'hidden';
+    if (modules[m.key] === true) return 'open';
+    return m.hideIfLocked ? 'hidden' : 'locked';
+  }
+
+  function renderModules(data) {
+    data = data || {};
+    const modules = data.modules || {}, roles = data.roles || {}, isAdmin = data.isAdmin === true;
+
+    // Every ordinary app always shows a tile: open ones go straight in; locked ones are dashed and,
+    // when tapped, send an access request to the admins. Staff-only tools simply stay out of sight.
+    let n = 0;
+    const html = GROUPS.map(g => {
+      const tiles = MODULES.filter(m => m.group === g.id).map(m => ({ m, a: accessFor(m, modules, roles, isAdmin) })).filter(x => x.a !== 'hidden');
+      if (!tiles.length) return '';
+      return `<section class="sect"><div class="sect-head"><h2>${g.title}</h2><p>${g.sub}</p><span class="rail"></span></div><div class="tiles">` +
+        tiles.map(({ m, a }) => {
+          const style = `style="animation-delay:${(n++) * 0.04}s"`;
+          const inner = `<div class="ico">${m.icon}</div><div class="txt"><b>${m.name}${a === 'locked' ? ' <span class="lock">🔒 Locked</span>' : ''}</b><small>${a === 'locked' ? 'Tap to request access from an admin' : m.desc}</small></div><span class="go">→</span>`;
+          return a === 'open'
+            ? `<a class="tile ${g.tone}" href="${m.href}" ${style}>${inner}</a>`
+            : `<button type="button" class="tile locked ${g.tone}" data-request="${m.key}" data-name="${m.name}" ${style}>${inner}</button>`;
+        }).join('') + `</div></section>`;
+    }).join('');
+    document.getElementById('moduleGrid').innerHTML = html || '<div class="empty"><b>No apps yet</b>Ask an admin to add you.</div>';
+  }
+
+
+  const HOME_CACHE = 'rcc.home.v1';
+  function readHomeCache() { try { const c = JSON.parse(localStorage.getItem(HOME_CACHE)); return c && c.uid && c.isMember ? c : null; } catch (e) { return null; } }
+  function writeHomeCache(c) { try { localStorage.setItem(HOME_CACHE, JSON.stringify(c)); } catch (e) { /* private window: just skip */ } }
+  function clearHomeCache() { try { localStorage.removeItem(HOME_CACHE); } catch (e) { /* nothing saved */ } }
+  function setGreeting(name) {
+    const first = name ? name.split(' ')[0] : '';
+    const h = new Date().getHours();
+    document.getElementById('welcomeTitle').textContent = (h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening') + (first ? ', ' + first : '');
+    document.getElementById('today').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  }
+  function signOutHome() { clearHomeCache(); if (typeof auth !== 'undefined') auth.signOut(); }
+  window.homeFromCache = null;
+  (function () {
+    const c = readHomeCache();
+    if (!c) return;
+    window.homeFromCache = c.uid;
+    document.getElementById('bootScreen').hidden = true;
+    document.getElementById('appShell').style.display = 'block';
+    setGreeting(c.name);
+    RccShell.render(document.getElementById('rccNav'), { active: 'home', user: { displayName: c.name, email: c.email }, roles: Object.assign({}, c.roles, { isAdmin: c.isAdmin }), onSignOut: signOutHome });
+    document.getElementById('welcomeSub').textContent = 'Pick up where you left off, or start something new.';
+    document.querySelector('.foot').hidden = false;
+    renderModules({ modules: c.modules, roles: c.roles, isAdmin: c.isAdmin });
+  })();
+  // If nothing has appeared after a long wait, say so instead of leaving a blank "Loading…".
+  setTimeout(function () {
+    const b = document.getElementById('bootScreen');
+    if (b && !b.hidden) b.querySelector('p').textContent = 'This is taking longer than usual. Check your connection, then refresh the page.';
+  }, 12000);
+</script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="room-logic.js"></script>
+<script>
+  const firebaseConfig = RCC.firebaseConfig;
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
+  // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
+  RCC.tuneFirestore(db);
+  RCC.dialog(document.getElementById('requestModal'), { dialog: document.querySelector('#requestModal .modal'), label: 'Request app access' });
+
   let currentUser = null;
   let lastUserData = null;
   let isMember = true;
 
   auth.onAuthStateChanged(async user => {
+    document.getElementById('bootScreen').hidden = true;
     if (user) {
       currentUser = user;
+      // The saved copy belonged to someone else on this browser: drop it and start from "Loading…".
+      if (window.homeFromCache && window.homeFromCache !== user.uid) {
+        clearHomeCache(); window.homeFromCache = null;
+        document.getElementById('moduleGrid').innerHTML = '<div class="empty">Loading your apps…</div>';
+        document.querySelector('.foot').hidden = true;
+      }
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('appShell').style.display = 'block';
-      const first = user.displayName ? user.displayName.split(' ')[0] : '';
-      const h = new Date().getHours();
-      document.getElementById('welcomeTitle').textContent = (h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening') + (first ? ', ' + first : '');
-      document.getElementById('today').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-
-      await ensureUserDoc(user);
+      setGreeting(user.displayName);
       loadModules(user.uid);
     } else {
+      clearHomeCache();
       currentUser = null;
       document.getElementById('loginScreen').style.display = 'flex';
       document.getElementById('appShell').style.display = 'none';
@@ -331,50 +409,23 @@
 
   function loadModules(uid) {
     db.collection('users').doc(uid).onSnapshot(async doc => {
+      // First sign-in (or an old profile with no app list): create/repair it; this listener fires again with the result.
+      if (!doc.exists || !(doc.data() || {}).modules) { await ensureUserDoc(currentUser); return; }
       lastUserData = doc.data() || {};
       isMember = await computeMember(currentUser, lastUserData);
       const roles = Object.assign({}, lastUserData.roles || {}, { isAdmin: lastUserData.isAdmin === true });
-      RccShell.render(document.getElementById('rccNav'), { active: 'home', user: currentUser, roles: Object.assign({}, roles, { pending: !isMember }), onSignOut: () => auth.signOut() });
+      RccShell.render(document.getElementById('rccNav'), { active: 'home', user: currentUser, roles: Object.assign({}, roles, { pending: !isMember }), onSignOut: signOutHome });
       document.querySelector('.foot').hidden = !isMember;
-      if (!isMember) { watchNeeds({}); renderWaiting(lastUserData); if (lastUserData.approvalDeclined !== true) fileSignupRequest(currentUser); return; }
+      if (!isMember) { clearHomeCache(); watchNeeds({}); renderWaiting(lastUserData); if (lastUserData.approvalDeclined !== true) fileSignupRequest(currentUser); return; }
       document.getElementById('welcomeSub').textContent = 'Pick up where you left off, or start something new.';
-      renderModules();
+      renderModules(lastUserData);
+      writeHomeCache({ uid, name: currentUser.displayName || '', email: currentUser.email || '', roles: lastUserData.roles || {}, isAdmin: lastUserData.isAdmin === true, modules: lastUserData.modules || {}, isMember: true });
       watchNeeds(roles);
     }, err => {
       document.getElementById('moduleGrid').innerHTML =
         '<div class="empty"><b>Could not load your apps</b>Please refresh and try again.</div>';
       console.error(err);
     });
-  }
-
-  function accessFor(m, modules, roles, isAdmin) {
-    if (m.always) return 'open';
-    if (m.staff === 'staff') return (isAdmin || roles.graphics || roles.marketing) ? 'open' : 'hidden';
-    if (m.staff === 'admin') return (isAdmin || roles.vanAdmin || roles.bedsideAdmin || roles.overview || roles.clearances || roles.facilities) ? 'open' : 'hidden';
-    if (modules[m.key] === true) return 'open';
-    return m.hideIfLocked ? 'hidden' : 'locked';
-  }
-
-  function renderModules() {
-    const data = lastUserData || {};
-    const modules = data.modules || {}, roles = data.roles || {}, isAdmin = data.isAdmin === true;
-
-    // Every ordinary app always shows a tile: open ones go straight in; locked ones are dashed and,
-    // when tapped, send an access request to the admins. Staff-only tools simply stay out of sight.
-    let n = 0;
-    const html = GROUPS.map(g => {
-      const tiles = MODULES.filter(m => m.group === g.id).map(m => ({ m, a: accessFor(m, modules, roles, isAdmin) })).filter(x => x.a !== 'hidden');
-      if (!tiles.length) return '';
-      return `<section class="sect"><div class="sect-head"><h2>${g.title}</h2><p>${g.sub}</p><span class="rail"></span></div><div class="tiles">` +
-        tiles.map(({ m, a }) => {
-          const style = `style="animation-delay:${(n++) * 0.04}s"`;
-          const inner = `<div class="ico">${m.icon}</div><div class="txt"><b>${m.name}${a === 'locked' ? ' <span class="lock">🔒 Locked</span>' : ''}</b><small>${a === 'locked' ? 'Tap to request access from an admin' : m.desc}</small></div><span class="go">→</span>`;
-          return a === 'open'
-            ? `<a class="tile ${g.tone}" href="${m.href}" ${style}>${inner}</a>`
-            : `<button type="button" class="tile locked ${g.tone}" data-request="${m.key}" data-name="${m.name}" ${style}>${inner}</button>`;
-        }).join('') + `</div></section>`;
-    }).join('');
-    document.getElementById('moduleGrid').innerHTML = html || '<div class="empty"><b>No apps yet</b>Ask an admin to add you.</div>';
   }
 
   document.addEventListener('click', e => {

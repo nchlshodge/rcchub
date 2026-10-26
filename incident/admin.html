@@ -3,14 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://www.gstatic.com">
+  <link rel="preload" href="../assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../assets/fonts/playfair-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../rcc-base.css">
 <title>RCC — Incident Report Admin</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
-
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-functions-compat.js"></script>
-<script src="../rcc-audit.js"></script>
 
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -66,6 +63,7 @@
 <style>.embedded #appShell>header,.embedded #appShell>nav.nav,.embedded .topbar{display:none!important}</style>
 </head>
 <body>
+<div id="rccBoot" class="rcc-boot" role="status"><img src="../assets/rcc-logo-plain-96.png" width="64" height="64" alt=""><b>RCC</b><span>Loading…</span></div>
 
 <div id="loginScreen">
   <h1 style="font-family:'Playfair Display',serif; font-size:28px; margin-bottom:20px;">RCC Incident Report Admin</h1>
@@ -115,6 +113,11 @@
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-functions-compat.js"></script>
+<script src="../rcc-audit.js"></script>
 <script src="../rcc-common.js"></script>
 <script>
   const firebaseConfig = RCC.firebaseConfig;
