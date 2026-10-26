@@ -94,6 +94,11 @@
   .camera-box img{max-width:100%;border-radius:10px;margin-top:10px;}
   .upload-progress{font-size:13px;color:var(--blue);margin-top:8px;}
   .banner-safe{background:var(--safe-dim);color:var(--safe-ink);padding:14px 16px;border-radius:14px;margin-top:12px;font-weight:600;}
+  .stepbar{display:flex;gap:4px;list-style:none;padding:0;margin:0 0 18px;}
+  .stepbar li{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12.5px;font-weight:600;color:var(--muted);padding:8px 6px;border-radius:999px;background:var(--bg-soft);white-space:nowrap;}
+  .stepbar li span{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#fff;border:1px solid var(--border-2);font-size:12px;flex:none;}
+  .stepbar li.cur{background:var(--blue);color:#fff;} .stepbar li.cur span{background:#fff;color:var(--blue-ink);border-color:transparent;}
+  .stepbar li.done{background:var(--safe-dim);color:var(--safe-ink);} .stepbar li.done span{background:var(--safe);color:#fff;border-color:transparent;}
   .needs-list{font-size:13.5px;color:var(--muted);margin-top:14px;line-height:1.5;}
   .banner-danger{background:var(--danger-dim);color:var(--danger-ink);padding:14px 16px;border-radius:14px;margin-top:12px;font-weight:700;}
   .nav-tabs{display:flex;gap:4px;background:var(--bg-soft);border-radius:999px;padding:4px;margin-bottom:18px;overflow-x:auto;}
@@ -914,6 +919,21 @@ function GasGauge({
     }
   }, "Pick the closest mark at or below the needle — e.g. between 3/4 and Full, pick 3/4."));
 }
+
+// A small "1 Photos · 2 Readings · 3 Confirm" marker for multi-step screens.
+function StepBar({
+  step,
+  labels
+}) {
+  return /*#__PURE__*/React.createElement("ol", {
+    className: "stepbar",
+    "aria-label": `Step ${step} of ${labels.length}: ${labels[step - 1]}`
+  }, labels.map((l, i) => /*#__PURE__*/React.createElement("li", {
+    key: l,
+    className: i + 1 === step ? 'cur' : i + 1 < step ? 'done' : '',
+    "aria-current": i + 1 === step ? 'step' : undefined
+  }, /*#__PURE__*/React.createElement("span", null, i + 1 < step ? '\u2713' : i + 1), l)));
+}
 function CheckoutFlow({
   user,
   van,
@@ -937,6 +957,14 @@ function CheckoutFlow({
   const [cleanUploading, setCleanUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [step, setStep] = useState(draft.dashPhoto && draft.odoPhoto ? draft.mileage && draft.gas != null ? 3 : draft.mileage ? 2 : 1 : 1);
+  function go(n) {
+    setStep(n);
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }
   const relevantLights = warningLights.filter(l => !l.van || l.van === van.id);
   const safetyLightsOn = checkedLights.filter(id => {
     const l = relevantLights.find(x => x.id === id);
@@ -992,17 +1020,19 @@ function CheckoutFlow({
     });
   }
   const canSubmit = keysConfirmed && mileage && gas !== null && dashPhoto && odoPhoto && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && clean !== null && cleanPhoto && confirmed && !saving;
-  // So a greyed-out button always says what is still missing.
-  const missing = [];
-  if (!keysConfirmed) missing.push('confirm you have the keys');
-  if (!mileage) missing.push('the mileage');
-  if (gas === null) missing.push('the gas level');
-  if (!dashPhoto) missing.push('the dashboard photo');
-  if (!odoPhoto) missing.push('the odometer close-up photo');
-  if (otherLightChecked && !otherLightDesc) missing.push('a description of the other warning light');
-  if (clean === null) missing.push('whether the van is clean');
-  if (!cleanPhoto) missing.push('the interior photo');
-  if (!confirmed) missing.push('the confirmation box');
+  // So a greyed-out button always says what is still missing, for the step you are on.
+  const missing1 = [];
+  if (!dashPhoto) missing1.push('the dashboard photo');
+  if (!odoPhoto) missing1.push('the odometer close-up photo');
+  if (!mileage) missing1.push('the mileage');
+  const missing2 = [];
+  if (gas === null) missing2.push('the gas level');
+  if (otherLightChecked && !otherLightDesc) missing2.push('a description of the other warning light');
+  const missing3 = [];
+  if (clean === null) missing3.push('whether the van is clean');
+  if (!cleanPhoto) missing3.push('the interior photo');
+  if (!confirmed) missing3.push('the confirmation box');
+  const missing = step === 1 ? missing1 : step === 2 ? missing2 : missing3;
   async function finishCheckout() {
     setSaving(true);
     const lightNames = checkedLights.map(id => relevantLights.find(l => l.id === id)?.name).filter(Boolean);
@@ -1070,9 +1100,12 @@ function CheckoutFlow({
     className: "content"
   }, /*#__PURE__*/React.createElement("div", {
     className: "card"
-  }, /*#__PURE__*/React.createElement("h2", null, "Dashboard Check"), /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement(StepBar, {
+    step: step,
+    labels: ['Dashboard', 'Gas & lights', 'Confirm']
+  }), step === 1 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h2", null, "Dashboard"), /*#__PURE__*/React.createElement("p", {
     className: "muted"
-  }, "One photo of the full dashboard, then confirm what it shows below."), /*#__PURE__*/React.createElement(CameraCapture, {
+  }, "Two photos — the whole dashboard, then a close-up of the odometer — and the mileage it shows."), /*#__PURE__*/React.createElement(CameraCapture, {
     label: "Take a photo of the full dashboard",
     photoUrl: dashPhoto,
     uploading: dashUploading,
@@ -1093,7 +1126,9 @@ function CheckoutFlow({
     value: mileage,
     onChange: e => setMileage(e.target.value),
     placeholder: `Last known: ${van.mileage}`
-  }), /*#__PURE__*/React.createElement("label", null, "Gas Level"), /*#__PURE__*/React.createElement(GasGauge, {
+  })), step === 2 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h2", null, "Gas & warning lights"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Set the gas level, and tick anything lit on the dash."), /*#__PURE__*/React.createElement("label", null, "Gas Level"), /*#__PURE__*/React.createElement(GasGauge, {
     value: gas,
     onChange: setGas
   }), /*#__PURE__*/React.createElement("label", null, "Warning Lights — check off anything lit on the dash"), relevantLights.map(l => {
@@ -1150,7 +1185,9 @@ function CheckoutFlow({
     className: "banner-safe"
   }, nonSafetyLightsOn.map(id => relevantLights.find(l => l.id === id)?.feedback).filter(Boolean).join(' ')), safetyLightsOn.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "banner-danger"
-  }, safetyLightsOn.map(id => relevantLights.find(l => l.id === id)?.name).join(', '), " — this is a known safety issue. Please call Nicholas right now before taking the van."), /*#__PURE__*/React.createElement("label", {
+  }, safetyLightsOn.map(id => relevantLights.find(l => l.id === id)?.name).join(', '), " — this is a known safety issue. Please call Nicholas right now before taking the van.")), step === 3 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h2", null, "Confirm"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Last step: the van's cleanliness, then confirm."), /*#__PURE__*/React.createElement("label", {
     style: {
       marginTop: 20
     }
@@ -1191,14 +1228,21 @@ function CheckoutFlow({
       fontWeight: 400,
       fontSize: 14
     }
-  }, "I confirm the mileage, gas level, and warning lights above match what I see on the dashboard."))), !canSubmit && !saving && safetyLightsOn.length === 0 && missing.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "I confirm the mileage, gas level, and warning lights above match what I see on the dashboard.")))), !saving && safetyLightsOn.length === 0 && missing.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "needs-list",
     role: "status"
-  }, "Still needed: ", missing.join(', '), "."), /*#__PURE__*/React.createElement("button", {
+  }, "Still needed: ", missing.join(', '), "."), step < 3 && /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    disabled: missing.length > 0 || safetyLightsOn.length > 0,
+    onClick: () => go(step + 1)
+  }, safetyLightsOn.length > 0 ? 'Call Nicholas before continuing' : step === 1 ? 'Next: Gas & lights' : 'Next: Confirm'), step === 3 && /*#__PURE__*/React.createElement("button", {
     className: "primary",
     disabled: !canSubmit,
     onClick: finishCheckout
-  }, saving ? 'Saving...' : safetyLightsOn.length > 0 ? 'Call Nicholas before continuing' : 'Confirm & Drive Safely')));
+  }, saving ? 'Saving...' : safetyLightsOn.length > 0 ? 'Call Nicholas before continuing' : 'Confirm & Drive Safely'), step > 1 && !saving && /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    onClick: () => go(step - 1)
+  }, "Back")));
 }
 
 // ---------- Return Flow ----------

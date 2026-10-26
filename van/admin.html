@@ -96,6 +96,11 @@
   .nav-tabs{display:flex;gap:4px;background:var(--bg-soft);border-radius:999px;padding:4px;margin-bottom:18px;overflow-x:auto;}
   .nav-tabs button{flex:1;padding:10px 14px;background:none;border:none;font-size:14px;font-weight:600;color:var(--muted);border-radius:999px;white-space:nowrap;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s var(--ease);}
   .nav-tabs button:hover{color:var(--text);}
+  .group-tabs button{font-size:15px;}
+  .group-tabs .gbadge{display:inline-block;margin-left:7px;min-width:20px;padding:1px 7px;border-radius:999px;background:var(--danger);color:#fff;font-size:12px;font-weight:700;}
+  .sub-tabs{background:transparent;padding:0;gap:6px;margin-top:-6px;}
+  .sub-tabs button{flex:none;background:var(--bg-soft);font-size:13.5px;padding:8px 14px;}
+  .sub-tabs button.active{background:var(--blue);color:#fff;box-shadow:none;}
   .nav-tabs button.active{background:#fff;color:var(--blue-ink);box-shadow:0 1px 3px rgba(60,40,10,.15);}
   .link-btn{background:none;border:none;color:var(--blue);font-size:15px;font-weight:600;text-decoration:underline;padding:8px 0;cursor:pointer;font-family:'Inter',sans-serif;}
   .step-dot{display:flex;gap:6px;justify-content:center;margin-bottom:16px;padding-top:16px;}
@@ -1041,6 +1046,40 @@ function SafetyBlockAlertCard({
 function currentUserUid() {
   return auth.currentUser ? auth.currentUser.uid : null;
 }
+
+// The admin screen has 13 pages; they are grouped so only 4 + a few show at a time. Counts roll up into the group.
+const ADMIN_GROUPS = [{
+  key: 'people',
+  label: 'People',
+  tabs: ['approvals', 'adddriver', 'team']
+}, {
+  key: 'trips',
+  label: 'Trips',
+  tabs: ['checkinout', 'schedule', 'recurring', 'history', 'mileage']
+}, {
+  key: 'vans',
+  label: 'Vans',
+  tabs: ['vans', 'lights']
+}, {
+  key: 'maint',
+  label: 'Upkeep',
+  tabs: ['alerts', 'maint', 'repairs']
+}];
+const ADMIN_TAB_LABEL = {
+  approvals: 'Drivers',
+  adddriver: 'Add Driver',
+  team: 'Team',
+  checkinout: 'Check In/Out',
+  schedule: 'Schedule',
+  recurring: 'Recurring',
+  history: 'History',
+  mileage: 'Mileage',
+  vans: 'Vans',
+  lights: 'Lights',
+  alerts: 'Alerts',
+  maint: 'Maint.',
+  repairs: 'Repairs'
+};
 function AdminDashboard({
   allUsers,
   vans,
@@ -1053,12 +1092,20 @@ function AdminDashboard({
   recurringRequests
 }) {
   const [tab, setTab] = useState(window.location.hash === '#mileage' ? 'mileage' : 'approvals');
+  const lastTabInGroup = useRef({}); // so choosing a group again returns to the page you were on
   const driverUsers = allUsers.filter(u => u.vanRentalProfile);
   const pending = driverUsers.filter(u => u.vanRentalProfile.status === 'pending');
   const approved = driverUsers.filter(u => u.vanRentalProfile.status === 'approved');
   const openAlerts = alerts.filter(a => !a.resolved);
   const openMileage = (mileageFlags || []).filter(f => (f.status || 'open') === 'open');
   const recurringPendingCount = recurringRequests.filter(r => r.status === 'pending' || r.status === 'renewal_requested').length;
+  const tabCount = {
+    recurring: recurringPendingCount,
+    mileage: openMileage.length,
+    alerts: openAlerts.length
+  };
+  const group = ADMIN_GROUPS.find(g => g.tabs.includes(tab)) || ADMIN_GROUPS[0];
+  lastTabInGroup.current[group.key] = tab;
   const driverName = uid_ => ((allUsers || []).find(u => u.id === uid_) || {}).name || uid_;
   const vanLabel = id => ((vans || []).find(v => v.id === id) || {}).name || id;
   async function approve(uid_) {
@@ -1548,48 +1595,32 @@ function AdminDashboard({
   }
   return /*#__PURE__*/React.createElement("div", {
     className: "content"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "nav-tabs"
-  }, /*#__PURE__*/React.createElement("button", {
-    className: tab === 'approvals' ? 'active' : '',
-    onClick: () => setTab('approvals')
-  }, "Drivers"), /*#__PURE__*/React.createElement("button", {
-    className: tab === 'adddriver' ? 'active' : '',
-    onClick: () => setTab('adddriver')
-  }, "Add Driver"), /*#__PURE__*/React.createElement("button", {
-    className: tab === 'vans' ? 'active' : '',
-    onClick: () => setTab('vans')
-  }, "Vans"), /*#__PURE__*/React.createElement("button", {
-    className: tab === 'checkinout' ? 'active' : '',
-    onClick: () => setTab('checkinout')
-  }, "Check In/Out"), /*#__PURE__*/React.createElement("button", {
-    className: tab === 'schedule' ? 'active' : '',
-    onClick: () => setTab('schedule')
-  }, "Schedule"), /*#__PURE__*/React.createElement("button", {
-    className: tab === 'history' ? 'active' : '',
-    onClick: () => setTab('history')
-  }, "History"), /*#__PURE__*/React.createElement("button", {
-    className: tab === 'recurring' ? 'active' : '',
-    onClick: () => setTab('recurring')
-  }, "Recurring", recurringPendingCount > 0 ? ` (${recurringPendingCount})` : ''), /*#__PURE__*/React.createElement("button", {
-    className: tab === 'team' ? 'active' : '',
-    onClick: () => setTab('team')
-  }, "Team"), /*#__PURE__*/React.createElement("button", {
-    className: tab === 'repairs' ? 'active' : '',
-    onClick: () => setTab('repairs')
-  }, "Repairs"), /*#__PURE__*/React.createElement("button", {
-    className: tab === 'lights' ? 'active' : '',
-    onClick: () => setTab('lights')
-  }, "Lights"), /*#__PURE__*/React.createElement("button", {
-    className: tab === 'mileage' ? 'active' : '',
-    onClick: () => setTab('mileage')
-  }, "Mileage", openMileage.length > 0 ? ` (${openMileage.length})` : ''), /*#__PURE__*/React.createElement("button", {
-    className: tab === 'alerts' ? 'active' : '',
-    onClick: () => setTab('alerts')
-  }, "Alerts", openAlerts.length > 0 ? ` (${openAlerts.length})` : ''), /*#__PURE__*/React.createElement("button", {
-    className: tab === 'maint' ? 'active' : '',
-    onClick: () => setTab('maint')
-  }, "Maint.")), tab === 'approvals' && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("nav", {
+    className: "nav-tabs group-tabs",
+    "aria-label": "Van admin sections"
+  }, ADMIN_GROUPS.map(g => {
+    const n = g.tabs.reduce((sum, t) => sum + (tabCount[t] || 0), 0),
+      on = g.key === group.key;
+    return /*#__PURE__*/React.createElement("button", {
+      key: g.key,
+      "aria-current": on ? 'page' : undefined,
+      className: on ? 'active' : '',
+      onClick: () => {
+        if (!on) setTab(lastTabInGroup.current[g.key] || g.tabs[0]);
+      }
+    }, g.label, n > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "gbadge",
+      "aria-label": `${n} waiting`
+    }, n));
+  })), /*#__PURE__*/React.createElement("nav", {
+    className: "nav-tabs sub-tabs",
+    "aria-label": `${group.label} pages`
+  }, group.tabs.map(t => /*#__PURE__*/React.createElement("button", {
+    key: t,
+    "aria-current": tab === t ? 'page' : undefined,
+    className: tab === t ? 'active' : '',
+    onClick: () => setTab(t)
+  }, ADMIN_TAB_LABEL[t], tabCount[t] > 0 ? ` (${tabCount[t]})` : ''))), tab === 'approvals' && /*#__PURE__*/React.createElement("div", {
     className: "card"
   }, /*#__PURE__*/React.createElement("h3", null, "Pending Applications"), pending.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "muted"
