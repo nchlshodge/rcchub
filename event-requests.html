@@ -427,7 +427,7 @@
 
   function statusChip(r) {
     const s = statusOf(r);
-    if (r.completed === true && s === 'approved') return '<span class="pill green">✓ Completed</span>';
+    if (RCC.isRequestDone(r) && s === 'approved') return '<span class="pill green">✓ Completed</span>';
     return '<span class="pill ' + (s === 'approved' ? 'green' : s === 'denied' ? 'gray' : 'blue') + '">' + (s === 'new' ? 'Needs approval' : s === 'approved' ? 'Approved' : 'Denied') + '</span>';
   }
   function typeChip(r) { return r.requestType ? '<span class="pill gray">' + esc(TYPE_LABELS[r.requestType] || r.requestType) + '</span>' : ''; }
@@ -478,7 +478,7 @@
     const upcoming = [], past = [], undated = [], overdue = [], doneList = [];
     list.forEach(r => {
       const d = placeDate(r);
-      if (r.completed === true && statusOf(r) === 'approved') doneList.push(r);
+      if (RCC.isRequestDone(r) && statusOf(r) === 'approved') doneList.push(r);
       else if (!d) undated.push(r); else if (graphicOverdue(r)) overdue.push(r); else if (d < TODAY) past.push(r); else upcoming.push(r);
     });
     overdue.sort(byDate);
@@ -561,7 +561,7 @@
       const over = d < TODAY;
       steps.push({ state: over ? 'done' : 'todo', title: over ? 'Event has happened' : 'Event day', sub: fmtLong(d) + (whenLabel(d) ? ' · ' + whenLabel(d) : '') });
     }
-    if (r.completed === true) {
+    if (RCC.isRequestDone(r)) {
       const cd = r.completedAt ? new Date(r.completedAt) : null;
       steps.push({ state: 'done', title: 'Completed', sub: cd && !isNaN(cd) ? cd.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '' });
     }
@@ -623,11 +623,12 @@
   // Creative Timeline and the reminders; nothing else about it changes.
   function completeRowHtml(r) {
     if (!isAdmin || statusOf(r) !== 'approved') return '';
-    if (r.completed === true) {
+    if (RCC.isRequestDone(r)) {
       const cd = r.completedAt ? new Date(r.completedAt) : null;
-      return '<div class="p-sec"><div class="box" style="background:var(--green-soft);border-color:transparent;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;"><span><b>✓ Completed</b>' + (cd && !isNaN(cd) ? ' on ' + esc(cd.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) : '') + '</span><button type="button" class="btn small" id="reopenReq">Reopen</button></div></div>';
+      const how = r.completed === true ? (cd && !isNaN(cd) ? ' on ' + esc(cd.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) : '') : ' <span class="hint">— everything on it is finished</span>';
+      return '<div class="p-sec"><div class="box" style="background:var(--green-soft);border-color:transparent;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;"><span><b>✓ Completed</b>' + how + '</span><button type="button" class="btn small" id="reopenReq">Reopen</button></div></div>';
     }
-    return '<div class="p-sec"><button type="button" class="btn good" id="markComplete">✓ Mark this request complete</button> <span class="hint">Moves it to Completed and takes it off the Creative Timeline and reminders.</span></div>';
+    return '<div class="p-sec"><button type="button" class="btn good" id="markComplete">✓ Mark this request complete</button> <span class="hint">' + (r.completed === false ? 'You reopened this, so it stays open until you complete it again.' : 'It also completes by itself once the calendar, graphic and marketing are all finished. Use this if plans changed.') + ' Moves it to Completed and takes it off the Creative Timeline and reminders.</span></div>';
   }
 
   // The graphic's due date, set right inside Progress (admins and the graphics team). Saves as soon as a date is picked.

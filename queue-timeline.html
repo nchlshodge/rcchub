@@ -366,10 +366,7 @@
     const hasMarketing = marketingHasWork(r.marketing);
     const relevant = hasCalendar || hasGraphic || hasMarketing;
 
-    const completed = r.completed === true || relevant &&
-      (!hasCalendar || r.calendarAdded === true) &&
-      (!hasGraphic || r.graphicStatus === 'Completed') &&
-      (!hasMarketing || r.marketingStatus === 'Completed');
+    const completed = RCC.isRequestDone(r);   // marked complete by an admin, or everything on it is finished
 
     const pending = r.status !== 'approved' && r.status !== 'denied';
 

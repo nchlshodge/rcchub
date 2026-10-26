@@ -19,6 +19,21 @@
     catch (e) { /* keep going with the default connection */ }
   };
 
+  // Is an event/media request finished? Yes when an admin marked it complete, OR when it is approved and everything
+  // it asked for is done (calendar added, graphic Completed, marketing Completed). An admin who reopened it
+  // (completed === false) keeps it open until they complete it again, even if every item is done.
+  RCC.isRequestDone = function (r) {
+    if (r.completed === true) return true;
+    if (r.completed === false || r.status !== 'approved') return false;
+    var hasCalendar = r.requestType === 'church_event';
+    var hasGraphic = Array.isArray(r.mediaSizes) && r.mediaSizes.length > 0;
+    var m = r.marketing, hasMarketing = Array.isArray(m) && m.length > 0 && !(m.length === 1 && m[0] === 'None');
+    if (!hasCalendar && !hasGraphic && !hasMarketing) return false;
+    return (!hasCalendar || r.calendarAdded === true) &&
+           (!hasGraphic || r.graphicStatus === 'Completed') &&
+           (!hasMarketing || r.marketingStatus === 'Completed');
+  };
+
   // Make user-typed text safe to put inside HTML. escAttr also covers single quotes (for '...' attributes).
   RCC.esc = function (s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

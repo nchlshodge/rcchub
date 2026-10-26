@@ -23,7 +23,7 @@
       --border-mid: rgba(0,0,0,0.14);
       --text:       #1a1a1a;
       --text-mid:   #57514a;
-      --text-soft:  #857e73;
+      --text-soft:  #6e695f;  /* same warm grey, darkened to hold 4.5:1 on cream, raised panels and white (was #857e73: 3.3-4.0:1) */
       --blue:       #2557b8;
       --blue-dim:   rgba(37,87,184,0.08);
       --blue-glow:  rgba(37,87,184,0.20);
@@ -202,7 +202,7 @@
     }
     body { background: radial-gradient(1100px 420px at 50% -180px, #fff9ea 0%, rgba(255,249,234,0) 70%), var(--bg); }
     h1, h2, h3, .card-title, .section-title, .login-title { font-weight: 500; letter-spacing: -.01em; }
-    :focus-visible { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; border-radius: 6px; }
+    :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
     header { background: var(--glass); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); height: 64px; }
     .logo { font-size: 23px; font-weight: 500; }
     .header-right a { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255,255,255,.6); font-weight: 500; transition: background .2s, color .2s; }
@@ -251,6 +251,18 @@
     #googleSignInBtn:hover { transform: translateY(-1px); box-shadow: var(--shadow-2); }
     .banner { border-radius: 0 0 16px 16px; }
 
+    /* ===== Overview: the original plain cards, plus only what the fixes need ===== */
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    #overviewCards a.card { display: block; text-decoration: none; }
+    #overviewCards .card-text { margin-bottom: 0; }
+    #overviewCards .card-text strong { font-weight: 600; color: var(--text); }
+    #overviewCards .is-static, #overviewCards .is-error, #overviewCards .is-loading { cursor: default; }
+    #overviewCards .is-error { border-color: rgba(160,48,48,.35); }
+    #overviewCards .is-error .card-text { color: var(--red); }
+    #overviewCards .queue-skel { display: block; background: var(--bg-raised); border-radius: 6px; }
+    #overviewCards .queue-skel-title { width: 38%; height: 19px; margin-bottom: 8px; }
+    #overviewCards .queue-skel-text { width: 62%; height: 14px; }
+
     .cl-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
     .cl-chip { border: 1px solid var(--border-mid, #d9d1c1); background: #fff; color: var(--text-mid); border-radius: 999px; padding: 7px 14px; font-size: 13.5px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all .2s var(--ease); }
     .cl-chip b { font-weight: 600; background: var(--bg-raised); border-radius: 999px; padding: 1px 8px; margin-left: 6px; font-size: 12px; }
@@ -280,9 +292,17 @@
       .header-right a { padding: 5px 10px; white-space: nowrap; }
       .logo span { display: none; }
       main { padding: 18px 12px 80px; }
-      .gtab { padding: 8px 14px; font-size: 13.5px; }
+      .gtab { padding: 8px 14px; font-size: 13.5px; min-height: 44px; }
+      #subNav .stab { min-height: 44px; }
+      /* A soft fade on the edge that still has more tabs, so it's clear the row scrolls. */
+      nav#groupNav.more-right, #subNav.more-right { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+      nav#groupNav.more-left, #subNav.more-left { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent); }
+      nav#groupNav.more-left.more-right, #subNav.more-left.more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
       .section-title { font-size: 23px; }
     }
+    /* The tab rows scroll sideways, which clips an outside focus ring, so draw it inside the pill. */
+    .gtab:focus-visible, #subNav .stab:focus-visible { outline-offset: -3px; }
+    .gtab.active:focus-visible { outline-color: #fff; }
   </style>
 </head>
 <body>
@@ -314,9 +334,9 @@
     <nav id="subNav" aria-label="Section pages"></nav>
     <nav id="legacyNav">
       <div class="section-tab active" data-section="overview">Overview</div>
-      <div class="section-tab" data-section="bedside">Bedside</div>
+      <div class="section-tab" data-section="bedside">Bedside <span class="badge-count" id="bedsideCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="incidents">Incident Reports <span class="badge-count" id="incidentsCount" style="display:none;"></span></div>
-      <div class="section-tab" data-section="vans">Van Usage</div>
+      <div class="section-tab" data-section="vans">Van Usage <span class="badge-count" id="vansCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="events">Event Requests <span class="badge-count" id="eventsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="timeline">Creative Timeline</div>
       <div class="section-tab" data-section="workorders">Work Orders</div>
@@ -332,7 +352,8 @@
       <!-- OVERVIEW -->
       <div class="section active" id="section-overview">
         <h2 class="section-title">Overview</h2>
-        <div id="overviewCards"><div class="loading">Loading...</div></div>
+        <p class="sr-only" id="overviewSummary" role="status" aria-live="polite"></p>
+        <div id="overviewCards" aria-busy="true"></div>
       </div>
 
       <!-- BEDSIDE (full Bedside admin, embedded) -->
@@ -545,13 +566,9 @@
         const landingSection = (requestedSection && tabVisibility[requestedSection])
           ? requestedSection
           : (canOverview ? 'overview' : firstVisible);
-        document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.querySelector(`[data-section="${landingSection}"]`)?.classList.add('active');
-        document.getElementById('section-' + landingSection)?.classList.add('active');
-        loadEmbed(landingSection);
+        showSection(landingSection);
 
-        if (canOverview) { loadOverview({canBedside, canVan, isFullAdmin, canOverview}); }
+        if (canOverview) { loadOverview(); }
         if (isFullAdmin) { loadIncidentsBadgeOnly(); }
         if (isFullAdmin) { loadEventRequests(); loadTimeOffRequests(); loadNotificationEmails(); }
         if (isFullAdmin) { loadModuleManagement(); loadAccessRequests(); loadAdminManagement(); loadActivity(); }
@@ -567,14 +584,43 @@
   });
 
   // ── Top-level section switching ──
+  // showSection() changes what is on screen and never touches history. openSection() is what a person's
+  // choice calls: it also records the section in the address (?section=...) so the Back button returns
+  // to the previous section instead of leaving the dashboard.
+  function activeSectionKey() { const t = document.querySelector('.section-tab.active'); return t ? t.dataset.section : null; }
+  function showSection(key) {
+    document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    const tab = document.querySelector('.section-tab[data-section="' + key + '"]');
+    if (tab) tab.classList.add('active');
+    const sec = document.getElementById('section-' + key);
+    if (sec) sec.classList.add('active');
+    loadEmbed(key);
+    document.title = key === 'overview' ? 'RCC · Admin' : tabLabel(key) + ' · RCC Admin';
+  }
+  function openSection(key) {
+    if (activeSectionKey() === key) return;
+    try {
+      const url = new URL(location.href);
+      url.searchParams.set('section', key);
+      history.pushState({ section: key }, '', url.pathname + url.search + url.hash);
+    } catch (e) { /* history unavailable (e.g. a sandboxed preview): the section still opens */ }
+    showSection(key);
+  }
   document.querySelectorAll('.section-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById('section-' + tab.dataset.section).classList.add('active');
-      loadEmbed(tab.dataset.section);
-    });
+    tab.addEventListener('click', () => openSection(tab.dataset.section));
+  });
+  window.addEventListener('popstate', () => {
+    const asked = new URLSearchParams(location.search).get('section');
+    const firstShown = Array.from(document.querySelectorAll('.section-tab')).find(t => t.style.display !== 'none');
+    const key = asked && tabShown(asked) ? asked : (tabShown('overview') ? 'overview' : (firstShown ? firstShown.dataset.section : null));
+    if (!key) return;
+    showSection(key);
+    // Coming Back to Overview from a card: put focus on that card again instead of the top of the page.
+    if (key === 'overview' && cameFromCard) {
+      const card = document.querySelector('#overviewCards [data-go="' + cameFromCard + '"]');
+      if (card) card.focus();
+    }
   });
 
 
@@ -600,10 +646,22 @@
   function tabLabel(key) { const t = flatTab(key); return t ? t.firstChild.textContent.trim() : key; }
   function makeBadge(n) { const s = document.createElement('span'); s.className = 'badge-count'; s.textContent = n; return s; }
   const lastPageInGroup = {};
+  let cameFromCard = null;     // which Overview card was used to leave Overview, so Back can return to it
+  let navFocusUntil = 0;       // set when a card sends someone to a section: land focus on that section's tab
+  let lastSyncedKey = null;
+  // Phone: a soft fade on the edge(s) of a scrolling pill row so it is clear there is more to reach.
+  function updateNavFade(nav) {
+    const max = nav.scrollWidth - nav.clientWidth;
+    nav.classList.toggle('more-right', max > 4 && nav.scrollLeft < max - 4);
+    nav.classList.toggle('more-left', max > 4 && nav.scrollLeft > 4);
+  }
   function syncNav() {
     const activeTab = document.querySelector('.section-tab.active');
     const activeKey = activeTab ? activeTab.dataset.section : null;
     const gnav = document.getElementById('groupNav'), snav = document.getElementById('subNav');
+    // The bar is redrawn on every badge or section change, which would drop keyboard focus: remember it.
+    const had = document.activeElement;
+    const focusKey = had && (gnav.contains(had) || snav.contains(had)) && had.dataset ? had.dataset.nav : null;
     gnav.replaceChildren(); snav.replaceChildren();
     let activeGroup = null;
     NAV_GROUPS.forEach(g => {
@@ -613,6 +671,7 @@
       if (isActive) { activeGroup = { g, pages }; lastPageInGroup[g.key] = activeKey; }
       const btn = document.createElement('button');
       btn.type = 'button'; btn.className = 'gtab' + (isActive ? ' active' : '');
+      btn.dataset.nav = 'g:' + g.key;
       btn.appendChild(document.createTextNode(g.label));
       const total = pages.reduce((s, k) => s + tabBadge(k), 0);
       if (total) btn.appendChild(makeBadge(total));
@@ -626,6 +685,7 @@
       activeGroup.pages.forEach(k => {
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'stab' + (k === activeKey ? ' active' : '');
+        b.dataset.nav = 's:' + k;
         b.appendChild(document.createTextNode(tabLabel(k)));
         if (tabBadge(k)) b.appendChild(makeBadge(tabBadge(k)));
         b.addEventListener('click', () => flatTab(k).click());
@@ -633,7 +693,24 @@
       });
       snav.classList.add('show');
     } else { snav.classList.remove('show'); }
+    // Put keyboard focus back where it was (or on the section just opened from a card).
+    const arriving = performance.now() < navFocusUntil;
+    const target = arriving ? (snav.querySelector('.stab.active') || gnav.querySelector('.gtab.active'))
+      : (focusKey ? document.querySelector('[data-nav="' + focusKey + '"]') : null);
+    if (target) target.focus({ preventScroll: true });
+    // After a different section opens, bring its pill into view on a narrow screen (not on every badge update).
+    if (activeKey !== lastSyncedKey) {
+      lastSyncedKey = activeKey;
+      const act = gnav.querySelector('.gtab.active');
+      if (act && act.scrollIntoView) act.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    }
+    updateNavFade(gnav); updateNavFade(snav);
   }
+  ['groupNav', 'subNav'].forEach(id => {
+    const nav = document.getElementById(id);
+    nav.addEventListener('scroll', () => updateNavFade(nav), { passive: true });
+  });
+  window.addEventListener('resize', () => { updateNavFade(document.getElementById('groupNav')); updateNavFade(document.getElementById('subNav')); });
   // Redraw whenever the flat list changes (active page, who can see what, badge counts).
   let navQueued = false;
   new MutationObserver(() => { if (navQueued) return; navQueued = true; queueMicrotask(() => { navQueued = false; syncNav(); }); })
@@ -650,87 +727,192 @@
   }
 
   // ── OVERVIEW ──
-  // Pulls a handful of lightweight counts from across all apps and
-  // shows them as cards with a link into each department's own,
-  // full-featured admin page. This does NOT duplicate any admin
-  // actions — it's purely "what's going on, and where do I go to deal
-  // with it." Which cards show depends on what the viewer can access:
-  // a Department Head sees their own department's card here too, but
-  // clicking it just takes them to the tab they already have open
-  // access to; someone with ONLY the overview role sees every card
-  // (read-only counts) but the links still respect their actual
-  // permissions when they click through.
-  function loadOverview({canBedside, canVan, isFullAdmin, canOverview}) {
+  // "What is waiting, and where do I go to deal with it." Six queues, one count each, linked into
+  // the section that owns the work. This does NOT duplicate any admin actions.
+  // Only people with the Overview role get here (the Overview tab and the loadOverview() call are
+  // both gated on canOverview), and they see all six counts as read-only information. A row is a
+  // link only when this person can actually open that section; otherwise it says "view only"
+  // instead of going nowhere. One shared store (queueState) feeds both these rows and the red
+  // badges on the nav, so the two can never disagree.
+  const QUEUES = [   // fixed order, care and safety first, so the page never reshuffles as counts arrive
+    { key: 'incidents', title: 'Incident Reports', noun: ['report', 'reports'] },
+    { key: 'bedside',   title: 'Bedside',          noun: ['prayer request', 'prayer requests'] },
+    { key: 'vans',      title: 'Van Usage',        noun: ['driver application', 'driver applications'] },
+    { key: 'events',    title: 'Event Requests',   noun: ['event request', 'event requests'] },
+    { key: 'timeoff',   title: 'Time Off',         noun: ['request', 'requests'] },
+    { key: 'requests',  title: 'Access Requests',  noun: ['request', 'requests'] },
+  ];
+  const QUEUE_BADGE_ID = { incidents: 'incidentsCount', bedside: 'bedsideCount', vans: 'vansCount', events: 'eventsCount', timeoff: 'timeOffCount', requests: 'requestsCount' };
+  const queueState = {};   // key -> { status: 'loading' | 'ready' | 'error', count, oldest (ms or null), code }
+  const queueWatch = {};   // key -> { query, read, stop }, so "Try again" can re-attach
+  let queueBoardOn = false;
+
+  // Every count in the app goes through here: it updates the shared store, the matching nav badge,
+  // and (when the Overview is in use) the rows.
+  function setQueue(key, patch) {
+    queueState[key] = Object.assign({ status: 'loading', count: 0, oldest: null }, queueState[key], patch);
+    const s = queueState[key], badge = document.getElementById(QUEUE_BADGE_ID[key]);
+    if (badge && s.status === 'ready') {
+      if (s.count) { badge.textContent = s.count; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
+    }
+    if (queueBoardOn) renderQueues();
+  }
+
+  // Firestore timestamp, Date, or milliseconds -> milliseconds (null when missing or unreadable).
+  function msOf(v) {
+    if (!v) return null;
+    if (typeof v.toMillis === 'function') return v.toMillis();
+    if (v instanceof Date) return v.getTime();
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  function oldestMs(values) {
+    let m = null;
+    values.forEach(v => { const x = msOf(v); if (x !== null && (m === null || x < m)) m = x; });
+    return m;
+  }
+  function waitedText(ms) {
+    if (ms === null) return '';
+    const mins = Math.max(0, Math.round((Date.now() - ms) / 60000));
+    if (mins < 60) return 'under an hour';
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return hrs + (hrs === 1 ? ' hour' : ' hours');
+    const days = Math.round(hrs / 24);
+    if (days < 14) return days + (days === 1 ? ' day' : ' days');
+    return Math.round(days / 7) + ' weeks';
+  }
+
+  // Listen to one queue. read(snap) returns { count, times }, where times are the submit times of
+  // the waiting items (used for "oldest"). A failed listener becomes an error row, never a silent zero.
+  function watchQueue(key, query, read) {
+    if (queueWatch[key] && queueWatch[key].stop) queueWatch[key].stop();
+    queueWatch[key] = { query, read, stop: null };
+    setQueue(key, { status: 'loading' });
+    queueWatch[key].stop = query.onSnapshot(snap => {
+      const r = read(snap);
+      setQueue(key, { status: 'ready', count: r.count, oldest: oldestMs(r.times) });
+    }, err => {
+      console.error('Overview: could not load ' + key, err);
+      setQueue(key, { status: 'error', code: err && err.code });
+    });
+  }
+  window.retryQueue = key => { const w = queueWatch[key]; if (w) watchQueue(key, w.query, w.read); };
+
+  function loadOverview() {
+    queueBoardOn = true;
+    renderQueues();   // all six rows appear at once, in order, as placeholders
+    watchQueue('incidents', db.collection('incidentReports'), snap => {
+      const rows = snap.docs.map(d => d.data()).filter(d => !d.reviewStatus || d.reviewStatus === 'new');
+      return { count: rows.length, times: rows.map(r => r.submittedAt) };
+    });
+    watchQueue('bedside', db.collection('prayerRequests').where('status', '==', 'pending'), snap => (
+      { count: snap.size, times: snap.docs.map(d => d.data().createdAt) }));
+    watchQueue('vans', db.collection('users'), snap => {
+      const rows = snap.docs.map(d => d.data().vanRentalProfile).filter(p => p && p.status === 'pending');
+      return { count: rows.length, times: rows.map(p => p.createdAt) };
+    });
+    watchQueue('events', db.collection('eventRequests'), snap => {
+      const rows = snap.docs.map(d => d.data()).filter(d => (d.status || 'new') === 'new');
+      return { count: rows.length, times: rows.map(r => r.submittedAt) };
+    });
+    watchQueue('timeoff', db.collection('timeOffRequests'), snap => {
+      const rows = snap.docs.map(d => d.data()).filter(d => (d.status || 'pending') === 'pending');
+      return { count: rows.length, times: rows.map(r => r.submittedAt) };
+    });
+    watchQueue('requests', db.collection('accessRequests').where('status', '==', 'pending'), snap => (
+      { count: snap.size, times: snap.docs.map(d => d.data().createdAt) }));
+  }
+
+  const plural = (n, forms) => (n === 1 ? forms[0] : forms[1]);
+  // One card per queue, in the page's original card style: a real link (so it can be reached by keyboard,
+  // opened in a new tab, and read by a screen reader), a placeholder while loading, an error card with a
+  // way to retry, or a plain card when this person can't open the section. Everything interpolated into
+  // this markup is a constant from QUEUES, a number, or passed through escHtml; no text from the
+  // database is ever written as HTML.
+  function queueRowHtml(q) {
+    const s = queueState[q.key] || { status: 'loading', count: 0, oldest: null };
+    const title = escHtml(q.title);
+    if (s.status === 'loading') {
+      return '<div class="card is-loading" aria-hidden="true"><span class="queue-skel queue-skel-title"></span><span class="queue-skel queue-skel-text"></span></div>';
+    }
+    if (s.status === 'error') {
+      const denied = s.code === 'permission-denied';
+      const msg = denied ? "You don't have access to this count." : "Couldn't load this count.";
+      return `<div class="card is-error" role="group" aria-label="${title}: ${msg}">
+        <div class="card-title">${title}</div>
+        <div class="card-text">${msg}</div>
+        ${denied ? '' : `<div class="actions" style="margin-top:8px;"><button type="button" class="btn btn-unhide" data-retry="${q.key}">Try again</button></div>`}
+      </div>`;
+    }
+    const n = s.count, canOpen = tabShown(q.key);
+    const age = n && s.oldest !== null ? waitedText(s.oldest) : '';
+    const rest = n ? `${plural(n, q.noun)} waiting${age ? ' · oldest ' + age : ''}${canOpen ? '' : ' · view only'}` : '';
+    const text = n ? `<strong>${n}</strong> ${escHtml(rest)}` : 'All clear';
+    const label = `${q.title}: ${n ? n + ' ' + plural(n, q.noun) + ' waiting' + (age ? ', oldest ' + age : '') : 'all clear'}${canOpen ? '' : '. View only.'}`;
+    const body = `<div class="card-title">${title}${canOpen ? ' <span style="font-size:13px; color:var(--text-soft); font-weight:400;" aria-hidden="true">→</span>' : ''}</div>
+      <div class="card-text">${text}</div>`;
+    return canOpen
+      ? `<a class="card" href="?section=${q.key}" data-go="${q.key}" aria-label="${escHtml(label)}">${body}</a>`
+      : `<div class="card is-static" role="group" aria-label="${escHtml(label)}">${body}</div>`;
+  }
+  // Same single column of cards as before. The order is fixed by priority (care and safety first) and
+  // queues with something waiting, still loading, or failed come before the ones that are all clear.
+  // While a pointer or keyboard focus is on the list the order is frozen, so a live update changes a
+  // card's text in place instead of sliding a different card under someone's finger; it re-sorts as
+  // soon as they let go.
+  let queueOrder = null, queueRendering = false;
+  const queueEngaged = () => { const list = document.getElementById('overviewCards'); return !!list && (list.matches(':hover') || list.contains(document.activeElement)); };
+  function queueResortIfIdle() { if (!queueRendering && queueBoardOn && !queueEngaged()) renderQueues(); }
+  function renderQueues() {
+    if (queueRendering) return;   // focus changes caused by redrawing must not trigger another redraw
+    queueRendering = true;
+    try { drawQueues(); } finally { queueRendering = false; }
+  }
+  function drawQueues() {
     const el = document.getElementById('overviewCards');
-    // Overview-role access shows every card as a read-only summary,
-    // even for someone who ISN'T also a Department Head — otherwise a
-    // person with only the overview role would see a completely empty
-    // page, since none of canBedside/canVan/isFullAdmin would be true
-    // for them on their own.
-    const showBedsideCard = canBedside || canOverview;
-    const showVanCard = canVan || canOverview;
-    const showFullAdminCards = isFullAdmin || canOverview;
-
-    if (showBedsideCard) {
-      db.collection('prayerRequests').where('status','==','pending').onSnapshot(snap => {
-        updateOverviewCard('bedside', 'Bedside', `${snap.size} prayer request${snap.size===1?'':'s'} awaiting review`, {targetSection: 'bedside'});
-      });
-    }
-    if (showVanCard) {
-      db.collection('users').onSnapshot(snap => {
-        const pendingDrivers = snap.docs.filter(d => d.data().vanRentalProfile?.status === 'pending').length;
-        updateOverviewCard('vans', 'Van Usage', `${pendingDrivers} driver application${pendingDrivers===1?'':'s'} awaiting approval`, {targetSection: 'vans'});
-      });
-    }
-    if (showFullAdminCards) {
-      db.collection('incidentReports').onSnapshot(snap => {
-        const newCount = snap.docs.filter(d => !d.data().reviewStatus || d.data().reviewStatus==='new').length;
-        updateOverviewCard('incidents', 'Incident Reports', `${newCount} new report${newCount===1?'':'s'}`, {targetSection: 'incidents'});
-      });
-      db.collection('eventRequests').onSnapshot(snap => {
-        const newCount = snap.docs.filter(d => (d.data().status||'new')==='new').length;
-        updateOverviewCard('events', 'Event Requests', `${newCount} new request${newCount===1?'':'s'}`, {targetSection: 'events'});
-      });
-      db.collection('timeOffRequests').onSnapshot(snap => {
-        const pendingCount = snap.docs.filter(d => (d.data().status||'pending')==='pending').length;
-        updateOverviewCard('timeoff', 'Time Off', `${pendingCount} pending request${pendingCount===1?'':'s'}`, {targetSection: 'timeoff'});
-      });
-      db.collection('accessRequests').where('status','==','pending').onSnapshot(snap => {
-        updateOverviewCard('requests', 'Access Requests', `${snap.size} pending request${snap.size===1?'':'s'}`, {targetSection: 'requests'});
-      });
-    }
-
-    if (el.querySelector('.loading')) el.innerHTML = '';
+    if (!el) return;
+    const states = QUEUES.map(q => queueState[q.key] || { status: 'loading', count: 0 });
+    const clear = QUEUES.filter((q, i) => states[i].status === 'ready' && states[i].count === 0);
+    const rest = QUEUES.filter(q => !clear.includes(q));
+    const order = queueEngaged() && queueOrder ? queueOrder : rest.concat(clear);
+    queueOrder = order;
+    const focused = document.activeElement;
+    const focusAttr = focused && el.contains(focused) ? (focused.dataset.go ? 'data-go' : focused.dataset.retry ? 'data-retry' : null) : null;
+    const focusKey = focusAttr ? focused.getAttribute(focusAttr) : null;
+    el.innerHTML = order.map(queueRowHtml).join('');
+    if (focusAttr) { const again = el.querySelector(`[${focusAttr}="${focusKey}"]`); if (again) again.focus(); }   // a live update must not drop keyboard focus
+    const loading = states.some(s => s.status === 'loading');
+    el.setAttribute('aria-busy', loading ? 'true' : 'false');
+    const ready = states.filter(s => s.status === 'ready');
+    const total = ready.reduce((sum, s) => sum + s.count, 0), queuesWaiting = ready.filter(s => s.count > 0).length;
+    const failed = states.filter(s => s.status === 'error').length;
+    let msg;
+    if (loading) msg = 'Checking what is waiting…';
+    else if (!total) msg = failed ? 'Nothing is waiting in the counts that loaded.' : 'All clear. Nothing is waiting.';
+    else msg = `${total} waiting across ${queuesWaiting} ${queuesWaiting === 1 ? 'queue' : 'queues'}.`;
+    if (!loading && failed && total) msg += ` ${failed} ${failed === 1 ? 'count' : 'counts'} couldn't be loaded.`;
+    document.getElementById('overviewSummary').textContent = msg;
   }
-
-  const overviewCardData = {};
-  function updateOverviewCard(key, title, summary, destination) {
-    overviewCardData[key] = { title, summary, destination };
-    renderOverviewCards();
-  }
-  function renderOverviewCards() {
-    const el = document.getElementById('overviewCards');
-    const keys = Object.keys(overviewCardData);
-    if (!keys.length) return;
-    el.innerHTML = keys.map(k => {
-      const c = overviewCardData[k];
-      const clickAction = c.destination.externalUrl
-        ? `window.location.href='${c.destination.externalUrl}'`
-        : `goToSection('${c.destination.targetSection}')`;
-      const arrow = c.destination.externalUrl ? '↗' : '→';
-      return `
-        <div class="card" style="cursor:pointer;" onclick="${clickAction}">
-          <div class="card-title">${escHtml(c.title)} <span style="font-size:13px; color:var(--text-soft); font-weight:400;">${arrow}</span></div>
-          <div class="card-text" style="margin-bottom:0;">${escHtml(c.summary)}</div>
-        </div>`;
-    }).join('');
-  }
+  // Plain clicks go to the section without reloading; ctrl/cmd/shift-click and middle-click keep
+  // working as normal links because the rows are real links.
+  document.getElementById('overviewCards').addEventListener('click', e => {
+    const retry = e.target.closest('[data-retry]');
+    if (retry) { window.retryQueue(retry.dataset.retry); return; }
+    const link = e.target.closest('a[data-go]');
+    if (!link || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    goToSection(link.dataset.go);
+  });
+  ['mouseleave', 'focusout', 'pointerup', 'pointercancel'].forEach(ev => {
+    // After a touch tap the click still has to land first, so give pointer releases a moment.
+    document.getElementById('overviewCards').addEventListener(ev, () => setTimeout(queueResortIfIdle, ev.indexOf('pointer') === 0 ? 600 : 0));
+  });
   window.goToSection = (section) => {
-    document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.querySelector(`[data-section="${section}"]`)?.classList.add('active');
-    document.getElementById('section-' + section)?.classList.add('active');
-    loadEmbed(section);
+    if (!tabShown(section)) return false;   // a section this person can't see would open blank with no tab lit
+    cameFromCard = activeSectionKey() === 'overview' ? section : null;
+    navFocusUntil = performance.now() + 400;   // keyboard users land on the new section's tab, not on the page body
+    openSection(section);
+    return true;
   };
 
   // Just the count for the nav link's badge — the full report list and
@@ -738,8 +920,7 @@
   function loadIncidentsBadgeOnly() {
     db.collection('incidentReports').onSnapshot(snap => {
       const newCount = snap.docs.filter(d => !d.data().reviewStatus || d.data().reviewStatus==='new').length;
-      const badge = document.getElementById('incidentsCount');
-      if (newCount) { badge.textContent = newCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
+      setQueue('incidents', { status: 'ready', count: newCount });
     });
   }
 
@@ -862,9 +1043,7 @@
     db.collection('accessRequests').where('status','==','pending').orderBy('createdAt','desc').onSnapshot(snap => {
       allAccessRequests = snap.docs.map(d => ({id:d.id, ...d.data()}));
       renderAccessRequests();
-      const badge = document.getElementById('requestsCount');
-      if (allAccessRequests.length) { badge.textContent = allAccessRequests.length; badge.style.display = 'inline-block'; }
-      else { badge.style.display = 'none'; }
+      setQueue('requests', { status: 'ready', count: allAccessRequests.length });
     }, err => {
       document.getElementById('accessRequestsList').innerHTML = '<div class="empty-state">Could not load requests.</div>';
       console.error(err);
@@ -998,8 +1177,7 @@
       allEventRequests = snap.docs.map(d => ({id:d.id, ...d.data()}));
       renderEventRequests();
       const newCount = allEventRequests.filter(r => (r.status||'new')==='new').length;
-      const badge = document.getElementById('eventsCount');
-      if (newCount) { badge.textContent = newCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
+      setQueue('events', { status: 'ready', count: newCount });
     }, err => {
       document.getElementById('eventRequestsList').innerHTML = '<div class="empty-state">Could not load event requests.</div>';
       console.error(err);
@@ -1102,8 +1280,7 @@
       allTimeOffRequests = snap.docs.map(d => ({id:d.id, ...d.data()}));
       renderTimeOffRequests();
       const pendingCount = allTimeOffRequests.filter(r => (r.status||'pending')==='pending').length;
-      const badge = document.getElementById('timeOffCount');
-      if (pendingCount) { badge.textContent = pendingCount; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; }
+      setQueue('timeoff', { status: 'ready', count: pendingCount });
     }, err => {
       document.getElementById('timeOffList').innerHTML = '<div class="empty-state">Could not load time off requests.</div>';
       console.error(err);
