@@ -40,7 +40,7 @@
   .er:hover { box-shadow: var(--shadow-2); transform: translateY(-2px); }
   .er.s-approved { --tone: var(--green); --tone-soft: var(--green-soft); }
   .er.s-new { border-style: dashed; border-color: var(--blue); }
-  .er.s-denied { --tone: #8e877c; --tone-soft: var(--bg-soft); opacity: .65; }
+  .er.s-denied { --tone: #6b655b; --tone-soft: var(--bg-soft); opacity: .65; }
   .er-date { background: var(--tone-soft); color: var(--tone); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 15px 6px; text-align: center; border-right: 1px solid var(--line); }
   .er-date small { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; opacity: .85; }
   .er-date strong { font-family: 'Playfair Display', serif; font-weight: 500; font-size: 34px; line-height: 1.05; margin: 2px 0; }
@@ -135,11 +135,11 @@
   .ef .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .ef .opts { display: flex; flex-wrap: wrap; gap: 7px; }
   .ef .opts label { cursor: pointer; }
-  .ef .opts input { position: absolute; opacity: 0; pointer-events: none; }
+  .ef .opts input { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
   .ef .opts span { display: inline-flex; padding: 7px 13px; border: 1px solid var(--line-2); border-radius: 999px; background: #fff; font-size: 13.5px; font-weight: 500; color: var(--ink-2); transition: all .2s var(--ease); user-select: none; }
   .ef .opts label:hover span { border-color: var(--blue); }
   .ef .opts input:checked + span { background: var(--blue); border-color: var(--blue); color: #fff; }
-  .ef .opts input:focus-visible + span { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; }
+  .ef .opts input:focus-visible + span { outline: 3px solid var(--blue); outline-offset: 2px; }
   .ef .grp { font-size: 12px; font-weight: 600; color: var(--ink-3); margin: 10px 0 6px; }
   .ef .chk { display: flex; align-items: flex-start; gap: 9px; font-size: 14px; color: var(--ink-2); cursor: pointer; margin-bottom: 10px; line-height: 1.4; }
   .ef .chk input { width: 17px; height: 17px; accent-color: var(--blue); margin-top: 2px; flex-shrink: 0; }

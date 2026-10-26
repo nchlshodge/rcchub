@@ -28,7 +28,7 @@
       --border-hi:  rgba(0,0,0,0.22);
       --text:       #1a1714;
       --text-mid:   #57514a;
-      --text-soft:  #857e73;
+      --text-soft:  #6b655b;
       --gold:       #2557b8;
       --gold-dim:   rgba(37,87,184,0.08);
       --gold-glow:  rgba(37,87,184,0.20);
@@ -51,7 +51,7 @@
       --border-hi:  rgba(255,255,255,0.22);
       --text:       #f0ede8;
       --text-mid:   #a8a39c;
-      --text-soft:  #666260;
+      --text-soft:  #9a958e;
       --gold:       #5b8fd6;
       --gold-dim:   rgba(91,143,214,0.12);
       --gold-glow:  rgba(91,143,214,0.25);
@@ -419,7 +419,7 @@
     input::placeholder, textarea::placeholder { color: var(--text-soft); }
     textarea { min-height: 100px; resize: vertical; }
     select { appearance: none; cursor: pointer; }
-    select option { background: #1a1a1a; }
+    select option { background: var(--bg-card); color: var(--text); }
 
     .profile-note {
       font-size: 14px;
@@ -551,7 +551,7 @@
       --shadow-2: 0 2px 4px rgba(0,0,0,.45), 0 14px 34px rgba(0,0,0,.5);
     }
     html:not([data-theme="dark"]) body { background: radial-gradient(1100px 420px at 50% -180px, #fff9ea 0%, rgba(255,249,234,0) 70%), var(--bg); }
-    :focus-visible { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; border-radius: 6px; }
+    :focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; border-radius: 6px; }
     header { background: var(--glass); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); height: 64px; }
     .logo { font-size: 23px; }
     nav { background: transparent; border-bottom: none; padding: 14px 16px 0; gap: 6px; }
@@ -574,7 +574,10 @@
     nav::-webkit-scrollbar { display: none; }
     header a, header button, .logo { white-space: nowrap; }
     @media (max-width: 520px) { #userName, .logo-dot, .logo-tag { display: none; } header { padding: 0 14px; } nav { padding: 12px 10px 0; gap: 2px; } .tab { padding: 8px 11px; font-size: 13.5px; } }
-  </style>
+      @media (max-width: 760px), (pointer: coarse) {
+      header a, header button, #userInfo button, .btn, .btn-sm { min-height: 44px; }
+    }
+</style>
 </head>
 <body>
 

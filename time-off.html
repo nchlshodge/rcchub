@@ -37,11 +37,11 @@
 
   .opts { display: flex; flex-wrap: wrap; gap: 9px; }
   .opts label { cursor: pointer; }
-  .opts input { position: absolute; opacity: 0; pointer-events: none; }
+  .opts input { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
   .opts span { display: inline-flex; padding: 10px 17px; border: 1px solid var(--line-2); border-radius: 999px; background: #fff; font-size: 15px; font-weight: 500; color: var(--ink-2); transition: all .2s var(--ease); user-select: none; }
   .opts label:hover span { border-color: var(--blue); }
   .opts input:checked + span { background: var(--blue); border-color: var(--blue); color: #fff; box-shadow: 0 4px 14px rgba(37,87,184,.25); }
-  .opts input:focus-visible + span { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; }
+  .opts input:focus-visible + span { outline: 3px solid var(--blue); outline-offset: 2px; }
   .other-input { display: none; margin-top: 10px; }
   .other-input.show { display: block; }
 

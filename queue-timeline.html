@@ -50,7 +50,7 @@
   .deck > .rc:hover { box-shadow: var(--shadow-2); }
   .rc.done { opacity: .75; }
   .rc.pending { border-style: dashed; border-color: var(--blue); }
-  .rc-date { background: var(--tone-soft); color: var(--tone); display: flex; flex-direction: column; align-items: center; padding: 15px 6px; text-align: center; border-right: 1px solid var(--line); }
+  .rc-date { background: var(--tone-soft); color: var(--tone-ink, var(--tone)); display: flex; flex-direction: column; align-items: center; padding: 15px 6px; text-align: center; border-right: 1px solid var(--line); }
   .rc-date small { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; opacity: .85; }
   .rc-date strong { font-family: 'Playfair Display', serif; font-weight: 500; font-size: 34px; line-height: 1.05; margin: 2px 0; }
   .rc-date em { font-style: normal; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
@@ -201,6 +201,7 @@
     .calbar h2 { font-size: 22px; min-width: 0; }
     .calbar .legend { margin-left: 0; }
   }
+  @media (max-width: 760px), (pointer: coarse) { .more-btn { min-height: 44px; } }
 </style>
 </head>
 <body>
@@ -353,7 +354,7 @@
     {key:"blocked",  label:"Awaiting approval", tone:"var(--blue)",  soft:"var(--blue-soft)",  ink:"var(--blue-ink)",  pill:"blue"},
     {key:"month",    label:"Due this month",    tone:"var(--gold)",  soft:"var(--gold-soft)",  ink:"var(--gold-ink)",  pill:"gold"},
     {key:"upcoming", label:"Upcoming",          tone:"var(--blue)",  soft:"var(--blue-soft)",  ink:"var(--blue-ink)",  pill:"blue"},
-    {key:"later",    label:"Later / no date",   tone:"#8e877c",      soft:"var(--bg-soft)",    ink:"var(--ink-2)",     pill:"gray"},
+    {key:"later",    label:"Later / no date",   tone:"#6b655b",      soft:"var(--bg-soft)",    ink:"var(--ink-2)",     pill:"gray"},
     {key:"done",     label:"Completed",         tone:"var(--green)", soft:"var(--green-soft)", ink:"var(--green-ink)", pill:"green"}
   ];
   function urgencyOf(key){ return URGENCY.find(u=>u.key===key) || URGENCY[URGENCY.length-1]; }
@@ -557,7 +558,7 @@
         : `<div class="approve"><span>Waiting on admin approval before creative work should start.</span></div>`;
     }
 
-    return `<article class="rc ${r.completed?'done':''} ${r.pending&&!r.completed?'pending':''} ${isOpen?'open':''}" data-card-id="${r.id}" style="--tone:${u.tone}; --tone-soft:${u.soft}">
+    return `<article class="rc ${r.completed?'done':''} ${r.pending&&!r.completed?'pending':''} ${isOpen?'open':''}" data-card-id="${r.id}" style="--tone:${u.tone}; --tone-soft:${u.soft}; --tone-ink:${u.ink}">
       <div class="rc-date">${dateTab}</div>
       <div class="rc-main">
         <div class="rc-top"><span class="pill ${u.pill}">${escHtml(u.label)}</span><span class="pill gray">${kindLabel}</span>${dept ? `<span class="pill gray">${escHtml(dept)}</span>` : ''}</div>
@@ -702,7 +703,7 @@
       ${rows.map(r => {
         const u = urgencyOf(r.urgencyKey), d = r.keyDate, ev = parseISO(r.eventDate);
         return `<button type="button" class="lrow ${r.completed?'done':''}" data-open="${r.id}">
-          <div class="ld"><b style="color:${u.tone}">${d ? d.toLocaleDateString('en-US',{month:'short', day:'numeric'}) : 'No date'}</b><small>${d ? d.toLocaleDateString('en-US',{weekday:'long'}) : ''}${r.dueApprox ? ' · event' : ''}</small></div>
+          <div class="ld"><b style="color:${u.ink}">${d ? d.toLocaleDateString('en-US',{month:'short', day:'numeric'}) : 'No date'}</b><small>${d ? d.toLocaleDateString('en-US',{weekday:'long'}) : ''}${r.dueApprox ? ' · event' : ''}</small></div>
           <div class="ltitle"><b>${escHtml(titleOf(r))}</b><small>${escHtml(r.requesterName||'')}${ev ? ' · event ' + fmtDate(ev) : ''}</small></div>
           <div class="needs">${needsPills(r)}</div>
           <div class="lcell">${escHtml((r.department||[]).join(', ') || '—')}</div>

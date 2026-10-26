@@ -41,12 +41,12 @@
   .f .help { font-size: 13px; color: var(--ink-3); }
   .opts { display: flex; flex-wrap: wrap; gap: 9px; }
   .opts label { cursor: pointer; }
-  .opts input { position: absolute; opacity: 0; pointer-events: none; }
+  .opts input { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
   .opts span { display: inline-flex; padding: 9px 16px; border: 1px solid var(--line-2); border-radius: 999px; background: #fff; font-size: 14.5px; font-weight: 500; color: var(--ink-2); transition: all .2s var(--ease); user-select: none; }
   .opts label:hover span { border-color: var(--blue); }
   .opts input:checked + span { background: var(--blue); border-color: var(--blue); color: #fff; }
   .opts.urg input[value=urgent]:checked + span { background: var(--red); border-color: var(--red); }
-  .opts input:focus-visible + span { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; }
+  .opts input:focus-visible + span { outline: 3px solid var(--blue); outline-offset: 2px; }
   .urg-note { font-size: 13px; color: var(--ink-3); }
   .urg-note.hot { color: var(--red-ink); background: var(--red-soft); padding: 8px 12px; border-radius: var(--radius-sm); }
   .other-input { display: none; margin-top: 8px; } .other-input.show { display: block; }

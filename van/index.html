@@ -26,7 +26,7 @@
   :root{
     --blue:#2557b8; --blue-dim:#e8eefb; --blue-glow:rgba(37,87,184,.22); --blue-ink:#183b82;
     --bg:#f6f2ea; --bg-soft:#efe9dd; --card:#ffffff; --text:#1d1b17;
-    --muted:#6f695f; --danger:#a8352f; --danger-dim:#f9e5e3; --danger-ink:#7c211c;
+    --muted:#6b655b; --danger:#a8352f; --danger-dim:#f9e5e3; --danger-ink:#7c211c;
     --safe:#2e7a52; --safe-dim:#e2f1e8; --safe-ink:#1d5236;
     --gold:#b5892a; --gold-soft:#f8f0da; --gold-ink:#7a5a14;
     --border:#e9e3d7; --border-2:#d9d1c1;
@@ -41,7 +41,12 @@
   h1,h2,h3{font-family:'Playfair Display',Georgia,serif;margin:0 0 8px;font-weight:500;letter-spacing:-.01em;line-height:1.2;}
   h2{font-size:24px;} h3{font-size:19px;}
   a{color:var(--blue);}
-  :focus-visible{outline:3px solid rgba(37,87,184,.35);outline-offset:2px;border-radius:6px;}
+  :focus-visible{outline:3px solid var(--blue);outline-offset:2px;border-radius:6px;}
+  /* Phones and touch screens: buttons and links at least 44px tall. */
+  @media (max-width:760px),(pointer:coarse){
+    .topbar .backlink,.topbar button.plain,.topbar a.plain{min-height:44px;display:inline-flex;align-items:center;}
+    .nav-tabs button,.link-btn{min-height:44px;}
+  }
   @keyframes rise{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
   @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;}}
 

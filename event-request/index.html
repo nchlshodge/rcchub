@@ -47,11 +47,11 @@
   /* chips (checkboxes / radios) */
   .opts { display: flex; flex-wrap: wrap; gap: 9px; }
   .opts label { cursor: pointer; }
-  .opts input { position: absolute; opacity: 0; pointer-events: none; }
+  .opts input { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
   .opts span { display: inline-flex; align-items: center; padding: 10px 17px; border: 1px solid var(--line-2); border-radius: 999px; background: #fff; font-size: 15px; font-weight: 500; color: var(--ink-2); transition: all .2s var(--ease); user-select: none; }
   .opts label:hover span { border-color: var(--blue); }
   .opts input:checked + span { background: var(--blue); border-color: var(--blue); color: #fff; box-shadow: 0 4px 14px rgba(37,87,184,.25); }
-  .opts input:focus-visible + span { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; }
+  .opts input:focus-visible + span { outline: 3px solid var(--blue); outline-offset: 2px; }
   .group-lbl { font-size: 12px; font-weight: 600; color: var(--ink-3); margin: 14px 0 8px; }
   .group-lbl:first-child { margin-top: 0; }
 
@@ -65,7 +65,7 @@
   .types .tc small { color: var(--ink-3); font-size: 13px; line-height: 1.4; }
   .types label:hover .tc { border-color: var(--blue); transform: translateY(-2px); box-shadow: var(--shadow-1); }
   .types input:checked + .tc { border-color: var(--blue); background: var(--blue-soft); box-shadow: 0 0 0 3px rgba(37,87,184,.18); }
-  .types input:focus-visible + .tc { outline: 3px solid rgba(37,87,184,.35); outline-offset: 2px; }
+  .types input:focus-visible + .tc { outline: 3px solid var(--blue); outline-offset: 2px; }
 
   .agree-box { background: var(--bg); border-radius: var(--radius-md); padding: 14px 16px; font-size: 14px; color: var(--ink-2); line-height: 1.55; margin-bottom: 14px; }
   .f > label.agree { text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 400; color: var(--ink); }
