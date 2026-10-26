@@ -405,9 +405,9 @@
           <input type="text" id="notifyEmail1" placeholder="you@rochesterchristian.church" style="width:100%; padding:9px 11px; border:1px solid #d1cdc4; border-radius:7px; font-size:14px; margin-bottom:10px;">
           <label style="font-size:12px; font-weight:500; color:var(--text-soft); display:block; margin-bottom:4px;">Second Email (optional)</label>
           <input type="text" id="notifyEmail2" placeholder="someone-else@rochesterchristian.church" style="width:100%; padding:9px 11px; border:1px solid #d1cdc4; border-radius:7px; font-size:14px; margin-bottom:10px;">
-          <label for="notifyApprovalCopy" style="font-size:12px; font-weight:500; color:var(--text-soft); display:block; margin-bottom:4px;">Copy of every approval goes to (optional)</label>
+          <label for="notifyApprovalCopy" style="font-size:12px; font-weight:500; color:var(--text-soft); display:block; margin-bottom:4px;">Copy of every approval and denial goes to (optional)</label>
           <input type="text" id="notifyApprovalCopy" placeholder="stephanie@rochesterchristian.church" style="width:100%; padding:9px 11px; border:1px solid #d1cdc4; border-radius:7px; font-size:14px; margin-bottom:10px;">
-          <div class="card-text" style="margin:-4px 0 10px;">Each time you approve a request, these addresses get a short email with the dates. Separate several with commas. Church addresses only.</div>
+          <div class="card-text" style="margin:-4px 0 10px;">Each time you approve or deny a request, these addresses get a short email with the dates. Separate several with commas. Church addresses only.</div>
           <button class="btn btn-approve" onclick="saveNotificationEmails()">Save</button>
         </div>
 
@@ -1365,7 +1365,7 @@
       await db.collection('settings').doc('timeOffNotifications').set({ email1, email2, approvalCopyEmails }, { merge: true });
     } catch (err) { RCC.notify('Could not save. Nothing was changed — try again.\n(' + err.message + ')', { kind: 'error' }); return; }
     RccAudit.log('settings.timeoff.emails', 'settings', 'timeOffNotifications', `Time-off notification emails set to ${email1 || '(none)'}${email2 ? ', ' + email2 : ''}; approval copies to ${approvalCopyEmails.join(', ') || '(none)'}`);
-    RCC.notify('Saved. New requests go to ' + ([email1, email2].filter(Boolean).join(' and ') || 'nobody') + '; approval copies go to ' + (approvalCopyEmails.join(', ') || 'nobody') + '.');
+    RCC.notify('Saved. New requests go to ' + ([email1, email2].filter(Boolean).join(' and ') || 'nobody') + '; approval and denial copies go to ' + (approvalCopyEmails.join(', ') || 'nobody') + '.');
   };
 
   window.cycleGraphicStatus = async (id, current) => {
