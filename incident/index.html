@@ -42,6 +42,7 @@
   .count { align-self: flex-end; font-size: 12px; color: var(--ink-3); margin-top: -2px; }
   .autofilled { background: var(--blue-soft) !important; }
 
+  .emergency { margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-md); background: var(--red-soft); color: var(--red-ink); font-size: 15px; max-width: 62ch; }
   .opts { display: flex; flex-wrap: wrap; gap: 9px; }
   .f .opts label { cursor: pointer; text-transform: none; letter-spacing: 0; font-size: inherit; font-weight: inherit; color: inherit; }
   .opts input { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
@@ -100,6 +101,7 @@
     <span class="eyebrow">Safety</span>
     <h1>Report an incident</h1>
     <p>It takes about two minutes. Only what you see below is required — you can add more detail at the end if it helps.</p>
+    <p class="emergency" role="note"><b>If someone needs help right now, call 911 first.</b> Then come back and fill this out.</p>
   </section>
 
   <div class="who" id="who">
@@ -203,7 +205,8 @@
   <section class="done" id="done">
     <div class="tick">✓</div>
     <h2>Report received</h2>
-    <p>Thank you — it's with the church office now, and someone will follow up if they need anything more.</p>
+    <p>Thank you — your report went to the church office and the staff who review incidents. They will reach out if they need anything more, using the contact details you gave. Keep the reference number below if you need to ask about it.</p>
+    <p><b>If anyone is still in danger or needs medical help, call 911 now.</b></p>
     <div class="ref" id="refNum"></div><br>
     <button class="btn" id="againBtn" type="button">Submit another report</button>
   </section>

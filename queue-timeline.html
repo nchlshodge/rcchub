@@ -294,7 +294,7 @@
 
   /* ---------- sign in / access ---------- */
   document.getElementById('googleSignInBtn').addEventListener('click', () => {
-    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => alert('Sign-in failed: ' + err.message));
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => RCC.notify('Sign-in failed: ' + err.message, { kind: 'error' }));
   });
 
   auth.onAuthStateChanged(async user => {
@@ -872,7 +872,7 @@
     if (save) {
       const block = save.closest('[data-edit-card]'), update = {};
       block.querySelectorAll('[data-edit-field]').forEach(input => { update[input.dataset.editField] = input.value.trim(); });
-      upd(save.dataset.id, update).catch(err => alert('Could not save: ' + err.message));
+      upd(save.dataset.id, update).catch(err => RCC.notify('Could not save. Nothing was changed — try again.\n(' + err.message + ')', { kind: 'error' }));
       editingId = null; render();
     }
   });

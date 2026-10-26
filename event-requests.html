@@ -60,6 +60,8 @@
   .st.done { color: var(--green-ink); } .st.done i { background: var(--green); border-color: var(--green); }
   .st.doing { color: var(--gold-ink); } .st.doing i { border-color: var(--gold); background: var(--gold-soft); }
   .track .bar { width: 18px; height: 2px; background: var(--line-2); margin: 0 7px; border-radius: 2px; }
+  .er-approve { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; background: var(--blue-soft); border-radius: var(--radius-md); padding: 8px 12px; }
+  .er-approve .why { font-size: 13px; font-weight: 500; color: var(--blue-ink); margin-right: auto; }
   .waiting { font-size: 13px; color: var(--blue-ink); background: var(--blue-soft); border-radius: var(--radius-md); padding: 8px 12px; font-weight: 500; }
   .er-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   .er-foot small { color: var(--ink-3); font-size: 12px; }
@@ -239,7 +241,7 @@
   let currentUser = null, isAdmin = false, isGraphics = false, deepLinkHandled = false;
 
   document.getElementById('googleSignInBtn').addEventListener('click', () => {
-    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => alert('Sign-in failed: ' + err.message));
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => RCC.notify('Sign-in failed: ' + err.message, { kind: 'error' }));
   });
 
   // Same access rule as the Firestore rules on eventRequests:
@@ -387,11 +389,18 @@
   function hasMarketing(r) { const m = r.marketing; return Array.isArray(m) && m.length > 0 && !(m.length === 1 && m[0] === 'None'); }
 
   /* ---------- rendering ---------- */
+  // For admins: Approve / Deny right where the request is, on the card and at the top of its panel.
+  function approveRowHtml(r) {
+    const id = esc(r.id);
+    return '<div class="er-approve"><span class="why">Needs your approval</span>' +
+      '<button type="button" class="btn small good" data-decide="approved" data-id="' + id + '">Approve</button>' +
+      '<button type="button" class="btn small bad" data-decide="denied" data-id="' + id + '">Deny…</button></div>';
+  }
   // The calm card shows the progress as a single line of steps; everything else is in the panel.
   function trackHtml(r) {
     const s = statusOf(r);
     if (s === 'denied') return '';
-    if (s !== 'approved') return '<div class="waiting">Waiting for admin approval</div>';
+    if (s !== 'approved') return isAdmin ? approveRowHtml(r) : '<div class="waiting">Waiting for admin approval</div>';
     const steps = [{ label: 'Approved', st: 'done' }];
     if (hasCalendar(r)) steps.push({ label: 'On calendar', st: r.calendarAdded ? 'done' : 'todo' });
     if (hasGraphic(r)) steps.push({ label: 'Graphic', st: r.graphicStatus === 'Completed' ? 'done' : (r.graphicStatus === 'In Progress' ? 'doing' : 'todo') });
@@ -532,6 +541,33 @@
     if (btn) openDetail(btn.dataset.open);
   });
 
+  // Approve or deny. Both email the requester (the server does that when the status changes), so Deny asks first
+  // and both say plainly what happened. A failure is shown and nothing is changed.
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-decide]');
+    if (!b || !isAdmin || !currentUser) return;
+    const status = b.dataset.decide, id = b.dataset.id;
+    const r = allRequests.find(x => x.id === id); if (!r) return;
+    const title = titleOf(r);
+    if (status === 'approved') {
+      try {
+        const c = await RoomLogic.checkApprovalConflicts(db, Object.assign({}, r, { status: 'approved', roomConfirmed: false }), id);
+        if (c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
+      } catch (err) { RCC.notify('Could not check the room calendar, so "' + title + '" was not approved. Try again.\n(' + err.message + ')', { kind: 'error' }); return; }
+    } else if (!confirm('Deny "' + title + '"?\n\n' + (r.requesterName || 'The requester') + ' will be emailed that it was denied. You can move it back to New later, but that email will already have gone.')) return;
+    const row = b.closest('.er-approve'); const btns = row ? row.querySelectorAll('button') : [b];
+    btns.forEach(x => { x.disabled = true; });
+    try {
+      await db.collection('eventRequests').doc(id).update({ status, statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid });
+    } catch (err) {
+      btns.forEach(x => { x.disabled = false; });
+      RCC.notify('Could not ' + (status === 'approved' ? 'approve' : 'deny') + ' "' + title + '". Nothing was changed — try again.\n(' + err.message + ')', { kind: 'error' });
+      return;
+    }
+    RccAudit.log('event.' + status, 'eventRequest', id, (status === 'approved' ? 'Approved' : 'Denied') + ': "' + title + '"');
+    RCC.notify((status === 'approved' ? 'Approved' : 'Denied') + ' "' + title + '". ' + (r.requesterName || 'The requester') + ' is being emailed.');
+  });
+
   /* ---------- detail panel: progress + notes ---------- */
   let openId = null, unsubNotes = null, noteDocs = [], editing = false;
 
@@ -654,6 +690,7 @@
     body.innerHTML =
       '<div class="p-head"><h2 class="p-title">' + esc(titleOf(r)) + '</h2>' + (isAdmin ? '<button type="button" class="btn small soft" id="editStart">Edit request</button>' : '') + '</div>' +
       '<div class="p-sec"><div class="er-chips">' + statusChip(r) + typeChip(r) + arr(r.department).map(x => '<span class="pill gray">' + esc(x) + '</span>').join('') + '</div></div>' +
+      (isAdmin && statusOf(r) === 'new' ? '<div class="p-sec">' + approveRowHtml(r) + '</div>' : '') +
       completeRowHtml(r) +
       '<div class="p-sec"><h4>Progress</h4><div class="box">' + stepsHtml(r) + dueRowHtml(r) + '</div></div>' +
       '<div class="p-sec"><h4>Notes &amp; updates</h4><div class="notes-list" id="notesList">' + notesHtml() + '</div>' +
@@ -708,7 +745,7 @@
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         });
         input.value = '';
-      } catch (err) { alert('Could not save the note: ' + err.message); }
+      } catch (err) { RCC.notify('Could not save the note. Your text is still in the box — try again.\n(' + err.message + ')', { kind: 'error' }); }
       btn.disabled = false;
       return;
     }
@@ -719,7 +756,7 @@
       const btn = e.target; btn.disabled = true;
       const patch = done ? { completed: true, completedAt: new Date().toISOString(), completedBy: currentUser.uid } : { completed: false };
       try { await db.collection('eventRequests').doc(r.id).update(patch); }
-      catch (err) { btn.disabled = false; alert('Could not save: ' + err.message); return; }
+      catch (err) { btn.disabled = false; RCC.notify('Could not save. Nothing was changed — try again.\n(' + err.message + ')', { kind: 'error' }); return; }
       const who = currentUser.displayName || currentUser.email || 'An admin';
       RccAudit.log(done ? 'event.complete' : 'event.reopen', 'eventRequest', r.id, '"' + titleOf(r) + '" ' + (done ? 'marked complete' : 'reopened'));
       db.collection('eventRequests').doc(r.id).collection('notes').add({ text: (done ? 'Marked complete by ' : 'Reopened by ') + who, authorUid: currentUser.uid, authorName: who, createdAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {});
@@ -728,7 +765,7 @@
     const del = e.target.closest('[data-del-note]');
     if (del && openId && confirm('Delete this note?')) {
       db.collection('eventRequests').doc(openId).collection('notes').doc(del.dataset.delNote).delete()
-        .catch(err => alert('Could not delete: ' + err.message));
+        .catch(err => RCC.notify('Could not delete the note. Try again.\n(' + err.message + ')', { kind: 'error' }));
     }
   });
 
@@ -928,7 +965,7 @@
       catch (ex) { emailMsg = 'Saved — but the email to the requester could not be sent (' + (ex.message || 'please try again') + ').'; }
     }
     editing = false; done(); drawDrawer();
-    if (emailMsg) alert(emailMsg);
+    if (emailMsg) RCC.notify(emailMsg, { kind: /could not be sent/.test(emailMsg) ? 'error' : 'ok' });
   });
 </script>
 </body>

@@ -94,6 +94,7 @@
   .camera-box img{max-width:100%;border-radius:10px;margin-top:10px;}
   .upload-progress{font-size:13px;color:var(--blue);margin-top:8px;}
   .banner-safe{background:var(--safe-dim);color:var(--safe-ink);padding:14px 16px;border-radius:14px;margin-top:12px;font-weight:600;}
+  .needs-list{font-size:13.5px;color:var(--muted);margin-top:14px;line-height:1.5;}
   .banner-danger{background:var(--danger-dim);color:var(--danger-ink);padding:14px 16px;border-radius:14px;margin-top:12px;font-weight:700;}
   .nav-tabs{display:flex;gap:4px;background:var(--bg-soft);border-radius:999px;padding:4px;margin-bottom:18px;overflow-x:auto;}
   .nav-tabs button{flex:1;padding:10px 14px;background:none;border:none;font-size:14px;font-weight:600;color:var(--muted);border-radius:999px;white-space:nowrap;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s var(--ease);}
@@ -991,6 +992,17 @@ function CheckoutFlow({
     });
   }
   const canSubmit = keysConfirmed && mileage && gas !== null && dashPhoto && odoPhoto && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && clean !== null && cleanPhoto && confirmed && !saving;
+  // So a greyed-out button always says what is still missing.
+  const missing = [];
+  if (!keysConfirmed) missing.push('confirm you have the keys');
+  if (!mileage) missing.push('the mileage');
+  if (gas === null) missing.push('the gas level');
+  if (!dashPhoto) missing.push('the dashboard photo');
+  if (!odoPhoto) missing.push('the odometer close-up photo');
+  if (otherLightChecked && !otherLightDesc) missing.push('a description of the other warning light');
+  if (clean === null) missing.push('whether the van is clean');
+  if (!cleanPhoto) missing.push('the interior photo');
+  if (!confirmed) missing.push('the confirmation box');
   async function finishCheckout() {
     setSaving(true);
     const lightNames = checkedLights.map(id => relevantLights.find(l => l.id === id)?.name).filter(Boolean);
@@ -1179,7 +1191,10 @@ function CheckoutFlow({
       fontWeight: 400,
       fontSize: 14
     }
-  }, "I confirm the mileage, gas level, and warning lights above match what I see on the dashboard."))), /*#__PURE__*/React.createElement("button", {
+  }, "I confirm the mileage, gas level, and warning lights above match what I see on the dashboard."))), !canSubmit && !saving && safetyLightsOn.length === 0 && missing.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "needs-list",
+    role: "status"
+  }, "Still needed: ", missing.join(', '), "."), /*#__PURE__*/React.createElement("button", {
     className: "primary",
     disabled: !canSubmit,
     onClick: finishCheckout
@@ -1217,6 +1232,14 @@ function ReturnFlow({
     setCheckedLights(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
   const canSubmit = mileage && gas !== null && clean !== null && cleanPhoto && odoPhoto && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && problems !== null && !saving;
+  const missing = [];
+  if (!mileage) missing.push('the mileage');
+  if (gas === null) missing.push('the gas level');
+  if (!odoPhoto) missing.push('the odometer close-up photo');
+  if (clean === null) missing.push('whether the van is clean');
+  if (!cleanPhoto) missing.push('the interior photo');
+  if (otherLightChecked && !otherLightDesc) missing.push('a description of the other warning light');
+  if (problems === null) missing.push('whether there were any problems');
   async function handlePhoto(file) {
     setCleanUploading(true);
     const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/return-${uid()}.jpg`);
@@ -1369,7 +1392,10 @@ function ReturnFlow({
   }), problems && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Please describe"), /*#__PURE__*/React.createElement("textarea", {
     value: problemDetails,
     onChange: e => setProblemDetails(e.target.value)
-  })), /*#__PURE__*/React.createElement("button", {
+  })), !canSubmit && !saving && safetyLightsOn.length === 0 && missing.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "needs-list",
+    role: "status"
+  }, "Still needed: ", missing.join(', '), "."), /*#__PURE__*/React.createElement("button", {
     className: "primary",
     disabled: !canSubmit,
     onClick: finishReturn

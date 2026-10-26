@@ -1243,16 +1243,21 @@
   // The Google Sheet's Status cell and the requester's email are updated from
   // the server when the status changes (Cloud Function notifyEventRequestStatus).
   window.setEventStatus = async (id, status) => {
+    const req = allEventRequests.find(x => x.id === id);
+    const title = evTitle(id), who = (req && req.requesterName) || 'The requester';
     // Approving does NOT firm up the room — it stays a TBD hold until an admin confirms it
     // (see "Room" on the card). Just mention any overlaps so they can be sorted out.
     if (status === 'approved') {
-      const req = allEventRequests.find(x => x.id === id);
-      const c = req ? await RoomLogic.checkApprovalConflicts(db, Object.assign({}, req, { status: 'approved', roomConfirmed: false }), id) : { hard: [], soft: [] };
-      if (c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
-    }
-    await db.collection('eventRequests').doc(id).update({status, statusChangedAt:new Date().toISOString(), statusChangedBy: currentUser.uid});
-    RccAudit.log('event.' + status, 'eventRequest', id, `${status === 'approved' ? 'Approved' : status === 'denied' ? 'Denied' : 'Moved back to New'}: "${evTitle(id)}"`);
-    showBanner('Request updated.');
+      try {
+        const c = req ? await RoomLogic.checkApprovalConflicts(db, Object.assign({}, req, { status: 'approved', roomConfirmed: false }), id) : { hard: [], soft: [] };
+        if (c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
+      } catch (err) { RCC.notify('Could not check the room calendar, so "' + title + '" was not approved. Try again.\n(' + err.message + ')', { kind: 'error' }); return; }
+    } else if (status === 'denied' && !confirm('Deny "' + title + '"?\n\n' + who + ' will be emailed that it was denied. You can move it back to New later, but that email will already have gone.')) return;
+    try {
+      await db.collection('eventRequests').doc(id).update({status, statusChangedAt:new Date().toISOString(), statusChangedBy: currentUser.uid});
+    } catch (err) { RCC.notify('Could not update "' + title + '". Nothing was changed — try again.\n(' + err.message + ')', { kind: 'error' }); return; }
+    RccAudit.log('event.' + status, 'eventRequest', id, `${status === 'approved' ? 'Approved' : status === 'denied' ? 'Denied' : 'Moved back to New'}: "${title}"`);
+    RCC.notify(status === 'new' ? '"' + title + '" is back in New.' : (status === 'approved' ? 'Approved' : 'Denied') + ' "' + title + '". ' + who + ' is being emailed.');
   };
   // An approved event's room stays a TBD hold until an admin confirms it here. Confirming is
   // refused if the room is already firmly booked at that time.
