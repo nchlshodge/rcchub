@@ -444,20 +444,27 @@
   });
 
   // ── "WHAT NEEDS YOU" (staff only: counts from the live Event Requests) ──
-  let needsUnsub = null, needsFor = '';
+  // Event-request counters for admins / graphics / marketing, plus the van oil-change cards for admins and van admins.
+  // Each source is read once; the row is drawn when every source this person needs has answered.
+  let needsUnsubs = [], needsFor = '', needsRoles = {}, needsReqs = null, needsVans = null, needsFailed = false;
   function watchNeeds(roles) {
-    const staff = roles.isAdmin || roles.graphics || roles.marketing;
-    const sig = staff ? (roles.isAdmin ? 'admin' : 'staff') : '';
+    const events = roles.isAdmin || roles.graphics || roles.marketing;
+    const vans = roles.isAdmin || roles.vanAdmin;
+    const sig = (events ? (roles.isAdmin ? 'admin' : 'staff') : '') + (vans ? '+vans' : '');
     if (sig === needsFor) return;
     needsFor = sig;
-    if (needsUnsub) { needsUnsub(); needsUnsub = null; }
+    needsUnsubs.forEach(u => u()); needsUnsubs = [];
     const row = document.getElementById('needsRow');
     row.hidden = true; row.innerHTML = '';
-    if (!staff) return;
-    needsUnsub = db.collection('eventRequests').onSnapshot(snap => drawNeeds(snap.docs.map(d => d.data()), roles), () => {});
+    needsRoles = roles; needsFailed = false;
+    needsReqs = events ? null : []; needsVans = vans ? null : [];
+    if (events) needsUnsubs.push(db.collection('eventRequests').onSnapshot(snap => { needsReqs = snap.docs.map(d => d.data()); drawNeeds(); }, () => { needsFailed = true; }));
+    if (vans) needsUnsubs.push(db.collection('vans').onSnapshot(snap => { needsVans = snap.docs.map(d => d.data()); drawNeeds(); }, () => { needsFailed = true; }));
   }
 
-  function drawNeeds(reqs, roles) {
+  function drawNeeds() {
+    if (needsReqs === null || needsVans === null || needsFailed) return;
+    const reqs = needsReqs, roles = needsRoles;
     mark('counters');
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -480,6 +487,13 @@
     if (roles.isAdmin && awaiting) cards.push(['', 'admin.html?section=events', awaiting, 'Awaiting approval', 'Event requests to review']);
     if (roles.isAdmin && rooms) cards.push(['gold', 'admin.html?section=events', rooms, 'Rooms to confirm', 'Approved, still held as TBD']);
     if (overdue) cards.push(['red', 'queue-timeline.html', overdue, 'Creative work overdue', 'Open the timeline']);
+    if (roles.isAdmin || roles.vanAdmin) {
+      const oil = needsVans.filter(v => !v.borrowed && v.status !== 'maintenance').map(v => ({ v: v, st: RCC.oilStatus(v) }));
+      const names = list => list.map(x => RCC.esc(x.v.name || 'A van')).join(', ');
+      const late = oil.filter(x => x.st.state === 'overdue'), soon = oil.filter(x => x.st.state === 'soon');
+      if (late.length) cards.push(['red', 'van/admin.html', late.length, 'Oil change overdue', names(late)]);
+      if (soon.length) cards.push(['gold', 'van/admin.html', soon.length, 'Oil change due soon', names(soon)]);
+    }
     const row = document.getElementById('needsRow');
     row.hidden = false;
     row.innerHTML = cards.length

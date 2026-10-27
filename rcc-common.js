@@ -22,6 +22,18 @@
   // Is an event/media request finished? Yes when an admin marked it complete, OR when it is approved and everything
   // it asked for is done (calendar added, graphic Completed, marketing Completed). An admin who reopened it
   // (completed === false) keeps it open until they complete it again, even if every item is done.
+  // Oil-change status for a van (vans/{id}): where the last change was, how often, and how far off the next one is.
+  // 'unknown' = no oil change recorded yet; 'soon' = within 500 miles; 'overdue' = past due. Keep in step with
+  // functions/van-oil-logic.js (it sends the email reminder with the same numbers).
+  RCC.oilStatus = function (van) {
+    van = van || {};
+    var interval = Number(van.oilIntervalMiles) > 0 ? Number(van.oilIntervalMiles) : 5000;
+    var last = (van.lastOilChangeMileage == null || van.lastOilChangeMileage === '') ? NaN : Number(van.lastOilChangeMileage);
+    if (!isFinite(last)) return { state: 'unknown', interval: interval };
+    var nextAt = last + interval, left = nextAt - (Number(van.mileage) || 0);
+    return { state: left < 0 ? 'overdue' : left <= 500 ? 'soon' : 'ok', last: last, nextAt: nextAt, left: left, interval: interval };
+  };
+
   RCC.isRequestDone = function (r) {
     if (r.completed === true) return true;
     if (r.completed === false || r.status !== 'approved') return false;

@@ -88,6 +88,7 @@
   .camera-box img{max-width:100%;border-radius:10px;margin-top:10px;}
   .upload-progress{font-size:13px;color:var(--blue);margin-top:8px;}
   .banner-safe{background:var(--safe-dim);color:var(--safe-ink);padding:14px 16px;border-radius:14px;margin-top:12px;font-weight:600;}
+  .banner-warn{background:var(--gold-soft);color:var(--gold-ink);padding:14px 16px;border-radius:14px;margin-top:12px;font-weight:700;}
   .banner-danger{background:var(--danger-dim);color:var(--danger-ink);padding:14px 16px;border-radius:14px;margin-top:12px;font-weight:700;}
   .nav-tabs{display:flex;gap:4px;background:var(--bg-soft);border-radius:999px;padding:4px;margin-bottom:18px;overflow-x:auto;}
   .nav-tabs button{flex:1;padding:10px 14px;background:none;border:none;font-size:14px;font-weight:600;color:var(--muted);border-radius:999px;white-space:nowrap;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s var(--ease);}
@@ -421,6 +422,284 @@ function GasGauge({
   }, "Pick the closest mark at or below the needle — e.g. between 3/4 and Full, pick 3/4."));
 }
 
+// ---------- Oil changes + maintenance check-in ----------
+const SERVICE_TYPES = ['Oil Change', 'Tire Rotation', 'Brake Service', 'Battery Replacement', 'Check Engine Light Diagnosis', 'Inspection'];
+const fmtMiles = n => Number(n).toLocaleString('en-US', {
+  maximumFractionDigits: 1
+});
+const parseMiles = v => {
+  const n = Number(String(v == null ? '' : v).replace(/[,\s]/g, ''));
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+function todayLocal() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+const oilStatus = RCC.oilStatus; // shared with the hub homepage and the email reminder (rcc-common.js)
+
+// Banner at the top of Van Admin: every van (ours, not in the shop) that is due or overdue for an oil change.
+function OilBanner({
+  vans,
+  onOpen
+}) {
+  const due = vans.filter(v => !v.borrowed && v.status !== 'maintenance').map(v => ({
+    v,
+    st: oilStatus(v)
+  })).filter(x => x.st.state === 'overdue' || x.st.state === 'soon').sort((a, b) => a.st.left - b.st.left); // most overdue first
+  if (!due.length) return null;
+  const overdue = due.some(x => x.st.state === 'overdue');
+  return /*#__PURE__*/React.createElement("div", {
+    role: "status",
+    className: overdue ? 'banner-danger' : 'banner-warn',
+    style: {
+      cursor: 'pointer'
+    },
+    onClick: onOpen
+  }, /*#__PURE__*/React.createElement("div", null, overdue ? 'Oil change overdue' : 'Oil change due soon'), due.map(x => /*#__PURE__*/React.createElement("div", {
+    key: x.v.id,
+    style: {
+      fontWeight: 500,
+      marginTop: 2
+    }
+  }, x.v.name, ": ", x.st.state === 'overdue' ? 'overdue by ' + fmtMiles(-x.st.left) + ' mi' : 'due in ' + fmtMiles(x.st.left) + ' mi', " (at ", fmtMiles(x.st.nextAt), " mi)")));
+}
+function MaintenanceCheckIn({
+  van,
+  openNotes,
+  onSave,
+  onCancel,
+  onJustAvailable
+}) {
+  const [mileage, setMileage] = useState('');
+  const [date, setDate] = useState(todayLocal());
+  const [picked, setPicked] = useState([]);
+  const [other, setOther] = useState('');
+  const [notes, setNotes] = useState('');
+  const [by, setBy] = useState('');
+  const [resolve, setResolve] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const toggle = (list, setList, x) => setList(list.includes(x) ? list.filter(y => y !== x) : list.concat([x]));
+  const miles = parseMiles(mileage);
+  const interval = oilStatus(van).interval;
+  const services = picked.concat(other.trim() ? [other.trim()] : []);
+  const oil = picked.includes('Oil Change');
+  const lower = miles != null && miles < (Number(van.mileage) || 0) - 2;
+  const canSave = miles != null && date && services.length > 0 && !saving;
+  async function save() {
+    if (lower && !confirm('That reading (' + fmtMiles(miles) + ' mi) is LOWER than the last one on file for this van (' + fmtMiles(van.mileage) + ' mi). Use it anyway?')) return;
+    setSaving(true);
+    setErr('');
+    try {
+      await onSave({
+        vanId: van.id,
+        date,
+        mileage: miles,
+        services,
+        notes: notes.trim(),
+        performedBy: by.trim(),
+        toAvailable: true,
+        resolveIds: resolve
+      });
+    } catch (e) {
+      setErr('Could not save: ' + (e.message || e));
+      setSaving(false);
+    }
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTop: '1px solid var(--border)'
+    }
+  }, /*#__PURE__*/React.createElement("h4", {
+    style: {
+      fontSize: 15,
+      marginBottom: 2
+    }
+  }, "Check ", van.name, " back in from maintenance"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Last on file: ", fmtMiles(van.mileage || 0), " mi."), /*#__PURE__*/React.createElement("label", null, "Odometer reading now"), /*#__PURE__*/React.createElement("input", {
+    inputMode: "decimal",
+    value: mileage,
+    onChange: e => setMileage(e.target.value),
+    placeholder: "e.g. 52,418"
+  }), lower && /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      color: 'var(--danger)',
+      fontWeight: 600
+    }
+  }, "That is lower than the last reading on file. Double-check it."), /*#__PURE__*/React.createElement("label", null, "Date of service"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: date,
+    onChange: e => setDate(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "What was done?"), SERVICE_TYPES.map(t => /*#__PURE__*/React.createElement("label", {
+    key: t,
+    style: {
+      margin: '6px 0'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: picked.includes(t),
+    onChange: () => toggle(picked, setPicked, t)
+  }), " ", t)), /*#__PURE__*/React.createElement("label", null, "Something else (optional)"), /*#__PURE__*/React.createElement("input", {
+    value: other,
+    onChange: e => setOther(e.target.value),
+    placeholder: "e.g. Replaced wiper blades"
+  }), oil && miles != null && /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      marginTop: 8
+    }
+  }, "Oil change will be recorded at ", fmtMiles(miles), " mi. The next one will be due at ", fmtMiles(miles + interval), " mi."), oil && miles == null && /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      marginTop: 8
+    }
+  }, "Enter the odometer reading so the oil change can be tracked."), /*#__PURE__*/React.createElement("label", null, "Notes (optional)"), /*#__PURE__*/React.createElement("textarea", {
+    value: notes,
+    onChange: e => setNotes(e.target.value),
+    placeholder: "Anything worth remembering: parts, cost, what the shop said"
+  }), /*#__PURE__*/React.createElement("label", null, "Done by (optional)"), /*#__PURE__*/React.createElement("input", {
+    value: by,
+    onChange: e => setBy(e.target.value),
+    placeholder: "Shop name or staff member"
+  }), openNotes.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Open issues on this van: mark any that are now fixed"), openNotes.map(m => /*#__PURE__*/React.createElement("label", {
+    key: m.id,
+    style: {
+      margin: '6px 0'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: resolve.includes(m.id),
+    onChange: () => toggle(resolve, setResolve, m.id)
+  }), " ", m.note))), err && /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      color: 'var(--danger)',
+      fontWeight: 600
+    }
+  }, err), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 12,
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    style: {
+      marginTop: 0,
+      width: 'auto'
+    },
+    disabled: !canSave,
+    onClick: save
+  }, saving ? 'Saving…' : 'Check in and mark available'), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0,
+      width: 'auto'
+    },
+    disabled: saving,
+    onClick: onCancel
+  }, "Cancel")), /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      marginTop: 10
+    }
+  }, "Sent to maintenance by mistake? ", /*#__PURE__*/React.createElement("a", {
+    href: "#",
+    onClick: e => {
+      e.preventDefault();
+      if (!saving) onJustAvailable();
+    }
+  }, "Just mark it available"), " (nothing is recorded)."));
+}
+function OilInfo({
+  van,
+  onSave
+}) {
+  const st = oilStatus(van);
+  const [editing, setEditing] = useState(false);
+  const [mileage, setMileage] = useState('');
+  const [date, setDate] = useState('');
+  const [interval, setIntervalMiles] = useState('');
+  function open() {
+    setMileage(van.lastOilChangeMileage == null ? '' : String(van.lastOilChangeMileage));
+    setDate(van.lastOilChangeDate || '');
+    setIntervalMiles(String(st.interval));
+    setEditing(true);
+  }
+  const m = parseMiles(mileage),
+    iv = parseMiles(interval);
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h4", {
+    style: {
+      fontSize: 14,
+      marginTop: 16,
+      marginBottom: 6
+    }
+  }, "Oil Changes"), st.state === 'unknown' ? /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "No oil change on record yet. Enter the last one to start tracking.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "Last changed ", van.lastOilChangeDate || '(date not recorded)', " at ", fmtMiles(st.last), " mi."), /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: st.state === 'overdue' ? {
+      color: 'var(--danger)',
+      fontWeight: 600
+    } : null
+  }, "Next due at ", fmtMiles(st.nextAt), " mi", st.left >= 0 ? ' · ' + fmtMiles(st.left) + ' mi to go' : ' · overdue by ' + fmtMiles(-st.left) + ' mi', " (every ", fmtMiles(st.interval), " mi).")), !editing && /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 8,
+      width: 'auto',
+      padding: '6px 10px'
+    },
+    onClick: open
+  }, st.state === 'unknown' ? 'Enter last oil change' : 'Edit oil info'), editing && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Odometer at last oil change"), /*#__PURE__*/React.createElement("input", {
+    inputMode: "decimal",
+    value: mileage,
+    onChange: e => setMileage(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Date of last oil change"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: date,
+    onChange: e => setDate(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Change oil every (miles)"), /*#__PURE__*/React.createElement("input", {
+    inputMode: "numeric",
+    value: interval,
+    onChange: e => setIntervalMiles(e.target.value)
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    style: {
+      marginTop: 0,
+      width: 'auto'
+    },
+    disabled: m == null || iv == null || !date,
+    onClick: async () => {
+      await onSave(van.id, {
+        lastOilChangeMileage: m,
+        lastOilChangeDate: date,
+        oilIntervalMiles: iv
+      });
+      setEditing(false);
+    }
+  }, "Save"), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0,
+      width: 'auto'
+    },
+    onClick: () => setEditing(false)
+  }, "Cancel"))));
+}
+
 // ---------- Admin Dashboard ----------
 function VanDetailCard({
   van,
@@ -428,9 +707,13 @@ function VanDetailCard({
   repairLog,
   onSetStatus,
   onRemove,
-  onResolveMaint
+  onResolveMaint,
+  onService,
+  onSaveOil
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [checkingIn, setCheckingIn] = useState(false);
+  const oil = oilStatus(van);
   const openNotes = maintenanceNotes.filter(m => !m.resolved);
   const sortedRepairs = repairLog.slice().sort((a, b) => b.createdAt - a.createdAt);
   return /*#__PURE__*/React.createElement("div", {
@@ -453,9 +736,13 @@ function VanDetailCard({
     className: "badge admin"
   }, "borrowed"), " ", openNotes.length > 0 && /*#__PURE__*/React.createElement("span", {
     className: "badge maintenance"
-  }, openNotes.length, " open issue", openNotes.length === 1 ? '' : 's')), /*#__PURE__*/React.createElement("div", {
+  }, openNotes.length, " open issue", openNotes.length === 1 ? '' : 's'), " ", oil.state === 'overdue' && /*#__PURE__*/React.createElement("span", {
+    className: "badge maintenance"
+  }, "oil overdue"), " ", oil.state === 'soon' && /*#__PURE__*/React.createElement("span", {
+    className: "badge pending"
+  }, "oil due in ", fmtMiles(oil.left), " mi")), /*#__PURE__*/React.createElement("div", {
     className: "muted"
-  }, van.mileage, " mi · ", van.gas, "% gas"), van.borrowed && /*#__PURE__*/React.createElement("div", {
+  }, van.mileage, " mi · ", van.gas, "% gas", oil.state !== 'unknown' ? ' · oil due at ' + fmtMiles(oil.nextAt) + ' mi' : ''), van.borrowed && /*#__PURE__*/React.createElement("div", {
     className: "muted"
   }, "From ", van.borrowedFrom || 'unspecified org', van.expectedReturnDate ? ` · return by ${van.expectedReturnDate}` : '')), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -496,7 +783,10 @@ function VanDetailCard({
       padding: '6px 10px'
     },
     onClick: () => onResolveMaint(m.id)
-  }, "Resolve"))), /*#__PURE__*/React.createElement("h4", {
+  }, "Resolve"))), /*#__PURE__*/React.createElement(OilInfo, {
+    van: van,
+    onSave: onSaveOil
+  }), /*#__PURE__*/React.createElement("h4", {
     style: {
       fontSize: 14,
       marginTop: 16,
@@ -510,7 +800,19 @@ function VanDetailCard({
     style: {
       marginBottom: 6
     }
-  }, r.date, " — ", r.serviceType, r.performedBy ? ` (by ${r.performedBy})` : '', r.notes ? `: ${r.notes}` : ''))), /*#__PURE__*/React.createElement("div", {
+  }, r.date, r.mileage ? ' · ' + fmtMiles(r.mileage) + ' mi' : '', " — ", r.serviceType, r.performedBy ? ` (by ${r.performedBy})` : '', r.notes ? `: ${r.notes}` : ''))), van.status === 'maintenance' && checkingIn && /*#__PURE__*/React.createElement(MaintenanceCheckIn, {
+    van: van,
+    openNotes: openNotes,
+    onSave: async d => {
+      await onService(d);
+      setCheckingIn(false);
+    },
+    onCancel: () => setCheckingIn(false),
+    onJustAvailable: () => {
+      onSetStatus(van.id, 'available');
+      setCheckingIn(false);
+    }
+  }), !checkingIn && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
@@ -523,13 +825,16 @@ function VanDetailCard({
       marginTop: 0
     },
     onClick: () => onSetStatus(van.id, 'maintenance')
-  }, "Send to Maintenance") : /*#__PURE__*/React.createElement("button", {
+  }, "Send to Maintenance") : !checkingIn && /*#__PURE__*/React.createElement("button", {
     className: "secondary",
     style: {
       marginTop: 0
     },
-    onClick: () => onSetStatus(van.id, 'available')
-  }, "Mark Available"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCheckingIn(true);
+      setExpanded(true);
+    }
+  }, "Check in from maintenance"), /*#__PURE__*/React.createElement("button", {
     className: "secondary",
     style: {
       marginTop: 0,
@@ -1103,10 +1408,12 @@ function AdminDashboard({
   const openAlerts = alerts.filter(a => !a.resolved);
   const openMileage = (mileageFlags || []).filter(f => (f.status || 'open') === 'open');
   const recurringPendingCount = recurringRequests.filter(r => r.status === 'pending' || r.status === 'renewal_requested').length;
+  const oilDueCount = vans.filter(v => !v.borrowed && v.status !== 'maintenance' && ['overdue', 'soon'].includes(oilStatus(v).state)).length;
   const tabCount = {
     recurring: recurringPendingCount,
     mileage: openMileage.length,
-    alerts: openAlerts.length
+    alerts: openAlerts.length,
+    vans: oilDueCount
   };
   const group = ADMIN_GROUPS.find(g => g.tabs.includes(tab)) || ADMIN_GROUPS[0];
   lastTabInGroup.current[group.key] = tab;
@@ -1275,15 +1582,51 @@ function AdminDashboard({
     await db.collection('vans').doc(vanId).delete();
     RccAudit.log('van.remove', 'van', vanId, 'Removed the van "' + gone + '"');
   }
-  async function addRepair(vanId, date, serviceType, notes, performedBy) {
-    await db.collection('vanRepairLog').add({
+  // One place that records shop work: the repair-log entry, the van's odometer, oil-change tracking, and (when the van is
+  // coming back from maintenance) its status and any issues that were fixed. All in one batch so it saves whole or not at all.
+  async function recordService({
+    vanId,
+    date,
+    mileage,
+    services,
+    notes,
+    performedBy,
+    toAvailable,
+    resolveIds
+  }) {
+    const van = vans.find(v => v.id === vanId) || {};
+    const miles = parseMiles(mileage);
+    const oil = services.includes('Oil Change');
+    const batch = db.batch();
+    batch.set(db.collection('vanRepairLog').doc(), {
       vanId,
       date,
-      serviceType,
-      notes,
-      performedBy,
+      serviceType: services.join(', '),
+      services,
+      notes: notes || '',
+      performedBy: performedBy || '',
+      mileage: miles,
+      oilChange: oil,
+      backFromMaintenance: !!toAvailable,
       createdAt: Date.now()
     });
+    const upd = {};
+    if (miles != null && (toAvailable || miles > (Number(van.mileage) || 0))) upd.mileage = miles;
+    if (oil && miles != null && (!van.lastOilChangeDate || date >= van.lastOilChangeDate)) {
+      upd.lastOilChangeMileage = miles;
+      upd.lastOilChangeDate = date;
+    }
+    if (toAvailable) upd.status = 'available';
+    if (Object.keys(upd).length) batch.update(db.collection('vans').doc(vanId), upd);
+    (resolveIds || []).forEach(id => batch.update(db.collection('vanMaintenanceNotes').doc(id), {
+      resolved: true
+    }));
+    await batch.commit();
+    RccAudit.log(toAvailable ? 'van.maintenance.checkin' : 'van.repair', 'van', vanId, vanLabel(vanId) + (toAvailable ? ' back from maintenance' : ' serviced') + (miles != null ? ' at ' + fmtMiles(miles) + ' mi' : '') + ': ' + services.join(', ') + ((resolveIds || []).length ? ' (' + resolveIds.length + ' issue' + (resolveIds.length === 1 ? '' : 's') + ' resolved)' : ''));
+  }
+  async function saveOilInfo(vanId, fields) {
+    await db.collection('vans').doc(vanId).update(fields);
+    RccAudit.log('van.oil', 'van', vanId, vanLabel(vanId) + ' oil info set: last change at ' + fmtMiles(fields.lastOilChangeMileage) + ' mi on ' + fields.lastOilChangeDate + ', every ' + fmtMiles(fields.oilIntervalMiles) + ' mi');
   }
   async function addManualReservation({
     vanId,
@@ -1599,7 +1942,10 @@ function AdminDashboard({
   }
   return /*#__PURE__*/React.createElement("div", {
     className: "content"
-  }, /*#__PURE__*/React.createElement("nav", {
+  }, /*#__PURE__*/React.createElement(OilBanner, {
+    vans: vans,
+    onOpen: () => setTab('vans')
+  }), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs group-tabs",
     "aria-label": "Van admin sections"
   }, ADMIN_GROUPS.map(g => {
@@ -1677,7 +2023,9 @@ function AdminDashboard({
     repairLog: repairLog.filter(r => r.vanId === v.id),
     onSetStatus: setVanStatus,
     onRemove: removeVan,
-    onResolveMaint: resolveMaint
+    onResolveMaint: resolveMaint,
+    onService: recordService,
+    onSaveOil: saveOilInfo
   })), /*#__PURE__*/React.createElement(AddVanForm, {
     onAdd: addVan
   })), tab === 'checkinout' && /*#__PURE__*/React.createElement(ManualCheckInOut, {
@@ -1710,7 +2058,7 @@ function AdminDashboard({
   }), tab === 'repairs' && /*#__PURE__*/React.createElement(RepairsAdmin, {
     vans: vans,
     repairLog: repairLog,
-    onAdd: addRepair
+    onAdd: recordService
   }), tab === 'mileage' && /*#__PURE__*/React.createElement(MileageAdmin, {
     flags: mileageFlags || [],
     onExplain: explainMileage
@@ -2814,17 +3162,29 @@ function RepairsAdmin({
   const [customType, setCustomType] = useState('');
   const [notes, setNotes] = useState('');
   const [performedBy, setPerformedBy] = useState('');
+  const [mileage, setMileage] = useState('');
   const commonTypes = ['Oil Change', 'Tire Rotation', 'Check Engine Light Diagnosis', 'Brake Service', 'Battery Replacement', 'Inspection', 'Other'];
   async function submit() {
     const type = serviceType === 'Other' ? customType : serviceType;
-    await onAdd(vanId, date, type, notes, performedBy);
+    await onAdd({
+      vanId,
+      date,
+      mileage,
+      services: [type],
+      notes,
+      performedBy,
+      toAvailable: false,
+      resolveIds: []
+    });
     setDate('');
     setServiceType('');
     setCustomType('');
     setNotes('');
     setPerformedBy('');
+    setMileage('');
   }
-  const canSubmit = vanId && date && serviceType && (serviceType !== 'Other' || customType);
+  const needsMiles = serviceType === 'Oil Change';
+  const canSubmit = vanId && date && serviceType && (serviceType !== 'Other' || customType) && (!needsMiles || parseMiles(mileage) != null);
   const sorted = repairLog.slice().sort((a, b) => b.createdAt - a.createdAt);
   return /*#__PURE__*/React.createElement("div", {
     className: "card"
@@ -2839,7 +3199,7 @@ function RepairsAdmin({
         flexDirection: 'column',
         alignItems: 'stretch'
       }
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, van?.name), " — ", r.date), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, van?.name), " — ", r.date, r.mileage ? ' · ' + fmtMiles(r.mileage) + ' mi' : ''), /*#__PURE__*/React.createElement("div", {
       className: "muted"
     }, r.serviceType, r.performedBy ? ` · by ${r.performedBy}` : ''), r.notes && /*#__PURE__*/React.createElement("div", {
       className: "muted"
@@ -2869,7 +3229,12 @@ function RepairsAdmin({
   }, t))), serviceType === 'Other' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Describe the service"), /*#__PURE__*/React.createElement("input", {
     value: customType,
     onChange: e => setCustomType(e.target.value)
-  })), /*#__PURE__*/React.createElement("label", null, "Notes (optional)"), /*#__PURE__*/React.createElement("textarea", {
+  })), /*#__PURE__*/React.createElement("label", null, "Odometer reading", needsMiles ? ' (needed to track the oil change)' : ' (optional)'), /*#__PURE__*/React.createElement("input", {
+    inputMode: "decimal",
+    value: mileage,
+    onChange: e => setMileage(e.target.value),
+    placeholder: "e.g. 52,418"
+  }), /*#__PURE__*/React.createElement("label", null, "Notes (optional)"), /*#__PURE__*/React.createElement("textarea", {
     value: notes,
     onChange: e => setNotes(e.target.value)
   }), /*#__PURE__*/React.createElement("label", null, "Performed By (optional)"), /*#__PURE__*/React.createElement("input", {
