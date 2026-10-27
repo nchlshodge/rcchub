@@ -34,6 +34,36 @@
     return { state: left < 0 ? 'overdue' : left <= 500 ? 'soon' : 'ok', last: last, nextAt: nextAt, left: left, interval: interval };
   };
 
+  // Room clashes ("pending review"): when a request's room and time overlap another booking, the server records it in
+  // roomReviews/{requestId} (admins can read it). An admin looks at it and either keeps both bookings or changes one.
+  RCC.pendingClash = function (db, id) {
+    return db.collection('roomReviews').doc(id).get().then(function (s) { return s.exists && s.data().status === 'needed' ? s.data() : null; }, function () { return null; });
+  };
+  RCC.clashLines = function (rv) {
+    var RL = window.RoomLogic;
+    return ((rv && rv.clashes) || []).map(function (c) {
+      var rooms = (c.roomIds || []).map(function (i) { return RL && RL.BY_ID[i] ? RL.BY_ID[i].name : i; }).join(', ');
+      var when = c.allDay ? 'all day' : (RL ? RL.fmtMinutes(c.startMin) + ' to ' + RL.fmtMinutes(c.endMin) : '');
+      return c.title + (c.tentative ? ' (TBD hold)' : '') + ' — ' + when + ' in ' + rooms;
+    });
+  };
+  RCC.keepBoth = function (db, id, user, note) {
+    return db.collection('roomReviews').doc(id).update({ status: 'cleared', clearedBy: user.uid, clearedAt: new Date().toISOString(), note: note || '' }).then(function () {
+      if (window.RccAudit) RccAudit.log('room.clashReviewed', 'eventRequest', id, 'Reviewed a room clash and kept both bookings');
+    });
+  };
+  // Before approving a request or confirming its room: if it is waiting in room-clash review, show what it clashes with and
+  // ask. Resolves false = the admin backed out (stop); 'reviewed' = they chose to keep both (the clash is now marked reviewed);
+  // true = there was no clash.
+  RCC.confirmClash = async function (db, id, user, doing) {
+    var rv = await RCC.pendingClash(db, id);
+    if (!rv) return true;
+    if (!window.confirm('Room clash — pending review\n\n"' + rv.title + '" overlaps with:\n\n' + RCC.clashLines(rv).join('\n') + '\n\nKeep both bookings and ' + doing + '?\n(To fix it instead, press Cancel and change the time or room on one of them, or deny one.)')) return false;
+    try { await RCC.keepBoth(db, id, user, 'Kept both when asked to ' + doing); }
+    catch (e) { RCC.notify('Could not record the review, so nothing was changed. Try again.\n(' + e.message + ')', { kind: 'error' }); return false; }
+    return 'reviewed';
+  };
+
   RCC.isRequestDone = function (r) {
     if (r.completed === true) return true;
     if (r.completed === false || r.status !== 'approved') return false;

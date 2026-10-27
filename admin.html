@@ -1257,8 +1257,10 @@
     // (see "Room" on the card). Just mention any overlaps so they can be sorted out.
     if (status === 'approved') {
       try {
+        const clash = await RCC.confirmClash(db, id, currentUser, 'approve it');
+        if (!clash) return;
         const c = req ? await RoomLogic.checkApprovalConflicts(db, Object.assign({}, req, { status: 'approved', roomConfirmed: false }), id) : { hard: [], soft: [] };
-        if (c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
+        if (clash === true && c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
       } catch (err) { RCC.notify('Could not check the room calendar, so "' + title + '" was not approved. Try again.\n(' + err.message + ')', { kind: 'error' }); return; }
     } else if (status === 'denied' && !confirm('Deny "' + title + '"?\n\n' + who + ' will be emailed that it was denied. You can move it back to New later, but that email will already have gone.')) return;
     try {
@@ -1272,9 +1274,11 @@
   window.confirmRoom = async (id, confirmed) => {
     const req = allEventRequests.find(x => x.id === id);
     if (confirmed && req) {
+      const clash = await RCC.confirmClash(db, id, currentUser, 'confirm the room');
+      if (!clash) return;
       const c = await RoomLogic.checkApprovalConflicts(db, Object.assign({}, req, { status: 'approved', roomConfirmed: true }), id);
       if (c.hard.length) { alert('Can\'t confirm this room — it is already firmly booked then:\n\n' + c.hard.join('\n') + '\n\nChange the room or time first.'); return; }
-      if (c.soft.length && !confirm('Heads up — this overlaps with a TBD hold:\n\n' + c.soft.join('\n') + '\n\nConfirm the room anyway?')) return;
+      if (clash === true && c.soft.length && !confirm('Heads up — this overlaps with a TBD hold:\n\n' + c.soft.join('\n') + '\n\nConfirm the room anyway?')) return;
     }
     await db.collection('eventRequests').doc(id).update({ roomConfirmed: confirmed, roomConfirmedBy: confirmed ? currentUser.uid : null, roomConfirmedAt: confirmed ? new Date().toISOString() : null });
     RccAudit.log(confirmed ? 'room.confirm' : 'room.unconfirm', 'eventRequest', id, `${confirmed ? 'Confirmed the room for' : 'Put the room back to a TBD hold for'} "${evTitle(id)}"`);

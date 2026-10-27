@@ -97,6 +97,7 @@
   .seg button:disabled { cursor: not-allowed; opacity: .6; }
   .due-input, .cardin { font-family: inherit; font-size: 12.5px; color: var(--ink-2); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 5px 9px; }
   .due-input:disabled { opacity: .6; }
+  .duelbl { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink-3); }
   .hint { font-size: 11px; color: var(--ink-3); font-style: italic; }
   .calchk { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
   .calchk input { width: 16px; height: 16px; accent-color: var(--blue); }
@@ -481,7 +482,7 @@
     const opts = [["","Not started"],["In Progress","In progress"],["Completed","Done"]];
     const dis = canEdit ? '' : 'disabled';
     const btns = opts.map(([v,label]) => `<button type="button" data-value="${v}" class="${v===(value||'')?'active':''}" data-action="status" data-id="${id}" data-field="${field}" ${dis}>${label}</button>`).join('');
-    const dueHtml = dueField ? `<input type="date" class="due-input" data-action="due" data-id="${id}" data-field="${dueField}" value="${dueValue||''}" ${dis} aria-label="${name} due date">` : '';
+    const dueHtml = dueField ? `<label class="duelbl"><span>Due</span><input type="date" class="due-input" data-action="due" data-id="${id}" data-field="${dueField}" data-name="${name}" value="${dueValue||''}" ${dis} aria-label="${name} due date"></label>` : '';
     const hint = !canEdit && lockedHint ? `<span class="hint">${lockedHint}</span>` : '';
     return `<div class="field"><span class="lbl">${name}</span><div class="seg">${btns}</div>${dueHtml}${hint}</div>`;
   }
@@ -493,6 +494,7 @@
     return `<div class="editbox" data-edit-card="${r.id}">
       <div class="row">${row('Title', titleField, 'text', r.eventTitle || r.projectTitle || '')}${row('Requester name', 'requesterName', 'text', r.requesterName)}</div>
       <div class="row">${row('Event date', 'eventDate', 'date', r.eventDate)}${row('Start time', 'startTime', 'time', r.startTime)}${row('End time', 'endTime', 'time', r.endTime)}</div>
+      ${(r.hasGraphic || r.hasMarketing) ? `<div class="row">${r.hasGraphic ? row('Graphic due', 'graphicDueDate', 'date', r.graphicDueDate) : ''}${r.hasMarketing ? row('Marketing due', 'marketingDueDate', 'date', r.marketingDueDate) : ''}</div>` : ''}
       ${row('Location', 'location', 'text', r.location)}
       <div class="actions"><div>
         <button type="button" class="btn small primary" data-action="save-details" data-id="${r.id}">Save changes</button>
@@ -854,8 +856,10 @@
     if (approve) {
       const id = approve.dataset.id, req = allRequests.find(x => x.id === id);
       // Approving leaves the room as a TBD hold until an admin confirms it (Admin → Event requests).
-      RoomLogic.checkApprovalConflicts(db, Object.assign({}, req || {}, { status: 'approved', roomConfirmed: false }), id).then(c => {
-        if (c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
+      RCC.confirmClash(db, id, currentUser, 'approve it').then(clash => { if (!clash) return null; return RoomLogic.checkApprovalConflicts(db, Object.assign({}, req || {}, { status: 'approved', roomConfirmed: false }), id).then(c => ({ c, clash })); }).then(x => {
+        if (!x) return;
+        const c = x.c;
+        if (x.clash === true && c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
         upd(id, { status: 'approved', statusChangedAt: new Date().toISOString(), statusChangedBy: currentUser.uid });
       });
       return;
@@ -890,7 +894,16 @@
 
   document.addEventListener('change', e => {
     const cal = e.target.closest('[data-action="calendar"]'); if (cal) { upd(cal.dataset.id, { calendarAdded: cal.checked }); return; }
-    const due = e.target.closest('[data-action="due"]'); if (due) { upd(due.dataset.id, { [due.dataset.field]: due.value }); return; }
+    const due = e.target.closest('[data-action="due"]');
+    if (due) {
+      const r0 = allRequests.find(x => x.id === due.dataset.id) || {}, was = r0[due.dataset.field] || '', v = due.value || '', name = due.dataset.name || 'Due';
+      if (v === was) return;
+      const nice = x => x ? fmtDate(parseISO(x)) : '';
+      upd(due.dataset.id, { [due.dataset.field]: v })
+        .then(() => RCC.notify(name + ' due date ' + (v ? 'changed to ' + nice(v) : 'cleared') + (was ? ' (was ' + nice(was) + ')' : '') + '.'))
+        .catch(err => { due.value = was; RCC.notify('Could not change the ' + name.toLowerCase() + ' due date. Nothing was changed — try again.\n(' + err.message + ')', { kind: 'error' }); });
+      return;
+    }
     const link = e.target.closest('[data-action="link"]'); if (link) { upd(link.dataset.id, { graphicLink: link.value.trim() }); return; }
   });
   document.addEventListener('input', e => {

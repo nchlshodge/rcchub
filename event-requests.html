@@ -57,6 +57,11 @@
   .st.done { color: var(--green-ink); } .st.done i { background: var(--green); border-color: var(--green); }
   .st.doing { color: var(--gold-ink); } .st.doing i { border-color: var(--gold); background: var(--gold-soft); }
   .track .bar { width: 18px; height: 2px; background: var(--line-2); margin: 0 7px; border-radius: 2px; }
+  .er-clash { background: var(--gold-soft); border-radius: var(--radius-md); padding: 10px 12px; font-size: 13px; color: var(--gold-ink); }
+  .er-clash b { display: block; font-size: 14px; margin-bottom: 4px; }
+  .er-clash ul { margin: 0 0 8px 18px; padding: 0; }
+  .er-clash .hint { display: block; margin-bottom: 8px; }
+  .clash-note { background: var(--gold-soft); color: var(--gold-ink); border-radius: var(--radius-md); padding: 10px 14px; font-size: 14px; margin-bottom: 14px; display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; }
   .er-approve { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; background: var(--blue-soft); border-radius: var(--radius-md); padding: 8px 12px; }
   .er-approve .why { font-size: 13px; font-weight: 500; color: var(--blue-ink); margin-right: auto; }
   .waiting { font-size: 13px; color: var(--blue-ink); background: var(--blue-soft); border-radius: var(--radius-md); padding: 8px 12px; font-weight: 500; }
@@ -244,7 +249,9 @@
   let allRequests = [];
   let view = 'cards';
   try { view = localStorage.getItem('eventRequestsView') === 'list' ? 'list' : 'cards'; } catch (e) {}
-  let currentUser = null, isAdmin = false, isGraphics = false, deepLinkHandled = false;
+  let currentUser = null, isAdmin = false, isGraphics = false, isMarketing = false, deepLinkHandled = false;
+  let reviews = {};                                  // requests waiting in room-clash review (admins only): { requestId: roomReviews doc }
+  let clashOnly = /[?&]clash=1/.test(location.search);
 
   document.getElementById('googleSignInBtn').addEventListener('click', () => {
     auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => RCC.notify('Sign-in failed: ' + err.message, { kind: 'error' }));
@@ -266,11 +273,17 @@
     const roles = data.roles || {};
     isAdmin = data.isAdmin === true;
     isGraphics = roles.graphics === true;
+    isMarketing = roles.marketing === true;
     RccShell.render(document.getElementById('rccNav'), { active: 'requests', user, onSignOut: () => auth.signOut(), roles: Object.assign({}, roles, { isAdmin }) });
     document.getElementById('accessCheck').hidden = true;
     if (data.isAdmin === true || roles.graphics === true || roles.marketing === true) {
       document.getElementById('ui').hidden = false;
       syncViewButtons();
+      if (isAdmin) db.collection('roomReviews').where('status', '==', 'needed').onSnapshot(snap => {
+        reviews = {}; snap.docs.forEach(d => { reviews[d.id] = d.data(); });
+        render();
+        if (openId && !editing) drawDrawer();
+      }, () => {});
       db.collection('eventRequests').onSnapshot(snap => {
         allRequests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         buildDeptFilter();
@@ -365,6 +378,7 @@
       const s = statusOf(r);
       if (st === 'active' && s === 'denied') return false;
       if (['new', 'approved', 'denied'].includes(st) && s !== st) return false;
+      if (clashOnly && !reviews[r.id]) return false;
       if (ty && r.requestType !== ty) return false;
       if (dp && !arr(r.department).includes(dp)) return false;
       if (q) {
@@ -440,7 +454,20 @@
     return rows.length ? '<dl class="facts">' + rows.join('') + '</dl>' : '';
   }
 
+  function clashHtml(r) {
+    const rv = reviews[r.id];
+    if (!rv || !isAdmin || statusOf(r) === 'denied') return '';
+    return '<div class="er-clash"><b>⚠ Room clash — pending review</b>' +
+      '<ul>' + RCC.clashLines(rv).map(l => '<li>' + esc(l) + '</li>').join('') + '</ul>' +
+      '<span class="hint">Open the request and use Edit request to change the time or room, deny it, or keep both.</span>' +
+      '<button type="button" class="btn small" data-keep-both="' + esc(r.id) + '">Keep both</button></div>';
+  }
   function statusChip(r) {
+    const s = statusOf(r);
+    if (reviews[r.id] && isAdmin && s !== 'denied') return '<span class="pill gold">⚠ Room clash</span> ' + statusChipBase(r);
+    return statusChipBase(r);
+  }
+  function statusChipBase(r) {
     const s = statusOf(r);
     if (RCC.isRequestDone(r) && s === 'approved') return '<span class="pill green">✓ Completed</span>';
     return '<span class="pill ' + (s === 'approved' ? 'green' : s === 'denied' ? 'gray' : 'blue') + '">' + (s === 'new' ? 'Needs approval' : s === 'approved' ? 'Approved' : 'Denied') + '</span>';
@@ -465,6 +492,7 @@
         '<h3>' + esc(titleOf(r)) + '</h3>' +
         '<div class="er-who">Requested by ' + esc(r.requesterName || '—') + '</div>' +
         (meta.length ? '<div class="meta">' + meta.join('') + '</div>' : '') +
+        clashHtml(r) +
         trackHtml(r) +
         '<div class="er-foot"><button type="button" class="btn small soft" data-open="' + esc(r.id) + '">Progress &amp; notes →</button>' +
         (sd ? '<small>Submitted ' + esc(sd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })) + '</small>' : '') + '</div>' +
@@ -486,7 +514,8 @@
     const list = visibleRequests();
     document.getElementById('statShown').textContent = list.length;
     const el = document.getElementById('content');
-    if (!list.length) { el.innerHTML = '<div class="empty"><b>Nothing here</b>No requests match these filters.</div>'; return; }
+    const clashBar = clashOnly ? '<div class="clash-note"><span><b>Showing only requests with a room clash</b> (' + Object.keys(reviews).length + ').</span><button type="button" class="btn small" id="showAllClash">Show everything</button></div>' : '';
+    if (!list.length) { el.innerHTML = clashBar + '<div class="empty"><b>' + (clashOnly ? 'No room clashes to review' : 'Nothing here') + '</b>' + (clashOnly ? 'Every request has its own room and time. 🎉' : 'No requests match these filters.') + '</div>'; return; }
 
     const pastWasOpen = !!el.querySelector('details.past-group:not(.done-group)[open]');
     const doneWasOpen = !!el.querySelector('details.done-group[open]');
@@ -522,7 +551,7 @@
     if (undated.length) html += head('No date yet', undated.length) + draw(undated);
     if (past.length) html += '<details class="past-group"' + (pastWasOpen ? ' open' : '') + '><summary>Past events <span class="n">' + past.length + '</span></summary>' + draw(past) + '</details>';
     if (doneList.length) html += '<details class="past-group done-group"' + (doneWasOpen ? ' open' : '') + '><summary>Completed <span class="n">' + doneList.length + '</span></summary>' + draw(doneList) + '</details>';
-    el.innerHTML = html;
+    el.innerHTML = clashBar + html;
   }
 
   /* ---------- wiring ---------- */
@@ -550,6 +579,16 @@
   // Approve or deny. Both email the requester (the server does that when the status changes), so Deny asks first
   // and both say plainly what happened. A failure is shown and nothing is changed.
   document.addEventListener('click', async e => {
+    if (e.target.id === 'showAllClash') { clashOnly = false; render(); return; }
+    const kb = e.target.closest('[data-keep-both]');
+    if (kb && isAdmin && currentUser) {
+      const id = kb.dataset.keepBoth, r = allRequests.find(x => x.id === id), rv = reviews[id];
+      if (!rv || !confirm('Keep both bookings?\n\n' + RCC.clashLines(rv).join('\n') + '\n\nThis marks the clash as reviewed. Nothing else changes.')) return;
+      kb.disabled = true;
+      try { await RCC.keepBoth(db, id, currentUser, 'Kept both'); RCC.notify('Marked as reviewed: "' + (r ? titleOf(r) : 'request') + '".'); }
+      catch (err) { kb.disabled = false; RCC.notify('Could not mark it reviewed. Try again.\n(' + err.message + ')', { kind: 'error' }); }
+      return;
+    }
     const b = e.target.closest('[data-decide]');
     if (!b || !isAdmin || !currentUser) return;
     const status = b.dataset.decide, id = b.dataset.id;
@@ -557,8 +596,10 @@
     const title = titleOf(r);
     if (status === 'approved') {
       try {
+        const clash = await RCC.confirmClash(db, id, currentUser, 'approve it');
+        if (!clash) return;
         const c = await RoomLogic.checkApprovalConflicts(db, Object.assign({}, r, { status: 'approved', roomConfirmed: false }), id);
-        if (c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
+        if (clash === true && c.soft.length && !confirm('Heads up — this overlaps with:\n\n' + c.soft.join('\n') + '\n\nThe room will be held as a TBD until someone confirms it. Approve anyway?')) return;
       } catch (err) { RCC.notify('Could not check the room calendar, so "' + title + '" was not approved. Try again.\n(' + err.message + ')', { kind: 'error' }); return; }
     } else if (!confirm('Deny "' + title + '"?\n\n' + (r.requesterName || 'The requester') + ' will be emailed that it was denied. You can move it back to New later, but that email will already have gone.')) return;
     const row = b.closest('.er-approve'); const btns = row ? row.querySelectorAll('button') : [b];
@@ -673,15 +714,21 @@
     return '<div class="p-sec"><button type="button" class="btn good" id="markComplete">✓ Mark this request complete</button> <span class="hint">' + (r.completed === false ? 'You reopened this, so it stays open until you complete it again.' : 'It also completes by itself once the calendar, graphic and marketing are all finished. Use this if plans changed.') + ' Moves it to Completed and takes it off the Creative Timeline and reminders.</span></div>';
   }
 
-  // The graphic's due date, set right inside Progress (admins and the graphics team). Saves as soon as a date is picked.
-  let dueFlash = null;   // { id, text, until } — a short "Saved" message that survives the panel redrawing
+  // The graphic's and marketing's due dates, set right inside Progress (admins and that team). Each saves as soon as a date is picked,
+  // at any time — also after the request is approved or finished.
+  let dueFlash = null;   // { id, key, text, until } — a short "Saved" message that survives the panel redrawing
+  const DUE_KINDS = [
+    { key: 'g', id: 'gDue', label: 'Graphic', field: 'graphicDueDate', has: r => hasGraphic(r), can: () => isAdmin || isGraphics },
+    { key: 'm', id: 'mDue', label: 'Marketing', field: 'marketingDueDate', has: r => hasMarketing(r), can: () => isAdmin || isMarketing },
+  ];
   function dueRowHtml(r) {
-    if (!hasGraphic(r)) return '';
-    const can = isAdmin || isGraphics;
-    const asked = r.neededByDate && r.neededByDate !== r.graphicDueDate ? ' <span class="hint">(they asked for ' + esc(fmtDateLine(r.neededByDate)) + ')</span>' : '';
-    const flash = dueFlash && dueFlash.id === r.id && dueFlash.until > Date.now() ? '<span class="ok" id="gDueMsg">' + esc(dueFlash.text) + '</span>' : '<span id="gDueMsg"></span>';
-    if (!can) return '<div class="due-row"><span class="lbl">Graphic due</span><span>' + (r.graphicDueDate ? esc(fmtDateLine(r.graphicDueDate)) : '<span class="miss">No date set</span>') + '</span>' + asked + '</div>';
-    return '<div class="due-row"><label class="lbl" for="gDue">Graphic due</label><input type="date" id="gDue" value="' + esc(r.graphicDueDate || '') + '">' + flash + (r.graphicDueDate ? '' : '<span class="miss">No date set yet — pick one</span>') + asked + '</div>';
+    return DUE_KINDS.filter(k => k.has(r)).map(k => {
+      const val = r[k.field];
+      const asked = k.key === 'g' && r.neededByDate && r.neededByDate !== val ? ' <span class="hint">(they asked for ' + esc(fmtDateLine(r.neededByDate)) + ')</span>' : '';
+      const flash = dueFlash && dueFlash.id === r.id && dueFlash.key === k.key && dueFlash.until > Date.now() ? '<span class="ok" id="' + k.id + 'Msg">' + esc(dueFlash.text) + '</span>' : '<span id="' + k.id + 'Msg"></span>';
+      if (!k.can()) return '<div class="due-row"><span class="lbl">' + k.label + ' due</span><span>' + (val ? esc(fmtDateLine(val)) : '<span class="miss">No date set</span>') + '</span>' + asked + '</div>';
+      return '<div class="due-row"><label class="lbl" for="' + k.id + '">' + k.label + ' due</label><input type="date" id="' + k.id + '" value="' + esc(val || '') + '">' + flash + (val ? '' : '<span class="miss">No date set yet — pick one</span>') + asked + '</div>';
+    }).join('');
   }
 
   function drawDrawer() {
@@ -696,6 +743,7 @@
     body.innerHTML =
       '<div class="p-head"><h2 class="p-title">' + esc(titleOf(r)) + '</h2>' + (isAdmin ? '<button type="button" class="btn small soft" id="editStart">Edit request</button>' : '') + '</div>' +
       '<div class="p-sec"><div class="er-chips">' + statusChip(r) + typeChip(r) + arr(r.department).map(x => '<span class="pill gray">' + esc(x) + '</span>').join('') + '</div></div>' +
+      (clashHtml(r) ? '<div class="p-sec">' + clashHtml(r) + '</div>' : '') +
       (isAdmin && statusOf(r) === 'new' ? '<div class="p-sec">' + approveRowHtml(r) + '</div>' : '') +
       completeRowHtml(r) +
       '<div class="p-sec"><h4>Progress</h4><div class="box">' + stepsHtml(r) + dueRowHtml(r) + '</div></div>' +
@@ -777,18 +825,19 @@
 
   // pick a date -> saved (with a note and a record of who did it)
   document.getElementById('drawerBody').addEventListener('change', async e => {
-    if (e.target.id !== 'gDue' || !openId) return;
-    const r = allRequests.find(x => x.id === openId); if (!r || !(isAdmin || isGraphics)) return;
-    const v = e.target.value || '', before = r.graphicDueDate || '';
+    const k = DUE_KINDS.find(x => x.id === e.target.id);
+    if (!k || !openId) return;
+    const r = allRequests.find(x => x.id === openId); if (!r || !k.can()) return;
+    const v = e.target.value || '', before = r[k.field] || '';
     if (v === before) return;
-    const msg = document.getElementById('gDueMsg'); if (msg) msg.textContent = 'Saving…';
-    try { await db.collection('eventRequests').doc(openId).update({ graphicDueDate: v }); }
+    const msg = document.getElementById(k.id + 'Msg'); if (msg) msg.textContent = 'Saving…';
+    try { await db.collection('eventRequests').doc(openId).update({ [k.field]: v }); }
     catch (err) { e.target.value = before; if (msg) msg.textContent = 'Could not save: ' + err.message; return; }
     const from = before ? fmtDateLine(before) : '(none)', to = v ? fmtDateLine(v) : '(none)';
-    RccAudit.log('event.edit', 'eventRequest', r.id, '"' + titleOf(r) + '" graphic due date: ' + from + ' → ' + to);
+    RccAudit.log('event.edit', 'eventRequest', r.id, '"' + titleOf(r) + '" ' + k.label.toLowerCase() + ' due date: ' + from + ' → ' + to);
     const who = currentUser.displayName || currentUser.email || 'Staff';
-    db.collection('eventRequests').doc(r.id).collection('notes').add({ text: ('Graphic due date ' + (v ? 'set to ' + to : 'cleared') + ' by ' + who + (before ? ' (was ' + from + ')' : '')).slice(0, 2000), authorUid: currentUser.uid, authorName: who, createdAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {});
-    dueFlash = { id: r.id, text: v ? 'Saved ✓' : 'Cleared ✓', until: Date.now() + 6000 };
+    db.collection('eventRequests').doc(r.id).collection('notes').add({ text: (k.label + ' due date ' + (v ? 'set to ' + to : 'cleared') + ' by ' + who + (before ? ' (was ' + from + ')' : '')).slice(0, 2000), authorUid: currentUser.uid, authorName: who, createdAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+    dueFlash = { id: r.id, key: k.key, text: v ? 'Saved ✓' : 'Cleared ✓', until: Date.now() + 6000 };
     if (msg) msg.textContent = dueFlash.text;
   });
 

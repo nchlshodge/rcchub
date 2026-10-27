@@ -446,10 +446,11 @@
   // ── "WHAT NEEDS YOU" (staff only: counts from the live Event Requests) ──
   // Event-request counters for admins / graphics / marketing, plus the van oil-change cards for admins and van admins.
   // Each source is read once; the row is drawn when every source this person needs has answered.
-  let needsUnsubs = [], needsFor = '', needsRoles = {}, needsReqs = null, needsVans = null, needsFailed = false;
+  let needsUnsubs = [], needsFor = '', needsRoles = {}, needsReqs = null, needsVans = null, needsClashes = null, needsFailed = false;
   function watchNeeds(roles) {
     const events = roles.isAdmin || roles.graphics || roles.marketing;
     const vans = roles.isAdmin || roles.vanAdmin;
+    const clashes = roles.isAdmin === true;
     const sig = (events ? (roles.isAdmin ? 'admin' : 'staff') : '') + (vans ? '+vans' : '');
     if (sig === needsFor) return;
     needsFor = sig;
@@ -457,13 +458,15 @@
     const row = document.getElementById('needsRow');
     row.hidden = true; row.innerHTML = '';
     needsRoles = roles; needsFailed = false;
-    needsReqs = events ? null : []; needsVans = vans ? null : [];
+    needsReqs = events ? null : []; needsVans = vans ? null : []; needsClashes = clashes ? null : [];
     if (events) needsUnsubs.push(db.collection('eventRequests').onSnapshot(snap => { needsReqs = snap.docs.map(d => d.data()); drawNeeds(); }, () => { needsFailed = true; }));
+    // room clashes waiting for review (admins); a failed read just means "none to show", it never hides the rest
+    if (clashes) needsUnsubs.push(db.collection('roomReviews').where('status', '==', 'needed').onSnapshot(snap => { needsClashes = snap.docs.map(d => d.data()); drawNeeds(); }, () => { needsClashes = []; drawNeeds(); }));
     if (vans) needsUnsubs.push(db.collection('vans').onSnapshot(snap => { needsVans = snap.docs.map(d => d.data()); drawNeeds(); }, () => { needsFailed = true; }));
   }
 
   function drawNeeds() {
-    if (needsReqs === null || needsVans === null || needsFailed) return;
+    if (needsReqs === null || needsVans === null || needsClashes === null || needsFailed) return;
     const reqs = needsReqs, roles = needsRoles;
     mark('counters');
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -484,6 +487,7 @@
     }).length;
 
     const cards = [];
+    if (roles.isAdmin && needsClashes.length) cards.push(['red', 'event-requests.html?clash=1', needsClashes.length, 'Room clashes to review', needsClashes.slice(0, 3).map(c => RCC.esc(c.title || 'A request')).join(', ')]);
     if (roles.isAdmin && awaiting) cards.push(['', 'admin.html?section=events', awaiting, 'Awaiting approval', 'Event requests to review']);
     if (roles.isAdmin && rooms) cards.push(['gold', 'admin.html?section=events', rooms, 'Rooms to confirm', 'Approved, still held as TBD']);
     if (overdue) cards.push(['red', 'queue-timeline.html', overdue, 'Creative work overdue', 'Open the timeline']);

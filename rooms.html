@@ -378,9 +378,11 @@
       const b = e.target.closest('[data-confirm]'); if (!b) return;
       const r = approvedReqs.find(x => x.id === b.dataset.confirm); if (!r) return;
       b.disabled = true;
+      const clash = await RCC.confirmClash(db, r.id, currentUser, 'confirm the room');
+      if (!clash) { b.disabled = false; return; }
       const c = await RL.checkApprovalConflicts(db, Object.assign({}, r, { status: 'approved', roomConfirmed: true }), r.id);
       if (c.hard.length) { alert('Can\'t confirm this room — it is already firmly booked then:\n\n' + c.hard.join('\n') + '\n\nChange the room or time first (Admin → Event Requests).'); b.disabled = false; return; }
-      if (c.soft.length && !confirm('Heads up — this overlaps with a TBD hold:\n\n' + c.soft.join('\n') + '\n\nConfirm the room anyway?')) { b.disabled = false; return; }
+      if (clash === true && c.soft.length && !confirm('Heads up — this overlaps with a TBD hold:\n\n' + c.soft.join('\n') + '\n\nConfirm the room anyway?')) { b.disabled = false; return; }
       try { await db.collection('eventRequests').doc(r.id).update({ roomConfirmed: true, roomConfirmedBy: currentUser.uid, roomConfirmedAt: new Date().toISOString() }); RccAudit.log('room.confirm', 'eventRequest', r.id, 'Confirmed the room for "' + (r.eventTitle || r.projectTitle || r.id) + '"'); }
       catch (err) { alert('Could not confirm: ' + err.message); b.disabled = false; }
     });
