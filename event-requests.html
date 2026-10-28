@@ -714,6 +714,22 @@
     return '<div class="p-sec"><button type="button" class="btn good" id="markComplete">✓ Mark this request complete</button> <span class="hint">' + (r.completed === false ? 'You reopened this, so it stays open until you complete it again.' : 'It also completes by itself once the calendar, graphic and marketing are all finished. Use this if plans changed.') + ' Moves it to Completed and takes it off the Creative Timeline and reminders.</span></div>';
   }
 
+  // Marketing applies to events and media requests (the form doesn't ask facilities rentals); show it anywhere it was already chosen too.
+  function marketingApplies(r) { return r.requestType === 'church_event' || r.requestType === 'media_only' || hasMarketing(r); }
+  document.getElementById('drawerBody').addEventListener('click', async e => {
+    const b = e.target.closest('[data-mkt]'); if (!b || !(isAdmin || isMarketing) || !openId) return;
+    const r = allRequests.find(x => x.id === openId); if (!r) return;
+    b.disabled = true;
+    try { await RCC.setMarketing(db, r, currentUser, { toggle: b.dataset.mkt }); }
+    catch (err) { b.disabled = false; RCC.notify('Could not change the marketing plan. Nothing was changed — try again.\n(' + err.message + ')', { kind: 'error' }); }
+  });
+  document.getElementById('drawerBody').addEventListener('change', async e => {
+    const inp = e.target.closest('[data-mkt-other]'); if (!inp || !(isAdmin || isMarketing) || !openId) return;
+    const r = allRequests.find(x => x.id === openId); if (!r) return;
+    try { await RCC.setMarketing(db, r, currentUser, { other: inp.value }); }
+    catch (err) { inp.value = r.marketingOther || ''; RCC.notify('Could not change the marketing plan. Nothing was changed — try again.\n(' + err.message + ')', { kind: 'error' }); }
+  });
+
   // The graphic's and marketing's due dates, set right inside Progress (admins and that team). Each saves as soon as a date is picked,
   // at any time — also after the request is approved or finished.
   let dueFlash = null;   // { id, key, text, until } — a short "Saved" message that survives the panel redrawing
@@ -747,6 +763,7 @@
       (isAdmin && statusOf(r) === 'new' ? '<div class="p-sec">' + approveRowHtml(r) + '</div>' : '') +
       completeRowHtml(r) +
       '<div class="p-sec"><h4>Progress</h4><div class="box">' + stepsHtml(r) + dueRowHtml(r) + '</div></div>' +
+      (marketingApplies(r) ? '<div class="p-sec"><h4>Marketing plan</h4><div class="box">' + RCC.marketingPlanHtml(r, isAdmin || isMarketing) + ((isAdmin || isMarketing) ? '<span class="hint" style="display:block;margin-top:8px;">Tap an option to add or remove it. It saves right away and leaves a note.</span>' : '') + '</div></div>' : '') +
       '<div class="p-sec"><h4>Notes &amp; updates</h4><div class="notes-list" id="notesList">' + notesHtml() + '</div>' +
         '<div class="note-form"><textarea id="noteInput" maxlength="2000" placeholder="Add a note — new details, a change of plans, something to remember…"></textarea>' +
         '<div class="row-actions"><span class="hint">Everyone with access to this page sees notes.</span><button type="button" class="btn primary small" id="noteSave">Add note</button></div></div></div>' +

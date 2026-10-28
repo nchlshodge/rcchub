@@ -543,6 +543,7 @@
     }
     if (r.hasGraphic) fields += statusField(r.id, 'Graphic', 'graphicStatus', r.graphicStatus, 'graphicDueDate', r.graphicDueDate, canGraphic, 'graphics team');
     if (r.hasMarketing) fields += statusField(r.id, 'Marketing', 'marketingStatus', r.marketingStatus, 'marketingDueDate', r.marketingDueDate, canMarketing, 'marketing team');
+    if (r.requestType === 'church_event' || r.requestType === 'media_only' || r.hasMarketing) fields += `<div class="field"><span class="lbl">Marketing plan</span><div style="flex:1 1 260px">${RCC.marketingPlanHtml(r, canMarketing)}</div></div>`;
     const vans = Array.isArray(r.vansNeeded) ? r.vansNeeded.filter(v => v !== 'None') : [];
     const tags = [...(r.mediaSizes||[]), ...(vans.length ? ['Van: ' + vans.join(', ')] : [])].map(c=>`<span class="pill gray">${escHtml(c)}</span>`).join('');
     const descText = r.mediaDesc || r.eventDesc || '';
@@ -850,6 +851,8 @@
     if (t.closest('#panelClose') || t.id === 'scrim') { closePanel(); return; }
 
     // ---- actions on a request (deck cards and the side panel share these) ----
+    const mk = t.closest('[data-mkt]');
+    if (mk) { const r0 = allRequests.find(x => x.id === mk.dataset.id); if (r0) { mk.disabled = true; RCC.setMarketing(db, r0, currentUser, { toggle: mk.dataset.mkt }).catch(err => { mk.disabled = false; RCC.notify('Could not change the marketing plan. Nothing was changed — try again.\n(' + err.message + ')', { kind: 'error' }); }); } return; }
     const btn = t.closest('[data-action="status"]');
     if (btn) { upd(btn.dataset.id, { [btn.dataset.field]: btn.dataset.value }); return; }
     const approve = t.closest('[data-action="approve"]');
@@ -905,6 +908,8 @@
       return;
     }
     const link = e.target.closest('[data-action="link"]'); if (link) { upd(link.dataset.id, { graphicLink: link.value.trim() }); return; }
+    const mo = e.target.closest('[data-mkt-other]');
+    if (mo) { const r0 = allRequests.find(x => x.id === mo.dataset.id); if (r0) RCC.setMarketing(db, r0, currentUser, { other: mo.value }).catch(err => { mo.value = r0.marketingOther || ''; RCC.notify('Could not change the marketing plan. Nothing was changed — try again.\n(' + err.message + ')', { kind: 'error' }); }); return; }
   });
   document.addEventListener('input', e => {
     const note = e.target.closest('[data-action="note"]');

@@ -64,6 +64,50 @@
     return 'reviewed';
   };
 
+  // Marketing plan: the promotion options from the Event Request form, clickable by admins and the marketing team so what
+  // we do can be changed after the request came in. `marketing` holds the ticked options, `marketingOther` the free text
+  // (and "Other" is ticked while that text exists). No "None" is stored once anything is ticked.
+  RCC.MARKETING_OPTIONS = ['Social Media Post', 'Email Blast', 'Handout', 'PreService Announcements', 'Projector/Screens', 'Stage Announcement', 'Bathroom Signage', 'Text Message', 'Lobby Signage'];
+  RCC.marketingPlanHtml = function (r, canEdit) {
+    var cur = Array.isArray(r.marketing) ? r.marketing : [], other = r.marketingOther || '';
+    var chips = RCC.MARKETING_OPTIONS.map(function (o) {
+      var on = cur.indexOf(o) >= 0;
+      return canEdit
+        ? '<button type="button" class="mkt-chip' + (on ? ' on' : '') + '" data-mkt="' + RCC.escAttr(o) + '" data-id="' + RCC.escAttr(r.id) + '" aria-pressed="' + on + '">' + (on ? '✓ ' : '') + RCC.esc(o) + '</button>'
+        : (on ? '<span class="mkt-chip on">✓ ' + RCC.esc(o) + '</span>' : '');
+    }).join('');
+    var otherField = canEdit
+      ? '<label class="mkt-other"><span>Other</span><input type="text" data-mkt-other data-id="' + RCC.escAttr(r.id) + '" value="' + RCC.escAttr(other) + '" placeholder="Something else, e.g. banner at the entrance" maxlength="200"></label>'
+      : (other ? '<span class="mkt-chip on">✓ Other: ' + RCC.esc(other) + '</span>' : '');
+    var none = !canEdit && !chips && !other ? '<span class="mkt-none">No marketing planned.</span>' : '';
+    return '<div class="mkt-plan"><div class="mkt-chips">' + chips + none + '</div>' + otherField + '</div>';
+  };
+  // Save a change to the plan. change = { toggle: 'Email Blast' } or { other: 'text' }. Leaves a note on the request and an audit entry.
+  RCC.setMarketing = async function (db, r, user, change) {
+    var order = RCC.MARKETING_OPTIONS.concat(['Other']);
+    var before = (Array.isArray(r.marketing) ? r.marketing : []).filter(function (x) { return x !== 'None'; });
+    var cur = before.slice(), other = r.marketingOther || '', said = [];
+    if (change.toggle) {
+      var i = cur.indexOf(change.toggle);
+      if (i >= 0) { cur.splice(i, 1); said.push('removed ' + change.toggle); } else { cur.push(change.toggle); said.push('added ' + change.toggle); }
+    }
+    if ('other' in change) {
+      var t = String(change.other || '').trim().slice(0, 200);
+      if (t === other) return false;
+      cur = cur.filter(function (x) { return x !== 'Other'; });
+      if (t) cur.push('Other');
+      said.push(t ? (other ? 'changed Other to "' + t + '"' : 'added Other: "' + t + '"') : 'removed Other');
+      other = t;
+    }
+    cur = order.filter(function (o) { return cur.indexOf(o) >= 0; });
+    var data = { marketing: cur, marketingOther: cur.indexOf('Other') >= 0 ? other : '' };
+    await db.collection('eventRequests').doc(r.id).update(data);
+    var title = r.eventTitle || r.projectTitle || r.id, who = user.displayName || user.email || 'Staff';
+    if (window.RccAudit) RccAudit.log('event.edit', 'eventRequest', r.id, '"' + title + '" marketing plan: ' + said.join('; '));
+    db.collection('eventRequests').doc(r.id).collection('notes').add({ text: ('Marketing plan: ' + said.join('; ') + ' (by ' + who + ')').slice(0, 2000), authorUid: user.uid, authorName: who, createdAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(function () {});
+    return true;
+  };
+
   RCC.isRequestDone = function (r) {
     if (r.completed === true) return true;
     if (r.completed === false || r.status !== 'approved') return false;
