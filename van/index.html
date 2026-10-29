@@ -1541,7 +1541,38 @@ function DriverHome({
   // currently out, since the person bringing it back (e.g. a
   // department head wrapping up a group trip) isn't always the same
   // person who originally checked it out.
-  const myPendingCheckout = myRentals.find(r => r.status === 'assigned' && !r.checkout);
+  const todayStr = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-' + String(new Date().getDate()).padStart(2, '0');
+  // A department week you claimed ahead of time waits on the home screen until its own day (then it opens the check-out like any rental).
+  const myPendingCheckout = myRentals.find(r => r.status === 'assigned' && !r.checkout && !(r.department && r.date > todayStr));
+  // Department reservations (e.g. Wednesday youth) are held for a group, not a person: any approved driver can take
+  // one for the coming week, and hand it back if their plans change before they pick the van up.
+  const weekAhead = new Date();
+  weekAhead.setDate(weekAhead.getDate() + 7);
+  const weekAheadStr = weekAhead.getFullYear() + '-' + String(weekAhead.getMonth() + 1).padStart(2, '0') + '-' + String(weekAhead.getDate()).padStart(2, '0');
+  const openDept = rentals.filter(r => r.department && !r.driverId && r.status === 'assigned' && !r.checkout && r.date >= todayStr && r.date <= weekAheadStr).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  const [claimError, setClaimError] = useState('');
+  async function claimDept(r) {
+    setClaimError('');
+    try {
+      await db.collection('vanRentals').doc(r.id).update({
+        driverId: user.uid,
+        claimedAt: Date.now()
+      });
+    } catch (e) {
+      setClaimError('Could not claim it — someone else may have just taken it. (' + (e.message || e) + ')');
+    }
+  }
+  async function releaseDept(r) {
+    if (!confirm('Hand this back so someone else can drive it?')) return;
+    try {
+      await db.collection('vanRentals').doc(r.id).update({
+        driverId: null,
+        claimedAt: null
+      });
+    } catch (e) {
+      setClaimError('Could not hand it back. (' + (e.message || e) + ')');
+    }
+  }
   const anyOutstandingReturn = selectedReturnId ? rentals.find(r => r.id === selectedReturnId) : null;
   // If the driver explicitly clicked "Check It In" on a specific van
   // (selectedReturnId is set), that takes priority — otherwise a
@@ -1672,7 +1703,45 @@ function DriverHome({
     className: "secondary",
     disabled: enablingReminders,
     onClick: enableReminders
-  }, enablingReminders ? 'Enabling…' : 'Enable Reservation Reminders')), outstandingReturns.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, enablingReminders ? 'Enabling…' : 'Enable Reservation Reminders')), (openDept.length > 0 || myRentals.some(r => r.department && r.status === 'assigned' && !r.checkout)) && /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "Department Vans"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "These vans are held every week for a group. Tap \"I'm driving this one\" if you'll be driving it."), claimError && /*#__PURE__*/React.createElement("div", {
+    className: "banner-danger"
+  }, claimError), myRentals.filter(r => r.department && r.status === 'assigned' && !r.checkout).map(r => {
+    const van = vans.find(v => v.id === r.vanId);
+    return /*#__PURE__*/React.createElement("div", {
+      key: r.id,
+      className: "list-item"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", null, r.department, " — ", van?.name), /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, r.date, " ", r.time, "–", r.endTime, " · you're driving")), /*#__PURE__*/React.createElement("button", {
+      className: "secondary",
+      style: {
+        marginTop: 0,
+        width: 'auto',
+        padding: '8px 14px'
+      },
+      onClick: () => releaseDept(r)
+    }, "Hand Back"));
+  }), openDept.map(r => {
+    const van = vans.find(v => v.id === r.vanId);
+    return /*#__PURE__*/React.createElement("div", {
+      key: r.id,
+      className: "list-item"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", null, r.department, " — ", van?.name), /*#__PURE__*/React.createElement("div", {
+      className: "muted"
+    }, r.date, " ", r.time, "–", r.endTime, " · no driver yet")), /*#__PURE__*/React.createElement("button", {
+      className: "primary",
+      style: {
+        marginTop: 0,
+        width: 'auto',
+        padding: '8px 14px'
+      },
+      onClick: () => claimDept(r)
+    }, "I'm driving this one"));
+  })), outstandingReturns.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "card"
   }, /*#__PURE__*/React.createElement("h3", null, "Vans Still Out"), /*#__PURE__*/React.createElement("p", {
     className: "muted"
