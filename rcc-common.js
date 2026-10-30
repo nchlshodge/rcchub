@@ -108,6 +108,16 @@
     return true;
   };
 
+  // Periodic admin van check (Van Admin → Vans → Check this van): a verified odometer reading plus cleanliness. A van is
+  // "due" when it has never been checked or the last check was RCC.VAN_CHECK_DAYS or more days ago.
+  RCC.VAN_CHECK_DAYS = 30;
+  RCC.vanCheckStatus = function (van, nowMs) {
+    var last = Number((van || {}).lastCheckAt);
+    if (!isFinite(last) || last <= 0) return { state: 'never' };
+    var days = Math.floor(((nowMs || Date.now()) - last) / 86400000);
+    return { state: days >= RCC.VAN_CHECK_DAYS ? 'due' : 'ok', days: days, last: last };
+  };
+
   RCC.isRequestDone = function (r) {
     if (r.completed === true) return true;
     if (r.completed === false || r.status !== 'approved') return false;

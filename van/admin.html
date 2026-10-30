@@ -12,6 +12,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png">
 <meta name="theme-color" content="#2557b8">
 
+<script src="odometer-read.js"></script>
 
 
 <style>
@@ -437,6 +438,278 @@ function todayLocal() {
 }
 const oilStatus = RCC.oilStatus; // shared with the hub homepage and the email reminder (rcc-common.js)
 
+// ---------- Periodic van check: odometer (photo, read on the phone) + cleanliness ----------
+async function shrinkImage(file, max) {
+  try {
+    if (!window.createImageBitmap) return file;
+    const bmp = await createImageBitmap(file, {
+      imageOrientation: 'from-image'
+    });
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * k);
+    c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise(res => c.toBlob(b => res(b || file), 'image/jpeg', 0.82));
+  } catch (e) {
+    return file;
+  }
+}
+// The same odometer close-up the drivers use: photograph the number, the phone reads it and suggests it, the person confirms.
+function OdometerShot({
+  van,
+  folder,
+  photoUrl,
+  mileage,
+  setMileage,
+  onResult
+}) {
+  const inputRef = useRef();
+  const [phase, setPhase] = useState(photoUrl ? 'saved' : 'idle'); // idle | working | read | unread | error | saved
+  const [read, setRead] = useState(null);
+  async function onFile(file) {
+    setPhase('working');
+    try {
+      const small = await shrinkImage(file, 1600);
+      const saving = uploadPhoto(small, `vanRentalPhotos/${folder}/odo-${uid()}.jpg`);
+      let value = null;
+      try {
+        value = await window.OdometerRead.readFile(file, van.mileage);
+      } catch (e) {
+        console.warn('Odometer read skipped:', e && e.message);
+      }
+      const url = await saving;
+      setRead(value);
+      onResult(url, value);
+      if (value != null && !mileage) setMileage(String(value));
+      setPhase(value != null ? 'read' : 'unread');
+    } catch (e) {
+      console.warn('Odometer photo failed:', e && e.message);
+      setPhase('error');
+    }
+  }
+  const differs = phase === 'read' && mileage && Number(String(mileage).replace(/,/g, '')) !== read;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "camera-box"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, /*#__PURE__*/React.createElement("strong", null, "Odometer close-up"), " — turn the ignition on so the display is lit, then get close so the mileage fills the photo."), /*#__PURE__*/React.createElement("input", {
+    ref: inputRef,
+    type: "file",
+    accept: "image/*",
+    capture: "environment",
+    style: {
+      display: 'none'
+    },
+    onChange: e => {
+      const f = e.target.files[0];
+      e.target.value = '';
+      if (f) onFile(f);
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "secondary",
+    style: {
+      marginTop: 10
+    },
+    onClick: () => inputRef.current.click(),
+    disabled: phase === 'working'
+  }, "📷 ", phase === 'working' ? 'Reading the photo…' : photoUrl ? 'Retake close-up' : 'Take close-up of the odometer'), phase === 'working' && /*#__PURE__*/React.createElement("div", {
+    className: "upload-progress"
+  }, "Saving and reading the photo — the first time can take a few seconds."), photoUrl && phase !== 'working' && /*#__PURE__*/React.createElement("img", {
+    src: photoUrl,
+    alt: "odometer close-up"
+  }), phase === 'read' && !differs && /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      marginTop: 8
+    }
+  }, "We read ", /*#__PURE__*/React.createElement("strong", null, fmtMiles(read)), " from the photo. Check it matches the display, and fix the number below if it doesn't."), differs && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      color: '#7a5a14'
+    }
+  }, "We read ", /*#__PURE__*/React.createElement("strong", null, fmtMiles(read)), " from the photo, but the number below is ", /*#__PURE__*/React.createElement("strong", null, fmtMiles(String(mileage).replace(/,/g, ''))), ". Look at the display again and make sure the number below is right."), phase === 'unread' && /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      marginTop: 8
+    }
+  }, "We couldn't read the number from the photo — type it below. If the photo is blurry or dark, retake it."), phase === 'error' && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      color: '#a8352f'
+    }
+  }, "The photo didn't save. Check your connection and try again."));
+}
+function VanCheckForm({
+  van,
+  onSave,
+  onCancel
+}) {
+  const [mileage, setMileage] = useState('');
+  const [odoPhoto, setOdoPhoto] = useState(null);
+  const [odoRead, setOdoRead] = useState(null);
+  const [clean, setClean] = useState(null);
+  const [cleanPhoto, setCleanPhoto] = useState(null);
+  const [cleanUploading, setCleanUploading] = useState(false);
+  const [cleanNotes, setCleanNotes] = useState('');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const miles = parseMiles(mileage);
+  const lower = miles != null && miles < (Number(van.mileage) || 0) - 2;
+  const canSave = miles != null && odoPhoto && clean !== null && !saving;
+  const missing = [];
+  if (miles == null) missing.push('the odometer reading');
+  if (!odoPhoto) missing.push('the odometer photo');
+  if (clean === null) missing.push('whether it is clean');
+  async function takeCleanPhoto(file) {
+    setCleanUploading(true);
+    try {
+      const small = await shrinkImage(file, 1600);
+      setCleanPhoto(await uploadPhoto(small, `vanRentalPhotos/check_${van.id}/clean-${uid()}.jpg`));
+    } catch (e) {
+      setErr('The interior photo did not save. Try again.');
+    }
+    setCleanUploading(false);
+  }
+  async function save() {
+    if (lower && !confirm('That reading (' + fmtMiles(miles) + ' mi) is LOWER than the last one on file (' + fmtMiles(van.mileage) + ' mi). Use it anyway?')) return;
+    setSaving(true);
+    setErr('');
+    try {
+      await onSave({
+        vanId: van.id,
+        mileage: miles,
+        odoPhoto,
+        odoRead,
+        clean,
+        cleanPhoto,
+        cleanNotes: cleanNotes.trim(),
+        notes: notes.trim()
+      });
+    } catch (e) {
+      setErr('Could not save: ' + (e.message || e));
+      setSaving(false);
+    }
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTop: '1px solid var(--border)'
+    }
+  }, /*#__PURE__*/React.createElement("h4", {
+    style: {
+      fontSize: 15,
+      marginBottom: 2
+    }
+  }, "Check ", van.name), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Last on file: ", fmtMiles(van.mileage || 0), " mi. This becomes the new starting point: any miles driven since the last reading that no booking explains are flagged."), /*#__PURE__*/React.createElement(OdometerShot, {
+    van: van,
+    folder: 'check_' + van.id,
+    photoUrl: odoPhoto,
+    mileage: mileage,
+    setMileage: setMileage,
+    onResult: (url, val) => {
+      setOdoPhoto(url);
+      setOdoRead(val);
+    }
+  }), /*#__PURE__*/React.createElement("label", null, "Odometer reading"), /*#__PURE__*/React.createElement("input", {
+    inputMode: "decimal",
+    value: mileage,
+    onChange: e => setMileage(e.target.value),
+    placeholder: "e.g. 52,418"
+  }), lower && /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      color: 'var(--danger)',
+      fontWeight: 600
+    }
+  }, "That is lower than the last reading on file. Double-check it."), /*#__PURE__*/React.createElement("label", null, "Is the van clean (inside and out)?"), /*#__PURE__*/React.createElement(YesNo, {
+    value: clean,
+    onChange: setClean,
+    yesLabel: "Clean",
+    noLabel: "Needs cleaning"
+  }), clean === false && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "What needs cleaning?"), /*#__PURE__*/React.createElement("textarea", {
+    value: cleanNotes,
+    onChange: e => setCleanNotes(e.target.value),
+    placeholder: "e.g. Trash under the back seats, mud on the floor"
+  }), /*#__PURE__*/React.createElement(CameraCapture, {
+    label: "Photo of the problem (optional)",
+    photoUrl: cleanPhoto,
+    uploading: cleanUploading,
+    onCapture: takeCleanPhoto
+  }), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "It is added to this van's open issues so it gets taken care of.")), /*#__PURE__*/React.createElement("label", null, "Notes (optional)"), /*#__PURE__*/React.createElement("textarea", {
+    value: notes,
+    onChange: e => setNotes(e.target.value),
+    placeholder: "Anything else worth remembering"
+  }), err && /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      color: 'var(--danger)',
+      fontWeight: 600
+    }
+  }, err), !canSave && !saving && missing.length > 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Still needed: ", missing.join(', '), "."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 12,
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    style: {
+      marginTop: 0,
+      width: 'auto'
+    },
+    disabled: !canSave,
+    onClick: save
+  }, saving ? 'Saving…' : 'Save check'), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0,
+      width: 'auto'
+    },
+    disabled: saving,
+    onClick: onCancel
+  }, "Cancel")));
+}
+
+// Vans that have never been checked, or not within RCC.VAN_CHECK_DAYS days.
+function checkDueVans(vans) {
+  return vans.filter(v => !v.borrowed && v.status !== 'maintenance').map(v => ({
+    v,
+    st: RCC.vanCheckStatus(v)
+  })).filter(x => x.st.state !== 'ok');
+}
+function CheckBanner({
+  vans,
+  onOpen
+}) {
+  const due = checkDueVans(vans);
+  if (!due.length) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    role: "status",
+    className: "banner-warn",
+    style: {
+      cursor: 'pointer'
+    },
+    onClick: onOpen
+  }, /*#__PURE__*/React.createElement("div", null, "Vans due for a check"), due.map(x => /*#__PURE__*/React.createElement("div", {
+    key: x.v.id,
+    style: {
+      fontWeight: 500,
+      marginTop: 2
+    }
+  }, x.v.name, ": ", x.st.state === 'never' ? 'never checked' : 'last checked ' + x.st.days + ' days ago')));
+}
+
 // Banner at the top of Van Admin: every van (ours, not in the shop) that is due or overdue for an oil change.
 function OilBanner({
   vans,
@@ -709,10 +982,15 @@ function VanDetailCard({
   onRemove,
   onResolveMaint,
   onService,
-  onSaveOil
+  onSaveOil,
+  onCheck,
+  checks
 }) {
   const [expanded, setExpanded] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const chk = RCC.vanCheckStatus(van);
+  const sortedChecks = (checks || []).slice().sort((a, b) => b.at - a.at);
   const oil = oilStatus(van);
   const openNotes = maintenanceNotes.filter(m => !m.resolved);
   const sortedRepairs = repairLog.slice().sort((a, b) => b.createdAt - a.createdAt);
@@ -740,9 +1018,13 @@ function VanDetailCard({
     className: "badge maintenance"
   }, "oil overdue"), " ", oil.state === 'soon' && /*#__PURE__*/React.createElement("span", {
     className: "badge pending"
-  }, "oil due in ", fmtMiles(oil.left), " mi")), /*#__PURE__*/React.createElement("div", {
+  }, "oil due in ", fmtMiles(oil.left), " mi"), " ", van.status !== 'maintenance' && !van.borrowed && chk.state !== 'ok' && /*#__PURE__*/React.createElement("span", {
+    className: "badge pending"
+  }, chk.state === 'never' ? 'never checked' : 'check due')), /*#__PURE__*/React.createElement("div", {
     className: "muted"
-  }, van.mileage, " mi · ", van.gas, "% gas", oil.state !== 'unknown' ? ' · oil due at ' + fmtMiles(oil.nextAt) + ' mi' : ''), van.borrowed && /*#__PURE__*/React.createElement("div", {
+  }, van.mileage, " mi · ", van.gas, "% gas", oil.state !== 'unknown' ? ' · oil due at ' + fmtMiles(oil.nextAt) + ' mi' : ''), /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, chk.state === 'never' ? 'Never checked' : 'Last checked ' + (chk.days === 0 ? 'today' : chk.days + ' day' + (chk.days === 1 ? '' : 's') + ' ago') + (van.lastCheckClean === false ? ' · needed cleaning' : van.lastCheckClean === true ? ' · clean' : '')), van.borrowed && /*#__PURE__*/React.createElement("div", {
     className: "muted"
   }, "From ", van.borrowedFrom || 'unspecified org', van.expectedReturnDate ? ` · return by ${van.expectedReturnDate}` : '')), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -792,6 +1074,28 @@ function VanDetailCard({
       marginTop: 16,
       marginBottom: 6
     }
+  }, "Van Checks"), sortedChecks.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "No checks yet."), sortedChecks.slice(0, 5).map(c => /*#__PURE__*/React.createElement("div", {
+    key: c.id,
+    className: "muted",
+    style: {
+      marginBottom: 6
+    }
+  }, new Date(c.at).toLocaleDateString(), " — ", fmtMiles(c.mileage), " mi · ", c.clean ? 'clean' : 'needs cleaning', c.cleanNotes ? ': ' + c.cleanNotes : '', " · by ", c.byName || 'an admin', c.odoPhoto && /*#__PURE__*/React.createElement(React.Fragment, null, " · ", /*#__PURE__*/React.createElement("a", {
+    href: c.odoPhoto,
+    target: "_blank",
+    rel: "noopener"
+  }, "odometer photo")), c.cleanPhoto && /*#__PURE__*/React.createElement(React.Fragment, null, " · ", /*#__PURE__*/React.createElement("a", {
+    href: c.cleanPhoto,
+    target: "_blank",
+    rel: "noopener"
+  }, "interior photo")))), /*#__PURE__*/React.createElement("h4", {
+    style: {
+      fontSize: 14,
+      marginTop: 16,
+      marginBottom: 6
+    }
   }, "Repair History"), sortedRepairs.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "muted"
   }, "No repairs logged for this van."), sortedRepairs.map(r => /*#__PURE__*/React.createElement("div", {
@@ -800,7 +1104,14 @@ function VanDetailCard({
     style: {
       marginBottom: 6
     }
-  }, r.date, r.mileage ? ' · ' + fmtMiles(r.mileage) + ' mi' : '', " — ", r.serviceType, r.performedBy ? ` (by ${r.performedBy})` : '', r.notes ? `: ${r.notes}` : ''))), van.status === 'maintenance' && checkingIn && /*#__PURE__*/React.createElement(MaintenanceCheckIn, {
+  }, r.date, r.mileage ? ' · ' + fmtMiles(r.mileage) + ' mi' : '', " — ", r.serviceType, r.performedBy ? ` (by ${r.performedBy})` : '', r.notes ? `: ${r.notes}` : ''))), checking && /*#__PURE__*/React.createElement(VanCheckForm, {
+    van: van,
+    onSave: async d => {
+      await onCheck(d);
+      setChecking(false);
+    },
+    onCancel: () => setChecking(false)
+  }), van.status === 'maintenance' && checkingIn && /*#__PURE__*/React.createElement(MaintenanceCheckIn, {
     van: van,
     openNotes: openNotes,
     onSave: async d => {
@@ -812,14 +1123,24 @@ function VanDetailCard({
       onSetStatus(van.id, 'available');
       setCheckingIn(false);
     }
-  }), !checkingIn && /*#__PURE__*/React.createElement("div", {
+  }), !checkingIn && !checking && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
       marginTop: 8,
       flexWrap: 'wrap'
     }
-  }, van.status !== 'maintenance' ? /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    style: {
+      marginTop: 0,
+      width: 'auto'
+    },
+    onClick: () => {
+      setChecking(true);
+      setExpanded(true);
+    }
+  }, "Check this van"), van.status !== 'maintenance' ? /*#__PURE__*/React.createElement("button", {
     className: "secondary",
     style: {
       marginTop: 0
@@ -1398,7 +1719,8 @@ function AdminDashboard({
   repairLog,
   alerts,
   mileageFlags,
-  recurringRequests
+  recurringRequests,
+  vanChecks
 }) {
   const [tab, setTab] = useState(window.location.hash === '#mileage' ? 'mileage' : 'approvals');
   const lastTabInGroup = useRef({}); // so choosing a group again returns to the page you were on
@@ -1413,7 +1735,7 @@ function AdminDashboard({
     recurring: recurringPendingCount,
     mileage: openMileage.length,
     alerts: openAlerts.length,
-    vans: oilDueCount
+    vans: oilDueCount + checkDueVans(vans).length
   };
   const group = ADMIN_GROUPS.find(g => g.tabs.includes(tab)) || ADMIN_GROUPS[0];
   lastTabInGroup.current[group.key] = tab;
@@ -1708,6 +2030,54 @@ function AdminDashboard({
     }));
     await batch.commit();
     RccAudit.log(toAvailable ? 'van.maintenance.checkin' : 'van.repair', 'van', vanId, vanLabel(vanId) + (toAvailable ? ' back from maintenance' : ' serviced') + (miles != null ? ' at ' + fmtMiles(miles) + ' mi' : '') + ': ' + services.join(', ') + ((resolveIds || []).length ? ' (' + resolveIds.length + ' issue' + (resolveIds.length === 1 ? '' : 's') + ' resolved)' : ''));
+  }
+  // One admin van check: the record, the van's new odometer baseline, and (if it needs cleaning) an open issue on the van.
+  async function recordVanCheck({
+    vanId,
+    mileage,
+    odoPhoto,
+    odoRead,
+    clean,
+    cleanPhoto,
+    cleanNotes,
+    notes
+  }) {
+    const van = vans.find(v => v.id === vanId) || {};
+    const me = auth.currentUser || {};
+    const byName = me.displayName || me.email || 'An admin';
+    const now = Date.now();
+    const batch = db.batch();
+    batch.set(db.collection('vanChecks').doc(), {
+      vanId,
+      vanName: van.name || '',
+      by: me.uid,
+      byName,
+      at: now,
+      mileage,
+      odoPhoto: odoPhoto || null,
+      odoRead: odoRead == null ? null : odoRead,
+      clean,
+      cleanPhoto: cleanPhoto || null,
+      cleanNotes: cleanNotes || '',
+      notes: notes || ''
+    });
+    batch.update(db.collection('vans').doc(vanId), {
+      mileage,
+      lastCheckAt: now,
+      lastCheckClean: clean,
+      lastCheckBy: byName
+    });
+    if (!clean) {
+      batch.set(db.collection('vanMaintenanceNotes').doc(), {
+        vanId,
+        note: 'Needs cleaning (van check by ' + byName + ')' + (cleanNotes ? ': ' + cleanNotes : ''),
+        reportedBy: me.uid,
+        createdAt: now,
+        resolved: false
+      });
+    }
+    await batch.commit();
+    RccAudit.log('van.check', 'van', vanId, vanLabel(vanId) + ' checked at ' + fmtMiles(mileage) + ' mi: ' + (clean ? 'clean' : 'needs cleaning'));
   }
   async function saveOilInfo(vanId, fields) {
     await db.collection('vans').doc(vanId).update(fields);
@@ -2030,6 +2400,9 @@ function AdminDashboard({
   }, /*#__PURE__*/React.createElement(OilBanner, {
     vans: vans,
     onOpen: () => setTab('vans')
+  }), /*#__PURE__*/React.createElement(CheckBanner, {
+    vans: vans,
+    onOpen: () => setTab('vans')
   }), /*#__PURE__*/React.createElement("nav", {
     className: "nav-tabs group-tabs",
     "aria-label": "Van admin sections"
@@ -2110,6 +2483,8 @@ function AdminDashboard({
     onRemove: removeVan,
     onResolveMaint: resolveMaint,
     onService: recordService,
+    onCheck: recordVanCheck,
+    checks: (vanChecks || []).filter(c => c.vanId === v.id),
     onSaveOil: saveOilInfo
   })), /*#__PURE__*/React.createElement(AddVanForm, {
     onAdd: addVan
@@ -3567,6 +3942,7 @@ function AdminDataLoader({
   const [mileageFlags, setMileageFlags] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [recurringRequests, setRecurringRequests] = useState([]);
+  const [vanChecks, setVanChecks] = useState([]);
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const unsubs = [];
@@ -3590,6 +3966,10 @@ function AdminDataLoader({
       id: d.id,
       ...d.data()
     })))));
+    unsubs.push(db.collection('vanChecks').onSnapshot(s => setVanChecks(s.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }))), () => {}));
     unsubs.push(db.collection('users').onSnapshot(s => {
       setAllUsers(s.docs.map(d => ({
         id: d.id,
@@ -3615,7 +3995,8 @@ function AdminDataLoader({
     repairLog: repairLog,
     alerts: alerts,
     mileageFlags: mileageFlags,
-    recurringRequests: recurringRequests
+    recurringRequests: recurringRequests,
+    vanChecks: vanChecks
   });
 }
 function App() {
