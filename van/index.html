@@ -625,50 +625,92 @@ function RequestRental({
   const [saving, setSaving] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringDay, setRecurringDay] = useState('');
-  async function autoAssign() {
-    setError('');
-    setSaving(true);
-    const start = new Date(`${date}T${time}`);
-    const end = new Date(`${endDate}T${endTime}`);
-    if (!(start < end)) {
-      setError('End date/time must be after the start date/time.');
-      setSaving(false);
-      return;
-    }
+  const [vanChoice, setVanChoice] = useState(''); // '' = any available van (we pick), otherwise a van id
+
+  // Which vans are free for a time window: not in the shop, and not already reserved over any part of it.
+  function freeVanIds(start, end) {
     const activeRentals = rentals.filter(r => r.status !== 'completed' && r.status !== 'cancelled');
-    const vansWithConflict = new Set(activeRentals.filter(r => {
+    const busy = new Set(activeRentals.filter(r => {
       if (!r.date || !r.time) return false;
       const rStart = new Date(`${r.date}T${r.time}`);
       const rEnd = r.endDate && r.endTime ? new Date(`${r.endDate}T${r.endTime}`) : new Date(rStart.getTime() + 4 * 60 * 60 * 1000);
       return rentalOverlaps(start, end, rStart, rEnd);
     }).map(r => r.vanId));
-    const available = vans.filter(v => v.status !== 'maintenance' && !vansWithConflict.has(v.id));
-    if (available.length === 0) {
-      setError('No vans are free for that time window. An admin will follow up.');
+    return new Set(vans.filter(v => v.status !== 'maintenance' && !busy.has(v.id)).map(v => v.id));
+  }
+  const windowStart = date && time ? new Date(`${date}T${time}`) : null;
+  const windowEnd = endDate && endTime ? new Date(`${endDate}T${endTime}`) : null;
+  const windowOk = !!(windowStart && windowEnd && windowStart < windowEnd);
+  const freeNow = windowOk ? freeVanIds(windowStart, windowEnd) : null;
+  // If the van you picked stops being free after you change the times, go back to "any".
+  useEffect(() => {
+    if (vanChoice && freeNow && !freeNow.has(vanChoice)) setVanChoice('');
+  }, [date, time, endDate, endTime]);
+  async function autoAssign() {
+    setError('');
+    setSaving(true);
+    try {
+      const start = new Date(`${date}T${time}`);
+      const end = new Date(`${endDate}T${endTime}`);
+      if (!(start < end)) {
+        setError('End date/time must be after the start date/time.');
+        setSaving(false);
+        return;
+      }
+      const free = freeVanIds(start, end);
+      const available = vans.filter(v => free.has(v.id));
+      let van;
+      if (vanChoice) {
+        // They asked for a particular van: if it is free, it is theirs; if someone just took it, say so rather than quietly giving another.
+        van = available.find(v => v.id === vanChoice);
+        if (!van) {
+          setError('That van is no longer free for that time. Pick another van, or choose "Any available van".');
+          setSaving(false);
+          return;
+        }
+      } else {
+        if (available.length === 0) {
+          setError('No vans are free for that time window. An admin will follow up.');
+          setSaving(false);
+          return;
+        }
+        van = [...available].sort((a, b) => {
+          if (!!a.lowPriority !== !!b.lowPriority) return a.lowPriority ? 1 : -1;
+          return a.mileage - b.mileage;
+        })[0];
+      }
+      const rentalRef = db.collection('vanRentals').doc();
+      await rentalRef.set({
+        driverId: user.uid,
+        vanId: van.id,
+        date,
+        time,
+        endDate,
+        endTime,
+        purpose,
+        status: 'assigned',
+        createdAt: Date.now(),
+        ...(vanChoice ? {
+          vanRequested: true
+        } : {})
+      });
+      // The van shows as "in use" from the day it is booked for, not weeks ahead. Nothing here may stop the booking itself.
+      const today = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-' + String(new Date().getDate()).padStart(2, '0');
+      if (date <= today) {
+        try {
+          await db.collection('vans').doc(van.id).update({
+            status: 'inuse'
+          });
+        } catch (e) {
+          console.warn('Could not mark the van in use:', e.message);
+        }
+      }
       setSaving(false);
-      return;
+      onAssigned();
+    } catch (e) {
+      setError('Could not book that: ' + (e.message || e));
+      setSaving(false);
     }
-    const van = [...available].sort((a, b) => {
-      if (!!a.lowPriority !== !!b.lowPriority) return a.lowPriority ? 1 : -1;
-      return a.mileage - b.mileage;
-    })[0];
-    const rentalRef = db.collection('vanRentals').doc();
-    await rentalRef.set({
-      driverId: user.uid,
-      vanId: van.id,
-      date,
-      time,
-      endDate,
-      endTime,
-      purpose,
-      status: 'assigned',
-      createdAt: Date.now()
-    });
-    await db.collection('vans').doc(van.id).update({
-      status: 'inuse'
-    });
-    setSaving(false);
-    onAssigned();
   }
   async function submitRecurring() {
     setError('');
@@ -688,6 +730,9 @@ function RequestRental({
       purpose,
       windowStart,
       windowEnd,
+      ...(vanChoice ? {
+        preferredVanId: vanChoice
+      } : {}),
       status: 'pending',
       // pending | active | renewal_requested | ended | denied
       createdAt: Date.now()
@@ -751,7 +796,23 @@ function RequestRental({
     type: "time",
     value: endTime,
     onChange: e => setEndTime(e.target.value)
-  })), isRecurring && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Which day of the week?"), /*#__PURE__*/React.createElement("select", {
+  }), /*#__PURE__*/React.createElement("label", null, "Which van?"), /*#__PURE__*/React.createElement("select", {
+    value: vanChoice,
+    onChange: e => setVanChoice(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Any available van (we'll pick one)"), vans.map(v => {
+    const free = !freeNow || freeNow.has(v.id);
+    return /*#__PURE__*/React.createElement("option", {
+      key: v.id,
+      value: v.id,
+      disabled: !free
+    }, v.name, !free ? v.status === 'maintenance' ? ' — in the shop' : ' — booked then' : freeNow ? ' — free' : '');
+  })), !windowOk && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Fill in the dates and times to see which vans are free."), windowOk && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, freeNow.size === 0 ? 'No vans are free for that time.' : freeNow.size + ' van' + (freeNow.size === 1 ? ' is' : 's are') + ' free for that time. If the one you pick is free, it is yours — no approval needed.')), isRecurring && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Which day of the week?"), /*#__PURE__*/React.createElement("select", {
     value: recurringDay,
     onChange: e => setRecurringDay(e.target.value)
   }, /*#__PURE__*/React.createElement("option", {
@@ -782,9 +843,17 @@ function RequestRental({
     type: "time",
     value: endTime,
     onChange: e => setEndTime(e.target.value)
-  }), /*#__PURE__*/React.createElement("p", {
+  }), /*#__PURE__*/React.createElement("label", null, "Which van would you like? (optional)"), /*#__PURE__*/React.createElement("select", {
+    value: vanChoice,
+    onChange: e => setVanChoice(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "No preference"), vans.filter(v => v.status !== 'maintenance').map(v => /*#__PURE__*/React.createElement("option", {
+    key: v.id,
+    value: v.id
+  }, v.name))), /*#__PURE__*/React.createElement("p", {
     className: "muted"
-  }, "This requests the same day/time every week for 3 months. An admin will review and approve it, then you'll be prompted to renew before it runs out.")), /*#__PURE__*/React.createElement("label", null, "Purpose / Destination"), /*#__PURE__*/React.createElement("input", {
+  }, "This requests the same day/time every week for 3 months. An admin will review and approve it, then you'll be prompted to renew before it runs out. We'll use your preferred van each week it's free, and another one on weeks it isn't.")), /*#__PURE__*/React.createElement("label", null, "Purpose / Destination"), /*#__PURE__*/React.createElement("input", {
     value: purpose,
     onChange: e => setPurpose(e.target.value),
     placeholder: "e.g. Youth group retreat"

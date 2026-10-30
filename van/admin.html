@@ -1458,7 +1458,8 @@ function AdminDashboard({
       }).map(r => r.vanId));
       const available = vans.filter(v => v.status !== 'maintenance' && !conflictVanIds.has(v.id) && (!req.vanId || v.id === req.vanId));
       if (available.length > 0) {
-        const van = [...available].sort((a, b) => {
+        // a driver's preferred van wins on the weeks it is free; otherwise the usual pick
+        const van = available.find(v => v.id === req.preferredVanId) || [...available].sort((a, b) => {
           if (!!a.lowPriority !== !!b.lowPriority) return a.lowPriority ? 1 : -1;
           return a.mileage - b.mileage;
         })[0];
@@ -2465,7 +2466,7 @@ function RecurringAdmin({
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, nameFor(r.driverId)), " — ", DAY_NAMES[r.dayOfWeek], "s, ", r.time, "–", r.endTime), /*#__PURE__*/React.createElement("div", {
     className: "muted"
-  }, "Requested window: ", r.windowStart, " → ", r.windowEnd, ". Purpose: ", r.purpose || '—'), /*#__PURE__*/React.createElement("div", {
+  }, "Requested window: ", r.windowStart, " → ", r.windowEnd, ". Purpose: ", r.purpose || '—', r.preferredVanId ? ' · Prefers ' + ((vans.find(v => v.id === r.preferredVanId) || {}).name || 'a particular van') : ''), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
