@@ -539,7 +539,7 @@
     let fields = '';
     if (r.hasCalendar) {
       const dis = canCalendar ? '' : 'disabled';
-      fields += `<div class="field"><span class="lbl">Calendar</span><label class="calchk"><input type="checkbox" data-action="calendar" data-id="${r.id}" ${r.calendarAdded?'checked':''} ${dis}> Added to church calendar</label>${canCalendar ? '' : '<span class="hint">admin only</span>'}</div>`;
+      fields += `<div class="field"><span class="lbl">Calendar</span><label class="calchk"><input type="checkbox" data-action="calendar" data-id="${r.id}" ${r.calendarAdded?'checked':''} ${dis}> Added to church calendar</label>${r.pcoCalendar && r.pcoCalendar.found ? ` <span class="pill green">✓ On Planning Center</span>` : ''}${canCalendar ? '' : '<span class="hint">admin only</span>'}</div>`;
     }
     if (r.hasGraphic) fields += statusField(r.id, 'Graphic', 'graphicStatus', r.graphicStatus, 'graphicDueDate', r.graphicDueDate, canGraphic, 'graphics team');
     if (r.hasMarketing) fields += statusField(r.id, 'Marketing', 'marketingStatus', r.marketingStatus, 'marketingDueDate', r.marketingDueDate, canMarketing, 'marketing team');

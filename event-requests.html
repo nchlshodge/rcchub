@@ -464,9 +464,35 @@
   }
   function statusChip(r) {
     const s = statusOf(r);
-    if (reviews[r.id] && isAdmin && s !== 'denied') return '<span class="pill gold">⚠ Room clash</span> ' + statusChipBase(r);
-    return statusChipBase(r);
+    const pc = pcoApplies(r) && !RCC.isRequestDone(r) ? ' ' + pcoChip(r) : '';
+    if (reviews[r.id] && isAdmin && s !== 'denied') return '<span class="pill gold">⚠ Room clash</span> ' + statusChipBase(r) + pc;
+    return statusChipBase(r) + pc;
   }
+  // Planning Center: approved church-calendar events should also be on the Planning Center calendar (added by hand there; the hub
+  // looks for them every 30 minutes and shows whether it found one).
+  function pcoApplies(r) { return statusOf(r) === 'approved' && r.requestType === 'church_event'; }
+  function pcoChip(r) {
+    return r.pcoCalendar && r.pcoCalendar.found ? '<span class="pill green">✓ On Planning Center</span>' : '<span class="pill gray">Not on Planning Center yet</span>';
+  }
+  function pcoBoxHtml(r) {
+    const p = r.pcoCalendar;
+    if (p && p.found) {
+      const when = p.startsAt ? new Date(p.startsAt).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+      return '<div>✓ <b>' + esc(p.name || 'This event') + '</b> is on the Planning Center calendar' + (when ? ' (' + esc(when) + ')' : '') + '.</div>' +
+        (p.url ? '<div style="margin-top:6px;"><a href="' + esc(p.url) + '" target="_blank" rel="noopener">Open it in Planning Center →</a></div>' : '');
+    }
+    return '<div>Not found on the Planning Center calendar yet.</div><span class="hint" style="display:block;margin-top:6px;">Add it there (a hidden event is fine). The hub looks every 30 minutes for an event on the same day with a similar title.</span>' +
+      (isAdmin ? '<button type="button" class="btn small" id="pcoCheck" style="margin-top:8px;">Check now</button>' : '');
+  }
+  document.getElementById('drawerBody').addEventListener('click', async e => {
+    const b = e.target.closest('#pcoCheck'); if (!b || !isAdmin || !openId) return;
+    b.disabled = true; b.textContent = 'Checking…';
+    try {
+      const res = (await firebase.functions().httpsCallable('checkPlanningCenterNow')({ requestId: openId })).data || {};
+      RCC.notify(res.found ? 'Found on Planning Center: ' + (res.name || 'the event') + '.' : 'Not on the Planning Center calendar yet. Add it there, then check again.');
+    } catch (err) { RCC.notify('Could not check Planning Center. Try again in a minute.\n(' + (err.message || err) + ')', { kind: 'error' }); }
+    b.disabled = false; b.textContent = 'Check now';
+  });
   function statusChipBase(r) {
     const s = statusOf(r);
     if (RCC.isRequestDone(r) && s === 'approved') return '<span class="pill green">✓ Completed</span>';
@@ -763,6 +789,7 @@
       (isAdmin && statusOf(r) === 'new' ? '<div class="p-sec">' + approveRowHtml(r) + '</div>' : '') +
       completeRowHtml(r) +
       '<div class="p-sec"><h4>Progress</h4><div class="box">' + stepsHtml(r) + dueRowHtml(r) + '</div></div>' +
+      (pcoApplies(r) ? '<div class="p-sec"><h4>Planning Center</h4><div class="box">' + pcoBoxHtml(r) + '</div></div>' : '') +
       (marketingApplies(r) ? '<div class="p-sec"><h4>Marketing plan</h4><div class="box">' + RCC.marketingPlanHtml(r, isAdmin || isMarketing) + ((isAdmin || isMarketing) ? '<span class="hint" style="display:block;margin-top:8px;">Tap an option to add or remove it. It saves right away and leaves a note.</span>' : '') + '</div></div>' : '') +
       '<div class="p-sec"><h4>Notes &amp; updates</h4><div class="notes-list" id="notesList">' + notesHtml() + '</div>' +
         '<div class="note-form"><textarea id="noteInput" maxlength="2000" placeholder="Add a note — new details, a change of plans, something to remember…"></textarea>' +
