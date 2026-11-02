@@ -323,6 +323,29 @@
     .tocal-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; vertical-align: -2px; margin-right: 5px; }
     .to-past > summary { cursor: pointer; font-weight: 600; color: var(--text-soft); margin: 16px 0 10px; }
     @media (max-width: 640px) { .tocal-day { min-height: 64px; } .tocal-chip { font-size: 10.5px; padding: 1px 4px; } .tocal-bar label { margin-left: 0; } }
+  
+    /* time off cards (same look as the Creative Timeline deck) */
+    .to-group { font-family: 'Playfair Display', serif; font-weight: 500; font-size: 18px; margin: 22px 0 10px; display: flex; align-items: baseline; gap: 10px; }
+    .to-group span { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; color: var(--text-soft); background: #efe9dc; border-radius: 999px; padding: 1px 9px; }
+    .tocards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 14px; align-items: start; }
+    .tocard { --tone: #2557b8; --tone-soft: #dfe9fb; --tone-ink: #1b4590; display: grid; grid-template-columns: 74px minmax(0, 1fr); background: #fff; border: 1px solid #e8e4da; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); overflow: hidden; }
+    .tocard.pending { --tone: #b5892a; --tone-soft: #f8f0da; --tone-ink: #7a5a14; border-style: dashed; border-color: #b5892a; }
+    .tocard.now { --tone: #2e7d4f; --tone-soft: #e1f2e7; --tone-ink: #1d5a37; }
+    .tocard.past { opacity: .72; }
+    .tocard-date { background: var(--tone-soft); color: var(--tone-ink); display: flex; flex-direction: column; align-items: center; padding: 14px 6px; text-align: center; border-right: 1px solid #e8e4da; }
+    .tocard-date small { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; opacity: .85; }
+    .tocard-date strong { font-family: 'Playfair Display', serif; font-weight: 500; font-size: 32px; line-height: 1.05; margin: 2px 0; }
+    .tocard-date em { font-style: normal; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+    .tocard-date i { font-style: normal; font-size: 10px; font-weight: 600; margin-top: 9px; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,.75); letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+    .tocard-main { padding: 13px 16px 13px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .tocard-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tocard-chips .pill { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: #efe9dc; color: #4a463e; }
+    .tocard-chips .pill.pending { background: #f8f0da; color: #7a5a14; }
+    .tocard-chips .pill.ok { background: #dfe9fb; color: #1b4590; }
+    .tocard-main h3 { font-family: 'Playfair Display', serif; font-weight: 500; font-size: 20px; margin: 0; }
+    .tocard-meta { font-size: 13.5px; color: #4a463e; display: flex; flex-direction: column; gap: 3px; }
+    .tocard-meta small { color: var(--text-soft); }
+    .tocard .actions { margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -437,6 +460,7 @@
           <div class="subtab active" data-totab="pending">Pending</div>
           <div class="subtab" data-totab="approved">Approved</div>
           <div class="subtab" data-totab="denied">Denied</div>
+          <div class="subtab" data-totab="cards">Cards</div>
           <div class="subtab" data-totab="calendar">Calendar</div>
         </div>
         <div id="timeOffList"><div class="loading">Loading...</div></div>
@@ -1376,6 +1400,7 @@
 
   function renderTimeOffRequests() {
     if (timeOffFilter === 'calendar') { renderTimeOffCalendar(); return; }
+    if (timeOffFilter === 'cards') { renderTimeOffCards(); return; }
     const c = document.getElementById('timeOffList');
     const filtered = allTimeOffRequests.filter(r => (r.status||'pending') === timeOffFilter);
     if (!filtered.length) { c.innerHTML = '<div class="empty-state">Nothing here right now.</div>'; return; }
@@ -1386,6 +1411,46 @@
     const past = filtered.filter(r => (toRange(r).end || '9999') < today).sort((a, b) => key(b).localeCompare(key(a)));
     c.innerHTML = (upcoming.length ? upcoming.map(timeOffCardHtml).join('') : '<div class="empty-state">Nothing coming up.</div>') +
       (past.length ? `<details class="to-past"><summary>Past time off (${past.length})</summary>${past.map(timeOffCardHtml).join('')}</details>` : '');
+  }
+
+  // Card view (like the Creative Timeline deck): approved + pending time off, grouped by how soon it starts.
+  function renderTimeOffCards() {
+    const c = document.getElementById('timeOffList'), today = todayIso();
+    const plus = n => { const d = dayDate(today); d.setDate(d.getDate() + n); return dayIso(d); };
+    const items = allTimeOffRequests.filter(r => (r.status || 'pending') !== 'denied').map(r => ({ r, rg: toRange(r) })).filter(x => x.rg.start);
+    const groups = [
+      { title: 'Out now', cls: 'now', test: x => x.rg.start <= today && x.rg.end >= today },
+      { title: 'This week', test: x => x.rg.start > today && x.rg.start <= plus(7) },
+      { title: 'Next 30 days', test: x => x.rg.start > plus(7) && x.rg.start <= plus(30) },
+      { title: 'Further out', test: x => x.rg.start > plus(30) },
+      { title: 'Past', cls: 'past', test: x => x.rg.end < today },
+    ];
+    const card = (x, cls) => {
+      const r = x.r, rg = x.rg, pend = (r.status || 'pending') === 'pending', d = dayDate(rg.start);
+      const away = Math.round((d - dayDate(today)) / 86400000);
+      const tag = rg.end < today ? 'past' : rg.start <= today ? 'out now' : away === 1 ? 'tomorrow' : 'in ' + away + ' days';
+      const when = rg.start === rg.end ? prettyDay(rg.start) : prettyDay(rg.start) + ' → ' + prettyDay(rg.end);
+      return `<article class="tocard ${pend ? 'pending' : ''} ${cls || ''}">
+        <div class="tocard-date"><small>${d.toLocaleDateString('en-US', { weekday: 'short' })}</small><strong>${d.getDate()}</strong><em>${d.toLocaleDateString('en-US', { month: 'short' })}</em><i>${tag}</i></div>
+        <div class="tocard-main">
+          <div class="tocard-chips"><span class="pill ${pend ? 'pending' : 'ok'}">${pend ? 'Pending approval' : 'Approved'}</span>${r.requestType ? `<span class="pill">${escHtml(r.requestType)}</span>` : ''}</div>
+          <h3>${escHtml(r.name || 'Someone')}</h3>
+          <div class="tocard-meta"><div>📅 ${escHtml(when)} <small>· ${escHtml(daysOffLabel(rg))}</small></div>${r.amountOff ? `<div>🕐 ${escHtml(r.amountOff)}</div>` : ''}${r.coverage ? `<div>👥 Covered by ${escHtml(r.coverage)}</div>` : ''}${r.officeReturnDate ? `<div><small>Office return: ${escHtml(r.officeReturnDate)}</small></div>` : ''}</div>
+          <div class="actions">${pend ? `<button class="btn btn-approve" onclick="setTimeOffStatus('${r.id}','approved')">Approve</button> <button class="btn btn-hide" onclick="setTimeOffStatus('${r.id}','denied')">Deny</button>` : `<button class="btn btn-unhide" onclick="setTimeOffStatus('${r.id}','pending')">Move back to Pending</button>`}</div>
+        </div></article>`;
+    };
+    let html = '', shown = 0;
+    groups.forEach(g => {
+      let list = items.filter(g.test);
+      if (!list.length) return;
+      list = list.sort((a, b) => g.title === 'Past' ? b.rg.start.localeCompare(a.rg.start) : a.rg.start.localeCompare(b.rg.start) || String(a.r.name).localeCompare(String(b.r.name)));
+      shown += list.length;
+      const body = `<div class="tocards">${list.slice(0, g.title === 'Past' ? 30 : 500).map(x => card(x, g.cls)).join('')}</div>`;
+      html += g.title === 'Past'
+        ? `<details class="to-past"><summary>Past time off (${list.length})</summary>${body}</details>`
+        : `<h3 class="to-group">${g.title} <span>${list.length}</span></h3>${body}`;
+    });
+    c.innerHTML = shown ? html : '<div class="empty-state">No time off to show.</div>';
   }
 
   // Month calendar of who is out: approved time off (and, if ticked, pending requests). Denied requests are left off.
