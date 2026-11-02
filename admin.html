@@ -301,6 +301,28 @@
     /* The tab rows scroll sideways, which clips an outside focus ring, so draw it inside the pill. */
     .gtab:focus-visible, #subNav .stab:focus-visible { outline-offset: -3px; }
     .gtab.active:focus-visible { outline-color: #fff; }
+  
+    /* time off calendar */
+    .tocal-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+    .tocal-bar h3 { font-family: 'Playfair Display', serif; font-weight: 500; font-size: 20px; margin: 0 8px 0 4px; min-width: 150px; }
+    .tocal-bar .btn { padding: 7px 14px; }
+    .tocal-bar label { font-size: 13px; color: var(--text-soft); display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+    .tocal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+    .tocal-dow { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-soft); text-align: center; padding: 4px 0; }
+    .tocal-day { background: #fff; border: 1px solid #e8e4da; border-radius: 8px; min-height: 92px; padding: 5px 5px 4px; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+    .tocal-day.off-month { background: transparent; border-color: transparent; }
+    .tocal-day.off-month .dn { opacity: .35; }
+    .tocal-day.weekend { background: #faf8f3; }
+    .tocal-day.today { border-color: #2557b8; box-shadow: 0 0 0 1px #2557b8 inset; }
+    .tocal-day .dn { font-size: 12px; font-weight: 600; color: var(--text-soft); display: flex; justify-content: space-between; }
+    .tocal-day .dn em { font-style: normal; font-size: 11px; color: #b5892a; font-weight: 600; }
+    .tocal-chip { font-size: 12px; line-height: 1.25; padding: 2px 6px; border-radius: 6px; background: #dfe9fb; color: #1b4590; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tocal-chip.pending { background: #f8f0da; color: #7a5a14; }
+    .tocal-more { font-size: 11px; color: var(--text-soft); padding-left: 4px; }
+    .tocal-legend { font-size: 12px; color: var(--text-soft); margin-top: 10px; display: flex; gap: 14px; flex-wrap: wrap; }
+    .tocal-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; vertical-align: -2px; margin-right: 5px; }
+    .to-past > summary { cursor: pointer; font-weight: 600; color: var(--text-soft); margin: 16px 0 10px; }
+    @media (max-width: 640px) { .tocal-day { min-height: 64px; } .tocal-chip { font-size: 10.5px; padding: 1px 4px; } .tocal-bar label { margin-left: 0; } }
   </style>
 </head>
 <body>
@@ -415,6 +437,7 @@
           <div class="subtab active" data-totab="pending">Pending</div>
           <div class="subtab" data-totab="approved">Approved</div>
           <div class="subtab" data-totab="denied">Denied</div>
+          <div class="subtab" data-totab="calendar">Calendar</div>
         </div>
         <div id="timeOffList"><div class="loading">Loading...</div></div>
       </div>
@@ -1312,15 +1335,32 @@
     });
   });
 
-  function renderTimeOffRequests() {
-    const c = document.getElementById('timeOffList');
-    const filtered = allTimeOffRequests.filter(r => (r.status||'pending') === timeOffFilter);
-    if (!filtered.length) { c.innerHTML = '<div class="empty-state">Nothing here right now.</div>'; return; }
+  // Dates in the requests come as M/D/YYYY (older rows) or YYYY-MM-DD; read both into YYYY-MM-DD.
+  function toDay(v) {
+    const t = String(v == null ? '' : v).trim();
+    let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0');
+    m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (m) return (m[3].length === 2 ? '20' + m[3] : m[3]) + '-' + m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0');
+    return '';
+  }
+  const dayDate = iso => { const p = iso.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); };
+  const dayIso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const todayIso = () => dayIso(new Date());
+  // first and last day off (a one-day request may leave the end blank)
+  function toRange(r) { const s = toDay(r.startDate), e = toDay(r.endDate) || s; return { start: s, end: e < s ? s : e }; }
+  const prettyDay = iso => iso ? dayDate(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  function daysOffLabel(rg) { if (!rg.start) return ''; const n = Math.round((dayDate(rg.end) - dayDate(rg.start)) / 86400000) + 1; return n + (n === 1 ? ' calendar day' : ' calendar days'); }
 
-    c.innerHTML = filtered.map(r => `
+  let timeOffCalMonth = null, timeOffShowPending = true;
+
+  function timeOffCardHtml(r) {
+    const rg = toRange(r);
+    const when = rg.start ? (rg.start === rg.end ? prettyDay(rg.start) : prettyDay(rg.start) + ' → ' + prettyDay(rg.end)) : (escHtml(r.startDate || '') + ' → ' + escHtml(r.endDate || ''));
+    return `
       <div class="card">
         <div class="card-title">${escHtml(r.name||'')}</div>
-        <div class="card-meta"><span class="tag tag-hospital">${escHtml(r.requestType||'')}</span><span>${escHtml(r.startDate||'')} → ${escHtml(r.endDate||'')}</span></div>
+        <div class="card-meta"><span class="tag tag-hospital">${escHtml(r.requestType||'')}</span><span>${escHtml(when)}</span>${rg.start ? `<span>${escHtml(daysOffLabel(rg))}</span>` : ''}</div>
         <div class="card-text">Amount off: ${escHtml(r.amountOff||'')}</div>
         <div class="card-text">Coverage: ${escHtml(r.coverage||'')}</div>
         ${r.officeReturnDate ? `<div class="card-meta"><span>Office return: ${escHtml(r.officeReturnDate)}</span></div>` : ''}
@@ -1331,8 +1371,72 @@
             <button class="btn btn-hide" onclick="setTimeOffStatus('${r.id}','denied')">Deny</button>
           ` : `<button class="btn btn-unhide" onclick="setTimeOffStatus('${r.id}','pending')">Move back to Pending</button>`}
         </div>
-      </div>`).join('');
+      </div>`;
   }
+
+  function renderTimeOffRequests() {
+    if (timeOffFilter === 'calendar') { renderTimeOffCalendar(); return; }
+    const c = document.getElementById('timeOffList');
+    const filtered = allTimeOffRequests.filter(r => (r.status||'pending') === timeOffFilter);
+    if (!filtered.length) { c.innerHTML = '<div class="empty-state">Nothing here right now.</div>'; return; }
+    // Sorted by the days they are off: coming up soonest first; time that has already passed goes in a collapsed "Past" group (newest first).
+    const today = todayIso();
+    const key = r => toRange(r).start || '9999-99-99';
+    const upcoming = filtered.filter(r => (toRange(r).end || '9999') >= today).sort((a, b) => key(a).localeCompare(key(b)) || String(a.name).localeCompare(String(b.name)));
+    const past = filtered.filter(r => (toRange(r).end || '9999') < today).sort((a, b) => key(b).localeCompare(key(a)));
+    c.innerHTML = (upcoming.length ? upcoming.map(timeOffCardHtml).join('') : '<div class="empty-state">Nothing coming up.</div>') +
+      (past.length ? `<details class="to-past"><summary>Past time off (${past.length})</summary>${past.map(timeOffCardHtml).join('')}</details>` : '');
+  }
+
+  // Month calendar of who is out: approved time off (and, if ticked, pending requests). Denied requests are left off.
+  function renderTimeOffCalendar() {
+    const c = document.getElementById('timeOffList');
+    if (!timeOffCalMonth) { const n = new Date(); timeOffCalMonth = new Date(n.getFullYear(), n.getMonth(), 1); }
+    const y = timeOffCalMonth.getFullYear(), mo = timeOffCalMonth.getMonth();
+    const byDay = {};
+    allTimeOffRequests.forEach(r => {
+      const st = r.status || 'pending';
+      if (st === 'denied' || (st === 'pending' && !timeOffShowPending)) return;
+      const rg = toRange(r); if (!rg.start) return;
+      let d = dayDate(rg.start); const last = dayDate(rg.end); let guard = 0;
+      while (d <= last && guard++ < 120) { (byDay[dayIso(d)] = byDay[dayIso(d)] || []).push({ r, st }); d.setDate(d.getDate() + 1); }
+    });
+    const first = new Date(y, mo, 1), gridStart = new Date(y, mo, 1 - first.getDay());
+    const weeks = Math.ceil((first.getDay() + new Date(y, mo + 1, 0).getDate()) / 7), today = todayIso();
+    const MAX = 4;
+    let cells = '';
+    for (let i = 0; i < weeks * 7; i++) {
+      const d = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i), iso = dayIso(d);
+      const items = (byDay[iso] || []).sort((a, b) => String(a.r.name).localeCompare(String(b.r.name)));
+      const dow = d.getDay();
+      const chips = items.slice(0, MAX).map(x => {
+        const rg = toRange(x.r);
+        const tip = `${x.r.name || ''}: ${x.r.requestType || 'time off'}, ${prettyDay(rg.start)}${rg.end !== rg.start ? ' → ' + prettyDay(rg.end) : ''}${x.r.amountOff ? ' (' + x.r.amountOff + ')' : ''}${x.st === 'pending' ? ' — pending approval' : ''}`;
+        return `<div class="tocal-chip ${x.st === 'pending' ? 'pending' : ''}" title="${RCC.escAttr(tip)}">${escHtml(String(x.r.name || '').trim().split(/\s+/)[0] || 'Someone')}</div>`;
+      }).join('');
+      cells += `<div class="tocal-day${d.getMonth() !== mo ? ' off-month' : ''}${dow === 0 || dow === 6 ? ' weekend' : ''}${iso === today ? ' today' : ''}"><div class="dn"><span>${d.getDate()}</span>${items.length > 1 ? `<em>${items.length} out</em>` : ''}</div>${chips}${items.length > MAX ? `<div class="tocal-more">+${items.length - MAX} more</div>` : ''}</div>`;
+    }
+    c.innerHTML = `
+      <div class="tocal-bar">
+        <button class="btn btn-unhide" id="toCalPrev" aria-label="Previous month">‹</button>
+        <h3>${timeOffCalMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
+        <button class="btn btn-unhide" id="toCalNext" aria-label="Next month">›</button>
+        <button class="btn btn-unhide" id="toCalToday">Today</button>
+        <label><input type="checkbox" id="toCalPending" ${timeOffShowPending ? 'checked' : ''}> Show pending requests</label>
+      </div>
+      <div class="tocal-grid">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(n => `<div class="tocal-dow">${n}</div>`).join('')}${cells}</div>
+      <div class="tocal-legend"><span><i style="background:#dfe9fb"></i>Approved</span><span><i style="background:#f8f0da"></i>Pending approval</span><span>Hover a name for the dates and type.</span></div>`;
+  }
+  document.getElementById('timeOffList').addEventListener('click', e => {
+    const id = e.target.id;
+    if (!timeOffCalMonth) return;
+    if (id === 'toCalPrev') { timeOffCalMonth = new Date(timeOffCalMonth.getFullYear(), timeOffCalMonth.getMonth() - 1, 1); renderTimeOffCalendar(); }
+    else if (id === 'toCalNext') { timeOffCalMonth = new Date(timeOffCalMonth.getFullYear(), timeOffCalMonth.getMonth() + 1, 1); renderTimeOffCalendar(); }
+    else if (id === 'toCalToday') { const n = new Date(); timeOffCalMonth = new Date(n.getFullYear(), n.getMonth(), 1); renderTimeOffCalendar(); }
+  });
+  document.getElementById('timeOffList').addEventListener('change', e => {
+    if (e.target.id === 'toCalPending') { timeOffShowPending = e.target.checked; renderTimeOffCalendar(); }
+  });
 
   window.setTimeOffStatus = async (id, status) => {
     await db.collection('timeOffRequests').doc(id).update({
