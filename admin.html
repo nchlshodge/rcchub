@@ -384,6 +384,7 @@
       <div class="section-tab" data-section="events">Event Requests <span class="badge-count" id="eventsCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="timeline">Creative Timeline</div>
       <div class="section-tab" data-section="workorders">Work Orders</div>
+      <div class="section-tab" data-section="cleaning">Cleaning</div>
       <div class="section-tab" data-section="timeoff">Time Off <span class="badge-count" id="timeOffCount" style="display:none;"></span></div>
       <div class="section-tab" data-section="access">App Access</div>
       <div class="section-tab" data-section="requests">Access Requests <span class="badge-count" id="requestsCount" style="display:none;"></span></div>
@@ -482,6 +483,12 @@
       <div class="section" id="section-workorders">
         <div class="embed-bar"><span>Facilities Work Orders</span><a id="open-workorders" href="work-orders.html" target="_blank" rel="noopener">Open on its own page ↗</a></div>
         <iframe class="embed-frame" id="frame-workorders" title="Facilities work orders" data-src="work-orders.html?embed=1"></iframe>
+      </div>
+
+      <!-- CLEANING & SETUP (embedded) -->
+      <div class="section" id="section-cleaning">
+        <div class="embed-bar"><span>Cleaning &amp; Setup</span><a id="open-cleaning" href="cleaning.html" target="_blank" rel="noopener">Open on its own page ↗</a></div>
+        <iframe class="embed-frame" id="frame-cleaning" title="Cleaning and setup" data-src="cleaning.html?embed=1"></iframe>
       </div>
 
       <!-- VOLUNTEER CLEARANCES (from Planning Center) -->
@@ -605,7 +612,7 @@
         const tabVisibility = {
           overview: canOverview, bedside: canBedside, incidents: isFullAdmin, vans: canVan,
           events: isFullAdmin, timeline: canGraphics || canMarketing, timeoff: isFullAdmin, access: isFullAdmin,
-          requests: isFullAdmin, admins: isFullAdmin, activity: isFullAdmin, clearances: canClearances, workorders: canFacilities,
+          requests: isFullAdmin, admins: isFullAdmin, activity: isFullAdmin, clearances: canClearances, workorders: canFacilities, cleaning: isFullAdmin,
         };
         document.querySelectorAll('.section-tab').forEach(tab => {
           const key = tab.dataset.section;
@@ -686,7 +693,7 @@
   // (admin.html?section=events etc.) and every "go to section" call works exactly as before.
   const NAV_GROUPS = [
     { key: 'overview', label: 'Overview',        pages: ['overview'] },
-    { key: 'requests', label: 'Requests',        pages: ['events', 'timeline', 'workorders', 'timeoff'] },
+    { key: 'requests', label: 'Requests',        pages: ['events', 'timeline', 'workorders', 'cleaning', 'timeoff'] },
     { key: 'care',     label: 'Care & Safety',   pages: ['bedside', 'incidents', 'clearances'] },
     { key: 'vans',     label: 'Van Usage',       pages: ['vans'] },
     { key: 'people',   label: 'People & Access', pages: ['access', 'requests', 'admins', 'activity'] },

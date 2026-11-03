@@ -289,6 +289,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="room-logic.js"></script>
+<script src="cleaning-logic.js"></script>
 <script>
   mark('scriptsReady');
   const firebaseConfig = RCC.firebaseConfig;
@@ -446,7 +447,7 @@
   // ── "WHAT NEEDS YOU" (staff only: counts from the live Event Requests) ──
   // Event-request counters for admins / graphics / marketing, plus the van oil-change cards for admins and van admins.
   // Each source is read once; the row is drawn when every source this person needs has answered.
-  let needsUnsubs = [], needsFor = '', needsRoles = {}, needsReqs = null, needsVans = null, needsClashes = null, needsTimeOff = null, needsFailed = false;
+  let needsUnsubs = [], needsFor = '', needsRoles = {}, needsReqs = null, needsVans = null, needsClashes = null, needsTimeOff = null, needsCleaning = null, needsFailed = false;
   function watchNeeds(roles) {
     const events = roles.isAdmin || roles.graphics || roles.marketing;
     const vans = roles.isAdmin || roles.vanAdmin;
@@ -458,17 +459,19 @@
     const row = document.getElementById('needsRow');
     row.hidden = true; row.innerHTML = '';
     needsRoles = roles; needsFailed = false;
-    needsReqs = events ? null : []; needsVans = vans ? null : []; needsClashes = clashes ? null : []; needsTimeOff = clashes ? null : [];
+    needsReqs = events ? null : []; needsVans = vans ? null : []; needsClashes = clashes ? null : []; needsTimeOff = clashes ? null : []; needsCleaning = clashes ? null : {};
     if (events) needsUnsubs.push(db.collection('eventRequests').onSnapshot(snap => { needsReqs = snap.docs.map(d => d.data()); drawNeeds(); }, () => { needsFailed = true; }));
     // room clashes waiting for review (admins); a failed read just means "none to show", it never hides the rest
     if (clashes) needsUnsubs.push(db.collection('roomReviews').where('status', '==', 'needed').onSnapshot(snap => { needsClashes = snap.docs.map(d => d.data()); drawNeeds(); }, () => { needsClashes = []; drawNeeds(); }));
     // pending time off (admins): waiting for an approve / deny; a failed read just means none to show
     if (clashes) needsUnsubs.push(db.collection('timeOffRequests').onSnapshot(snap => { needsTimeOff = snap.docs.map(d => d.data()).filter(r => (r.status || 'pending') === 'pending'); drawNeeds(); }, () => { needsTimeOff = []; drawNeeds(); }));
+    // the cleaning calendar's settings (admins): decides which events need setup details; a failed read means none to show
+    if (clashes) needsUnsubs.push(db.collection('settings').doc('cleaning').onSnapshot(s => { needsCleaning = s.exists ? s.data() : {}; drawNeeds(); }, () => { needsCleaning = {}; drawNeeds(); }));
     if (vans) needsUnsubs.push(db.collection('vans').onSnapshot(snap => { needsVans = snap.docs.map(d => d.data()); drawNeeds(); }, () => { needsFailed = true; }));
   }
 
   function drawNeeds() {
-    if (needsReqs === null || needsVans === null || needsClashes === null || needsTimeOff === null || needsFailed) return;
+    if (needsReqs === null || needsVans === null || needsClashes === null || needsTimeOff === null || needsCleaning === null || needsFailed) return;
     const reqs = needsReqs, roles = needsRoles;
     mark('counters');
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -495,6 +498,17 @@
       const fmt = d => d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
       const list = needsTimeOff.map(r => ({ name: String(r.name || 'Someone').trim().split(/\s+/)[0], s: day(r.startDate), e: day(r.endDate) })).sort((a, b) => (a.s || 8e15) - (b.s || 8e15));
       cards.push(['gold', 'admin.html?section=timeoff', needsTimeOff.length, 'Time off to review', list.slice(0, 3).map(x => RCC.esc(x.name) + (x.s ? ' (' + fmt(x.s) + (x.e && +x.e !== +x.s ? '–' + (x.e.getMonth() === x.s.getMonth() ? x.e.getDate() : fmt(x.e)) : '') + ')' : '')).join(', ') + (list.length > 3 ? ' +' + (list.length - 3) + ' more' : '')]);
+    }
+    if (roles.isAdmin && needsCleaning.calendarId) {
+      // approved events in the next two weeks whose rooms get setup tasks but have no setup details yet
+      const soon = iso(new Date(today.getTime() + 14 * 864e5));
+      const noSetup = open.filter(r => {
+        if (r.status !== 'approved' || (r.eventDate || '') < t || (r.eventDate || '') > soon) return false;
+        const doc = RoomLogic.buildScheduleDoc('x', r);
+        if (!doc || !doc.roomIds.some(id => CleaningLogic.roomConfig(needsCleaning, id).tasks)) return false;
+        return !['headcount', 'chairs', 'tables', 'layout', 'notes'].some(k => String((r.setup || {})[k] || '').trim());
+      }).sort((a, b) => String(a.eventDate).localeCompare(String(b.eventDate)));
+      if (noSetup.length) cards.push(['gold', 'admin.html?section=cleaning', noSetup.length, 'Events need setup details', noSetup.slice(0, 3).map(r => RCC.esc(r.eventTitle || r.projectTitle || 'An event')).join(', ') + (noSetup.length > 3 ? ' +' + (noSetup.length - 3) + ' more' : '')]);
     }
     if (roles.isAdmin && awaiting) cards.push(['', 'admin.html?section=events', awaiting, 'Awaiting approval', 'Event requests to review']);
     if (roles.isAdmin && rooms) cards.push(['gold', 'admin.html?section=events', rooms, 'Rooms to confirm', 'Approved, still held as TBD']);

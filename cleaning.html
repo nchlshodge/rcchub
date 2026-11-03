@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://www.gstatic.com">
+  <link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/playfair-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="rcc-base.css">
+<title>RCC — Cleaning &amp; Setup</title>
+<meta name="theme-color" content="#2557b8">
+
+<script>if(/[?&]embed=1(&|$)/.test(location.search))document.documentElement.classList.add('embedded');</script>
+<link rel="stylesheet" href="rcc-ui.css">
+
+<style>
+  .embedded #rccNav { display: none !important; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: clamp(20px, 4vw, 44px) clamp(14px, 3vw, 24px) 90px; }
+  .embedded .wrap { padding-top: 14px; }
+  .embedded .hero { display: none; }
+
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .tabs button { font: inherit; font-size: 13.5px; font-weight: 600; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: #fff; color: var(--ink-2); cursor: pointer; }
+  .tabs button.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .tabs button .n { opacity: .75; font-weight: 500; margin-left: 4px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px clamp(16px, 3vw, 26px); margin-bottom: 18px; box-shadow: var(--shadow-1); }
+  .card h2 { font-size: 21px; margin: 0 0 6px; }
+  .help { font-size: 13.5px; color: var(--ink-3); line-height: 1.5; }
+  .f { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .f > label, .lbl { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+  .f input[type=text], .f input[type=number], .f input[type=date], .f input[type=time], .f input[type=email], .f select, .f textarea { font-family: inherit; font-size: 16px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 11px 13px; width: 100%; box-sizing: border-box; }
+  .f textarea { min-height: 84px; resize: vertical; }
+  .f input:focus, .f select:focus, .f textarea:focus { outline: none; border-color: var(--blue); background: #fff; box-shadow: 0 0 0 4px rgba(37,87,184,.12); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .opts label { cursor: pointer; }
+  .opts input { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
+  .opts span { display: inline-flex; padding: 8px 14px; border: 1px solid var(--line-2); border-radius: 999px; background: #fff; font-size: 14px; font-weight: 500; color: var(--ink-2); user-select: none; }
+  .opts input:checked + span { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .opts input:focus-visible + span { outline: 3px solid var(--blue); outline-offset: 2px; }
+  .err { background: var(--red-soft); color: var(--red-ink); border-radius: var(--radius-md); padding: 10px 14px; font-size: 14px; margin: 10px 0; }
+  .ok { background: var(--green-soft); color: var(--green); border-radius: var(--radius-md); padding: 10px 14px; font-size: 14px; margin: 10px 0; }
+  .row-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
+
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .item { background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--line-2); border-radius: var(--radius-md); padding: 14px 16px; }
+  .item.need { border-left-color: var(--gold); }
+  .item.done { border-left-color: var(--green); }
+  .item.paused { opacity: .65; }
+  .item .top { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: flex-start; cursor: pointer; }
+  .item h3 { font-size: 16.5px; margin: 0; font-family: inherit; font-weight: 600; }
+  .item .meta { font-size: 13px; color: var(--ink-3); margin-top: 3px; }
+  .item .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .item .body { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .lead { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin: 22px 0 8px; }
+
+  table.rooms { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  table.rooms th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); padding: 8px 8px; }
+  table.rooms td { padding: 7px 8px; border-top: 1px solid var(--line); }
+  table.rooms input[type=number] { width: 78px; font: inherit; font-size: 15px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); }
+  table.rooms td:first-child { width: 100%; }
+  .sharelist { margin: 8px 0; padding-left: 18px; font-size: 14.5px; }
+  .linkbox { word-break: break-all; font-size: 13px; background: var(--bg); border-radius: var(--radius-md); padding: 10px 12px; margin: 8px 0; }
+  @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="rccBoot" class="rcc-boot" role="status"><img src="assets/rcc-logo-plain-96.png" width="64" height="64" alt=""><b>RCC</b><span>Loading…</span></div>
+
+<div id="loginScreen" class="rcc-login" style="display:none;">
+  <img src="assets/rcc-logo-plain-96.png" alt="">
+  <h1>Cleaning &amp; Setup</h1>
+  <p>Sign in to manage the cleaning schedule.</p>
+  <button id="googleSignInBtn" type="button">
+    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+    Sign in with Google
+  </button>
+</div>
+
+<div id="appShell" style="display:none;">
+  <header id="rccNav"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="eyebrow">Facilities</span>
+      <h1>Cleaning &amp; setup</h1>
+      <p>Setup and tear-down tasks for every approved event, plus the regular cleaning jobs, all on one calendar for Don.</p>
+    </section>
+
+    <div id="notAdmin" class="card" hidden><h2>Admins only</h2><p class="help">This page is for admins. If you need something on the cleaning calendar, ask Nick or Stephanie.</p></div>
+
+    <div id="admin" hidden>
+      <div class="tabs" id="tabs">
+        <button type="button" data-tab="events" class="active">Event setup <span class="n" id="nEvents"></span></button>
+        <button type="button" data-tab="jobs">Cleaning schedule <span class="n" id="nJobs"></span></button>
+        <button type="button" data-tab="cal">Calendar &amp; rooms</button>
+      </div>
+
+      <div id="view-events">
+        <div class="card"><p class="help" style="margin:0;">When an event is approved, Don gets a <b>Setup</b> task (ending when the event starts) and a <b>Tear down &amp; clean up</b> task (starting when it ends) on the cleaning calendar. Fill in what the room needs so the Setup task tells him what to put out. It is copied to the calendar as soon as you save.</p></div>
+        <div class="list" id="evList"></div>
+      </div>
+
+      <div id="view-jobs" hidden>
+        <div class="row-actions" style="margin:0 0 14px;"><button type="button" class="btn primary" id="addJob">+ Add a cleaning job</button></div>
+        <div id="jobForm"></div>
+        <div class="list" id="jobList"></div>
+      </div>
+
+      <div id="view-cal" hidden>
+        <div id="calCard"></div>
+        <div class="card" id="roomsCard"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-functions-compat.js"></script>
+<script src="room-logic.js"></script>
+<script src="cleaning-logic.js"></script>
+<script src="rcc-audit.js"></script>
+<script src="rcc-shell.js"></script>
+<script src="rcc-common.js"></script>
+<script>
+(function(){
+  var firebaseConfig = RCC.firebaseConfig;
+  var fbApp; try { fbApp = firebase.app(); } catch(e) { fbApp = firebase.initializeApp(firebaseConfig); }
+  var auth = firebase.auth(), db = firebase.firestore();
+  RCC.tuneFirestore(db);
+  var RL = RoomLogic, CL = CleaningLogic;
+  var $ = function(id){ return document.getElementById(id); };
+
+  var me = null, unsubs = [];
+  var settings = {}, requests = [], jobs = [], tasks = {};
+  var openEvent = null, editingJob = null;        // editingJob: null = form closed, '' = adding, id = editing
+  var busy = '';                                   // which calendar button is working
+  var roomsNote = null;                            // the message under the rooms table, kept across redraws: { kind: 'ok' | 'err' | 'help', text }
+  var resultNote = null;                           // what the last calendar button did, kept across redraws: { r, created } or { error }
+
+  /* ---------- tiny DOM helper (no innerHTML, so nothing typed by a person is ever treated as markup) ---------- */
+  function h(tag, attrs, kids){
+    var el = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function(k){
+      if (k === 'text') el.textContent = attrs[k];
+      else if (k === 'class') el.className = attrs[k];
+      else if (k === 'value') el.value = attrs[k];
+      else if (k === 'checked') el.checked = !!attrs[k];
+      else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), attrs[k]);
+      else el.setAttribute(k, attrs[k]);
+    });
+    [].concat(kids || []).forEach(function(c){ if (c != null) el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return el;
+  }
+  function field(label, input, help){ return h('div', { class: 'f' }, [h('label', { text: label }), input, help ? h('span', { class: 'help', text: help }) : null]); }
+  function todayIso(){ var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function prettyDay(iso){ var p = iso.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
+  function roomNames(ids){ return ids.length >= RL.ALL_IDS.length ? 'Whole building' : ids.map(function(i){ return RL.BY_ID[i] ? RL.BY_ID[i].name : i; }).join(' & '); }
+
+  /* ---------- sign-in ---------- */
+  $('googleSignInBtn').addEventListener('click', function(){
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(err){ alert('Sign-in failed: ' + err.message); });
+  });
+  auth.onAuthStateChanged(function(user){
+    unsubs.forEach(function(u){ u(); }); unsubs = [];
+    if (!user) { me = null; $('loginScreen').style.display = 'flex'; $('appShell').style.display = 'none'; return; }
+    me = user;
+    $('loginScreen').style.display = 'none'; $('appShell').style.display = 'block';
+    db.collection('users').doc(user.uid).get().then(function(doc){
+      var data = doc.exists ? doc.data() : {}, roles = data.roles || {};
+      var isAdmin = data.isAdmin === true;
+      RccShell.render($('rccNav'), { active: 'admin', user: user, onSignOut: function(){ auth.signOut(); }, roles: Object.assign({}, roles, { isAdmin: isAdmin }) });
+      $('notAdmin').hidden = isAdmin; $('admin').hidden = !isAdmin;
+      if (isAdmin) watch();
+    }).catch(function(e){ console.error(e); $('notAdmin').hidden = false; });
+  });
+
+  function watch(){
+    var quiet = function(e){ console.warn(e.message); };
+    unsubs.push(db.collection('settings').doc('cleaning').onSnapshot(function(s){ settings = s.exists ? s.data() : {}; drawCal(); drawEvents(); }, quiet));
+    unsubs.push(db.collection('eventRequests').where('status', '==', 'approved').onSnapshot(function(s){ requests = s.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); }); drawEvents(); }, quiet));
+    unsubs.push(db.collection('cleaningJobs').onSnapshot(function(s){ jobs = s.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); }); drawJobs(); }, quiet));
+    unsubs.push(db.collection('cleaningTasks').onSnapshot(function(s){ tasks = {}; s.docs.forEach(function(d){ tasks[d.id] = d.data(); }); drawEvents(); drawJobs(); }, quiet));
+  }
+
+  /* ---------- tabs ---------- */
+  function show(tab){
+    ['events', 'jobs', 'cal'].forEach(function(t){ $('view-' + t).hidden = t !== tab; });
+    [].forEach.call($('tabs').querySelectorAll('button'), function(b){ b.classList.toggle('active', b.dataset.tab === tab); });
+  }
+  $('tabs').addEventListener('click', function(e){ var b = e.target.closest('button[data-tab]'); if (b) show(b.dataset.tab); });
+
+  /* ---------- event setup ---------- */
+  var SETUP = [['headcount', 'Expected headcount', 'e.g. 80'], ['chairs', 'Chairs', 'e.g. 80, or "use what is there"'], ['tables', 'Tables', 'e.g. 10 round tables'], ['layout', 'Layout', 'e.g. rounds of 8, theater, classroom']];
+
+  function eventInfo(r){
+    var doc = RL.buildScheduleDoc(r.id, r);
+    if (!doc) return null;
+    var on = doc.roomIds.filter(function(i){ return CL.roomConfig(settings, i).tasks; });
+    return { doc: doc, hasTasks: on.length > 0, entered: ['headcount', 'chairs', 'tables', 'layout', 'notes'].some(function(k){ return String((r.setup || {})[k] || '').trim(); }) };
+  }
+
+  function drawEvents(){
+    var list = $('evList'); if (!list) return;
+    var today = todayIso();
+    var rows = requests.map(function(r){ return { r: r, i: eventInfo(r) }; }).filter(function(x){ return x.i && x.i.doc.date >= today; })
+      .sort(function(a, b){ return a.i.doc.date < b.i.doc.date ? -1 : a.i.doc.date > b.i.doc.date ? 1 : a.i.doc.startMin - b.i.doc.startMin; });
+    var need = rows.filter(function(x){ return x.i.hasTasks && !x.i.entered; }).length;
+    $('nEvents').textContent = need ? '(' + need + ' need details)' : '';
+    list.replaceChildren();
+    if (!rows.length) { list.appendChild(h('div', { class: 'card' }, [h('p', { class: 'help', style: 'margin:0;', text: 'No approved events with a room are coming up.' })])); return; }
+    rows.forEach(function(x){
+      var r = x.r, doc = x.i.doc, wide = openEvent === r.id;
+      var when = doc.allDay ? 'All day' : RL.fmtMinutes(doc.startMin) + ' – ' + RL.fmtMinutes(doc.endMin);
+      var onCal = tasks[r.id] && tasks[r.id].hashes && Object.keys(tasks[r.id].hashes).length;
+      var item = h('div', { class: 'item ' + (!x.i.hasTasks ? '' : x.i.entered ? 'done' : 'need') }, [
+        h('div', { class: 'top', onclick: function(){ openEvent = wide ? null : r.id; drawEvents(); } }, [
+          h('div', {}, [h('h3', { text: doc.title }), h('div', { class: 'meta', text: prettyDay(doc.date) + ' · ' + when + ' · ' + roomNames(doc.roomIds) })]),
+          h('div', { class: 'pills' }, [
+            !x.i.hasTasks ? h('span', { class: 'pill gray', text: 'No tasks for these rooms' }) : x.i.entered ? h('span', { class: 'pill green', text: 'Setup details entered' }) : h('span', { class: 'pill gold', text: 'Needs setup details' }),
+            onCal ? h('span', { class: 'pill blue', text: 'On the cleaning calendar' }) : null,
+          ]),
+        ]),
+      ]);
+      if (wide) item.appendChild(eventForm(r, x.i));
+      list.appendChild(item);
+    });
+  }
+
+  function eventForm(r, info){
+    var s = r.setup || {}, inputs = {};
+    var body = h('div', { class: 'body' });
+    var grid = h('div', { class: 'grid2' });
+    SETUP.forEach(function(f){ inputs[f[0]] = h('input', { type: 'text', maxlength: '200', value: s[f[0]] || '', placeholder: f[2] }); grid.appendChild(field(f[1], inputs[f[0]])); });
+    body.appendChild(grid);
+    inputs.notes = h('textarea', { maxlength: '1200', placeholder: 'Anything else Don should know before the event: stage, risers, coffee station, who is bringing what…', text: s.notes || '' });
+    inputs.teardown = h('textarea', { maxlength: '1200', placeholder: 'Anything special for after the event: where chairs go back, what to wipe down, trash…', text: s.teardown || '' });
+    body.appendChild(field('Setup notes', inputs.notes));
+    body.appendChild(field('Tear-down notes', inputs.teardown));
+    var msg = h('div'), btn = h('button', { type: 'button', class: 'btn primary', text: 'Save setup details' });
+    btn.addEventListener('click', function(){
+      btn.disabled = true; msg.replaceChildren();
+      var setup = {}; Object.keys(inputs).forEach(function(k){ var v = inputs[k].value.trim(); if (v) setup[k] = v; });
+      db.collection('eventRequests').doc(r.id).update({ setup: Object.keys(setup).length ? setup : firebase.firestore.FieldValue.delete() }).then(function(){
+        RccAudit.log('cleaning.setup', 'eventRequest', r.id, 'Saved setup details for "' + (r.eventTitle || r.projectTitle || 'an event') + '"');
+        openEvent = null; drawEvents();   // the card goes back to "Setup details entered"
+      }).catch(function(e){ msg.replaceChildren(h('div', { class: 'err', text: 'Could not save: ' + e.message })); }).then(function(){ btn.disabled = false; });
+    });
+    body.appendChild(msg);
+    body.appendChild(h('div', { class: 'row-actions' }, [btn, !info.hasTasks ? h('span', { class: 'help', text: 'These rooms are set to no tasks (see Calendar & rooms), so nothing goes on the calendar.' }) : null]));
+    return body;
+  }
+
+  /* ---------- recurring jobs ---------- */
+  var FREQ = [['daily', 'Every day'], ['weekdays', 'Every weekday (Mon–Fri)'], ['weekly', 'Certain days of the week'], ['monthly', 'Once a month']];
+  var DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240];
+
+  $('addJob').addEventListener('click', function(){ editingJob = ''; drawJobs(); });
+
+  function drawJobs(){
+    var list = $('jobList'); if (!list) return;
+    $('nJobs').textContent = jobs.length ? '(' + jobs.length + ')' : '';
+    drawJobForm();
+    list.replaceChildren();
+    if (!jobs.length && editingJob === null) { list.appendChild(h('div', { class: 'card' }, [h('p', { class: 'help', style: 'margin:0;', text: 'No cleaning jobs yet. Add the regular ones (restrooms, floors, trash, the kitchen deep clean…) and each becomes one repeating event on the cleaning calendar.' })])); }
+    jobs.slice().sort(function(a, b){ return String(a.title || '').localeCompare(String(b.title || '')); }).forEach(function(j){
+      var onCal = tasks['job_' + j.id] && tasks['job_' + j.id].hashes && tasks['job_' + j.id].hashes.job;
+      var bad = CL.validateJob(j);
+      list.appendChild(h('div', { class: 'item' + (j.active === false ? ' paused' : '') }, [
+        h('div', { class: 'top', style: 'cursor:default;' }, [
+          h('div', {}, [h('h3', { text: (j.title || 'Untitled') + (j.area ? ' (' + j.area + ')' : '') }),
+            h('div', { class: 'meta', text: bad ? bad : CL.describeJob(j) + (j.time && j.durationMin ? ' · ' + j.durationMin + ' min' : '') + (j.assignedTo ? ' · ' + j.assignedTo : '') })]),
+          h('div', { class: 'pills' }, [
+            j.active === false ? h('span', { class: 'pill gray', text: 'Paused' }) : onCal ? h('span', { class: 'pill blue', text: 'On the cleaning calendar' }) : h('span', { class: 'pill gold', text: settings.calendarId ? 'Adding to the calendar…' : 'Not on a calendar yet' }),
+          ]),
+        ]),
+        h('div', { class: 'row-actions' }, [
+          h('button', { type: 'button', class: 'btn small soft', text: 'Edit', onclick: function(){ editingJob = j.id; drawJobs(); $('jobForm').scrollIntoView({ block: 'nearest' }); } }),
+          h('button', { type: 'button', class: 'btn small soft', text: j.active === false ? 'Resume' : 'Pause', onclick: function(){ db.collection('cleaningJobs').doc(j.id).update({ active: j.active === false, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }).then(function(){ RccAudit.log('cleaning.job', 'cleaningJob', j.id, (j.active === false ? 'Resumed' : 'Paused') + ' the cleaning job "' + j.title + '"'); }).catch(function(e){ alert('Could not change it: ' + e.message); }); } }),
+          h('button', { type: 'button', class: 'btn small bad', text: 'Delete', onclick: function(){ if (!confirm('Delete "' + j.title + '"? It is also removed from the cleaning calendar.')) return; db.collection('cleaningJobs').doc(j.id).delete().then(function(){ RccAudit.log('cleaning.job', 'cleaningJob', j.id, 'Deleted the cleaning job "' + j.title + '"'); }).catch(function(e){ alert('Could not delete it: ' + e.message); }); } }),
+        ]),
+      ]));
+    });
+  }
+
+  function drawJobForm(){
+    var box = $('jobForm'); box.replaceChildren();
+    if (editingJob === null) return;
+    var j = editingJob ? (jobs.filter(function(x){ return x.id === editingJob; })[0] || {}) : { frequency: 'weekly', days: [1], time: '07:00', durationMin: 60, startDate: todayIso(), active: true };
+    var f = {};
+    f.title = h('input', { type: 'text', maxlength: '120', value: j.title || '', placeholder: 'e.g. Clean the restrooms' });
+    f.area = h('input', { type: 'text', maxlength: '100', value: j.area || '', placeholder: 'e.g. Restrooms, Fellowship Hall, Whole building' });
+    f.frequency = h('select', {}, FREQ.map(function(o){ return h('option', { value: o[0], text: o[1] }); })); f.frequency.value = j.frequency || 'weekly';
+    var dayBox = h('div', { class: 'opts' });
+    CL.DAY_NAMES.forEach(function(n, i){ dayBox.appendChild(h('label', {}, [h('input', { type: 'checkbox', value: String(i), checked: CL.jobDays(j).indexOf(i) >= 0 }), h('span', { text: n.slice(0, 3) })])); });
+    f.interval = h('select', {}, [1, 2, 3, 4].map(function(n){ return h('option', { value: String(n), text: n === 1 ? 'Every week' : 'Every ' + n + ' weeks' }); })); f.interval.value = String(CL.whole(j.interval, 1, 4, 1));
+    f.monthDay = h('input', { type: 'number', min: '1', max: '28', value: j.monthDay || '1' });
+    f.allDay = h('input', { type: 'checkbox', checked: !j.time && !!editingJob });
+    f.time = h('input', { type: 'time', value: j.time || '' });
+    f.duration = h('select', {}, DURATIONS.map(function(n){ return h('option', { value: String(n), text: n < 60 ? n + ' minutes' : n === 60 ? '1 hour' : (n / 60) + ' hours' }); })); f.duration.value = String(j.durationMin || 60);
+    f.assignedTo = h('input', { type: 'text', maxlength: '100', value: j.assignedTo || '', placeholder: 'e.g. Don' });
+    f.notes = h('textarea', { maxlength: '2000', placeholder: 'A checklist or anything the person doing it should know', text: j.notes || '' });
+    f.startDate = h('input', { type: 'date', value: j.startDate || todayIso() });
+    f.endDate = h('input', { type: 'date', value: j.endDate || '' });
+
+    var weekly = field('Which days?', dayBox), every = field('How often', f.interval), monthly = field('Day of the month (1–28)', f.monthDay);
+    var timeBox = h('div', { class: 'grid2' }, [field('Time', f.time), field('How long', f.duration)]);
+    function sync(){
+      weekly.hidden = every.hidden = f.frequency.value !== 'weekly'; monthly.hidden = f.frequency.value !== 'monthly';
+      timeBox.hidden = f.allDay.checked;
+    }
+    f.frequency.addEventListener('change', sync); f.allDay.addEventListener('change', sync);
+
+    var msg = h('div'), save = h('button', { type: 'button', class: 'btn primary', text: editingJob ? 'Save changes' : 'Add the job' });
+    save.addEventListener('click', function(){
+      var out = { title: f.title.value.trim(), area: f.area.value.trim(), frequency: f.frequency.value, assignedTo: f.assignedTo.value.trim(), notes: f.notes.value.trim(),
+        startDate: f.startDate.value || todayIso(), active: j.active !== false };
+      if (out.frequency === 'weekly') { out.days = [].map.call(dayBox.querySelectorAll('input:checked'), function(c){ return Number(c.value); }); out.interval = Number(f.interval.value); }
+      if (out.frequency === 'monthly') out.monthDay = Number(f.monthDay.value);
+      if (!f.allDay.checked) { out.time = f.time.value; out.durationMin = Number(f.duration.value); }
+      if (f.endDate.value) out.endDate = f.endDate.value;
+      if (!f.allDay.checked && !out.time) { msg.replaceChildren(h('div', { class: 'err', text: 'Pick a time, or tick "All day".' })); return; }
+      var bad = CL.validateJob(out);
+      if (bad) { msg.replaceChildren(h('div', { class: 'err', text: bad })); return; }
+      save.disabled = true;
+      var stamp = firebase.firestore.FieldValue.serverTimestamp(), del = firebase.firestore.FieldValue.delete();
+      var write = editingJob
+        ? db.collection('cleaningJobs').doc(editingJob).update(Object.assign({}, out, { updatedAt: stamp }, f.allDay.checked ? { time: del, durationMin: del } : {}, !f.endDate.value ? { endDate: del } : {}, out.frequency !== 'weekly' ? { days: del, interval: del } : {}, out.frequency !== 'monthly' ? { monthDay: del } : {}))
+        : db.collection('cleaningJobs').add(Object.assign({}, out, { createdAt: stamp, updatedAt: stamp }));
+      write.then(function(ref){
+        RccAudit.log('cleaning.job', 'cleaningJob', editingJob || (ref && ref.id) || '', (editingJob ? 'Changed' : 'Added') + ' the cleaning job "' + out.title + '": ' + CL.describeJob(out));
+        editingJob = null; drawJobs();
+      }).catch(function(e){ msg.replaceChildren(h('div', { class: 'err', text: 'Could not save: ' + e.message })); save.disabled = false; });
+    });
+
+    box.appendChild(h('div', { class: 'card' }, [
+      h('h2', { text: editingJob ? 'Change this job' : 'New cleaning job' }),
+      field('What needs doing?', f.title), field('Where?', f.area, 'Optional. Shown in brackets after the name on the calendar.'),
+      field('How often?', f.frequency), weekly, every, monthly,
+      h('div', { class: 'f' }, [h('label', { text: 'Time of day' }), h('label', { style: 'font-size:15px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-2);display:flex;gap:8px;align-items:center;' }, [f.allDay, 'All day (no set time)'])]), timeBox,
+      field('Who does it?', f.assignedTo, 'Optional. Shown in the calendar event.'), field('Notes / checklist', f.notes),
+      h('div', { class: 'grid2' }, [field('Starts', f.startDate), field('Ends (optional)', f.endDate)]),
+      msg,
+      h('div', { class: 'row-actions' }, [save, h('button', { type: 'button', class: 'btn soft', text: 'Cancel', onclick: function(){ editingJob = null; drawJobs(); } })]),
+    ]));
+    sync();
+  }
+
+  /* ---------- calendar and rooms ---------- */
+  var call = function(payload){ return firebase.functions().httpsCallable('cleaningCalendar')(payload).then(function(r){ return r.data || {}; }); };
+  function cid(){ try { return btoa(settings.calendarId); } catch (e) { return ''; } }
+  function niceErr(e){ return (e && e.message) ? e.message : 'Something went wrong. Try again in a minute.'; }
+
+  function drawCal(){
+    var card = $('calCard'); if (!card) return;
+    card.replaceChildren();
+    if (!settings.calendarId) {
+      var msg = h('div'), btn = h('button', { type: 'button', class: 'btn primary', text: busy === 'create' ? 'Creating…' : 'Create the cleaning calendar' });
+      btn.disabled = !!busy;
+      btn.addEventListener('click', function(){
+        if (!confirm('This creates a new Google calendar named "RCC Cleaning & Setup", shares it with Don (view only), Nick and Stephanie (can edit), and puts every upcoming approved event\'s setup and tear-down tasks and your cleaning jobs on it. Continue?')) return;
+        busy = 'create'; resultNote = null; drawCal();
+        call({ action: 'create' }).then(function(r){ busy = ''; resultNote = { r: r, created: true }; drawCal(); })
+          .catch(function(e){ busy = ''; resultNote = { error: niceErr(e) }; drawCal(); });
+      });
+      card.appendChild(h('div', { class: 'card' }, [h('h2', { text: 'Cleaning calendar' }),
+        h('p', { class: 'help', text: 'Not created yet. One button makes a separate Google calendar, shares it, and fills it in. Until then, nothing is sent anywhere.' }),
+        msg, h('div', { class: 'row-actions' }, [btn]), h('div', { id: 'calResult' })]));
+      drawResult(); drawRooms();
+      return;
+    }
+    var link = 'https://calendar.google.com/calendar/u/0?cid=' + encodeURIComponent(cid());
+    var sync = h('button', { type: 'button', class: 'btn primary', text: busy === 'sync' ? 'Updating…' : 'Update the calendar now' }); sync.disabled = !!busy;
+    sync.addEventListener('click', function(){
+      busy = 'sync'; resultNote = null; drawCal();
+      call({ action: 'sync' }).then(function(r){ busy = ''; resultNote = { r: r, created: false }; drawCal(); })
+        .catch(function(e){ busy = ''; resultNote = { error: niceErr(e) }; drawCal(); });
+    });
+    var last = settings.lastSync, lastAt = last && last.at && last.at.toDate ? last.at.toDate().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+    var shared = (settings.shareWith || []).map(function(p){ return h('li', { text: p.email + ' — ' + (p.role === 'writer' ? 'can edit' : 'view only') }); });
+    var email = h('input', { type: 'email', placeholder: 'name@rochesterchristian.church', style: 'flex:1;min-width:200px;font:inherit;font-size:15px;padding:9px 12px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);' });
+    var role = h('select', { style: 'font:inherit;font-size:15px;padding:9px 12px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--bg);' }, [h('option', { value: 'reader', text: 'View only' }), h('option', { value: 'writer', text: 'Can edit' })]);
+    var shareMsg = h('div'), shareBtn = h('button', { type: 'button', class: 'btn soft', text: 'Share' });
+    shareBtn.addEventListener('click', function(){
+      shareBtn.disabled = true; shareMsg.replaceChildren();
+      call({ action: 'share', email: email.value, role: role.value }).then(function(){ email.value = ''; shareMsg.replaceChildren(h('div', { class: 'ok', text: 'Shared.' })); })
+        .catch(function(e){ shareMsg.replaceChildren(h('div', { class: 'err', text: niceErr(e) })); }).then(function(){ shareBtn.disabled = false; });
+    });
+    card.appendChild(h('div', { class: 'card' }, [
+      h('h2', { text: settings.calendarName || 'Cleaning calendar' }),
+      h('p', { class: 'help', text: 'Setup and tear-down tasks for approved events, and the cleaning jobs, are on this calendar. It updates itself whenever a request or job changes.' }),
+      last ? h('p', { class: 'help', text: 'Last full update' + (lastAt ? ' ' + lastAt : '') + ': ' + last.written + ' written, ' + last.removed + ' removed, ' + last.unchanged + ' already current.' }) : null,
+      h('div', { class: 'row-actions' }, [sync, h('a', { class: 'btn soft', href: 'https://calendar.google.com/calendar/u/0/r', target: '_blank', rel: 'noopener', text: 'Open Google Calendar ↗' })]),
+      h('div', { id: 'calResult' }),
+      h('div', { class: 'lead', text: 'Who can see it' }),
+      h('ul', { class: 'sharelist' }, shared),
+      h('div', { class: 'row-actions', style: 'margin-top:4px;' }, [email, role, shareBtn]), shareMsg,
+      h('p', { class: 'help', style: 'margin-top:12px;', text: 'If it does not appear in someone\'s calendar list on its own, send them this link and have them open it once:' }),
+      h('div', { class: 'linkbox', text: link }),
+      h('p', { class: 'help', text: 'Anyone who sees the calendar can set their own pop-up or email reminders for it in Google Calendar (the three dots next to its name, then Settings and sharing, then Notifications).' }),
+    ]));
+    drawResult(); drawRooms();
+  }
+  function drawResult(){
+    var box = $('calResult'); if (!box || !resultNote) return;
+    if (resultNote.error) { box.appendChild(h('div', { class: 'err', text: resultNote.error })); return; }
+    var r = resultNote.r;
+    box.appendChild(h('div', { class: 'ok', text: (resultNote.created ? 'The calendar is ready. ' : 'Done. ') + r.written + ' written, ' + r.removed + ' removed, ' + r.unchanged + ' already current.' }));
+    (r.shareErrors || []).forEach(function(e){ box.appendChild(h('div', { class: 'err', text: 'Could not share with ' + e })); });
+  }
+
+  function drawRooms(){
+    var card = $('roomsCard'); card.replaceChildren();
+    var inputs = {};
+    var defSetup = h('input', { type: 'number', min: '0', max: '480', value: String(CL.whole(settings.setupMin, 0, 480, CL.DEFAULT_MINUTES)) });
+    var defClean = h('input', { type: 'number', min: '0', max: '480', value: String(CL.whole(settings.cleanupMin, 0, 480, CL.DEFAULT_MINUTES)) });
+    var tbody = h('tbody');
+    RL.ROOMS.forEach(function(room){
+      var c = CL.roomConfig(settings, room.id), row = (settings.rooms || {})[room.id] || {};
+      inputs[room.id] = { tasks: h('input', { type: 'checkbox', checked: c.tasks }), setup: h('input', { type: 'number', min: '0', max: '480', value: row.setupMin != null ? String(row.setupMin) : '', placeholder: String(CL.whole(defSetup.value, 0, 480, CL.DEFAULT_MINUTES)) }),
+        clean: h('input', { type: 'number', min: '0', max: '480', value: row.cleanupMin != null ? String(row.cleanupMin) : '', placeholder: String(CL.whole(defClean.value, 0, 480, CL.DEFAULT_MINUTES)) }) };
+      tbody.appendChild(h('tr', {}, [h('td', {}, [h('label', { style: 'display:flex;gap:8px;align-items:center;cursor:pointer;' }, [inputs[room.id].tasks, room.name])]), h('td', {}, [inputs[room.id].setup]), h('td', {}, [inputs[room.id].clean])]));
+    });
+    var msg = h('div'), save = h('button', { type: 'button', class: 'btn primary', text: 'Save room settings' });
+    var note = function(kind, text){ roomsNote = { kind: kind, text: text }; msg.replaceChildren(h('div', { class: kind, text: text })); };
+    if (roomsNote) note(roomsNote.kind, roomsNote.text);
+    save.addEventListener('click', function(){
+      var rooms = {};
+      RL.ROOMS.forEach(function(room){
+        var i = inputs[room.id], o = { tasks: i.tasks.checked };
+        if (i.setup.value !== '') o.setupMin = CL.whole(i.setup.value, 0, 480, CL.DEFAULT_MINUTES);
+        if (i.clean.value !== '') o.cleanupMin = CL.whole(i.clean.value, 0, 480, CL.DEFAULT_MINUTES);
+        rooms[room.id] = o;
+      });
+      save.disabled = true; roomsNote = null; msg.replaceChildren();
+      db.collection('settings').doc('cleaning').set({ setupMin: CL.whole(defSetup.value, 0, 480, CL.DEFAULT_MINUTES), cleanupMin: CL.whole(defClean.value, 0, 480, CL.DEFAULT_MINUTES), rooms: rooms }, { merge: true }).then(function(){
+        RccAudit.log('cleaning.rooms', 'settings', 'cleaning', 'Changed which rooms get setup and tear-down tasks, and how long they take');
+        if (!settings.calendarId) { note('ok', 'Saved.'); return; }
+        note('help', 'Saved. Updating the calendar…');
+        return call({ action: 'sync' }).then(function(r){ note('ok', 'Saved and the calendar is updated: ' + r.written + ' written, ' + r.removed + ' removed.'); });
+      }).catch(function(e){ note('err', niceErr(e)); }).then(function(){ save.disabled = false; });
+    });
+    card.appendChild(h('h2', { text: 'Rooms and timing' }));
+    card.appendChild(h('p', { class: 'help', text: 'Untick a room that should not get setup or tear-down tasks. Leave a room\'s minutes blank to use the default. If an event uses several rooms, the longest time wins. Use 0 to skip just the setup or just the tear-down.' }));
+    card.appendChild(h('div', { class: 'grid2', style: 'margin-top:12px;' }, [field('Default setup time (minutes before the event)', defSetup), field('Default tear-down time (minutes after)', defClean)]));
+    card.appendChild(h('table', { class: 'rooms' }, [h('thead', {}, [h('tr', {}, [h('th', { text: 'Room gets tasks' }), h('th', { text: 'Setup min' }), h('th', { text: 'Tear-down min' })])]), tbody]));
+    card.appendChild(msg);
+    card.appendChild(h('div', { class: 'row-actions' }, [save]));
+  }
+
+  drawJobs(); drawEvents();
+})();
+</script>
+</body>
+</html>
