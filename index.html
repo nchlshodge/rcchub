@@ -505,8 +505,8 @@
       const noSetup = open.filter(r => {
         if (r.status !== 'approved' || (r.eventDate || '') < t || (r.eventDate || '') > soon) return false;
         const doc = RoomLogic.buildScheduleDoc('x', r);
-        if (!doc || !doc.roomIds.some(id => CleaningLogic.roomConfig(needsCleaning, id).tasks)) return false;
-        return !['headcount', 'chairs', 'tables', 'layout', 'notes'].some(k => String((r.setup || {})[k] || '').trim());
+        if (!doc || !CleaningLogic.taskRooms(doc.roomIds, needsCleaning, RoomLogic.ALL_IDS, RoomLogic.BY_ID).length) return false;
+        return CleaningLogic.eventTasks(r.setup).setupBefore && !CleaningLogic.hasSetupDetails(r.setup);
       }).sort((a, b) => String(a.eventDate).localeCompare(String(b.eventDate)));
       if (noSetup.length) cards.push(['gold', 'admin.html?section=cleaning', noSetup.length, 'Events need setup details', noSetup.slice(0, 3).map(r => RCC.esc(r.eventTitle || r.projectTitle || 'An event')).join(', ') + (noSetup.length > 3 ? ' +' + (noSetup.length - 3) + ' more' : '')]);
     }

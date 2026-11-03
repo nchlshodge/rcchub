@@ -9,7 +9,11 @@
   else root.CleaningLogic = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
 
-  const DEFAULT_MINUTES = 60;                       // setup before / tear-down after, unless a room says otherwise
+  // Minutes each task takes, unless a room says otherwise: setup before the event, tear-down after it, and a cleaning pass.
+  const DEFAULTS = { setupMin: 60, teardownMin: 30, cleanupMin: 30 };
+  // Which tasks an event gets when nobody has ticked its boxes: setup before, tear-down and a clean-up after.
+  const DEFAULT_TASKS = { setupBefore: true, cleanBefore: false, tearAfter: true, cleanAfter: true };
+  const TASK_KINDS = ['setupBefore', 'cleanBefore', 'tearAfter', 'cleanAfter'];
   const OFF_BY_DEFAULT = ['prayer', 'nursingmom', 'green'];   // small rooms that rarely need a crew
   const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const FREQUENCIES = ['daily', 'weekdays', 'weekly', 'monthly'];
@@ -21,16 +25,49 @@
     return v !== '' && v != null && Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : fallback;
   };
 
-  // { tasks: boolean, setupMin, cleanupMin } for one room, from settings/cleaning.
+  // { tasks: boolean, setupMin, teardownMin, cleanupMin } for one room, from settings/cleaning.
   function roomConfig(settings, roomId) {
     const s = settings || {};
     const r = (s.rooms && s.rooms[roomId]) || {};
-    const base = (key) => whole(r[key] != null ? r[key] : s[key], 0, 480, DEFAULT_MINUTES);
+    const base = (key) => whole(r[key] != null ? r[key] : s[key], 0, 480, DEFAULTS[key]);
     return {
       tasks: r.tasks === undefined ? OFF_BY_DEFAULT.indexOf(roomId) < 0 : r.tasks === true,
       setupMin: base('setupMin'),
+      teardownMin: base('teardownMin'),
       cleanupMin: base('cleanupMin'),
     };
+  }
+
+  // The rooms of an event that get their own tasks: [{ id, name, cfg }]. A whole-building event is one entry
+  // ('whole') that uses the longest time of any room that has tasks on.
+  function taskRooms(roomIds, settings, allIds, byId) {
+    const on = (roomIds || []).filter(id => roomConfig(settings, id).tasks);
+    if (!on.length) return [];
+    if ((roomIds || []).length >= allIds.length) {
+      const cfgs = on.map(id => roomConfig(settings, id)), most = key => Math.max.apply(null, cfgs.map(c => c[key]));
+      return [{ id: 'whole', name: 'Whole Building', cfg: { tasks: true, setupMin: most('setupMin'), teardownMin: most('teardownMin'), cleanupMin: most('cleanupMin') } }];
+    }
+    return on.map(id => ({ id, name: byId[id] ? byId[id].name : id, cfg: roomConfig(settings, id) }));
+  }
+
+  // Which of the four tasks an event needs: { setupBefore, cleanBefore, tearAfter, cleanAfter }. `setup` is the request's setup details.
+  function eventTasks(setup) {
+    const t = (setup && setup.tasks) || {}, out = {};
+    TASK_KINDS.forEach(k => { out[k] = typeof t[k] === 'boolean' ? t[k] : DEFAULT_TASKS[k]; });
+    return out;
+  }
+
+  const text = v => String(v == null ? '' : v).trim();
+  // What was entered for one room of an event: { setupItems, stayUp }.
+  function roomDetail(setup, roomId) {
+    const r = (setup && setup.rooms && setup.rooms[roomId]) || {};
+    return { setupItems: text(r.setupItems), stayUp: text(r.stayUp) };
+  }
+  // Has anyone said what needs to be set up (the general details, or any room's list)?
+  function hasSetupDetails(setup) {
+    const s = setup || {};
+    if (['headcount', 'chairs', 'tables', 'layout', 'notes'].some(k => text(s[k]))) return true;
+    return Object.keys(s.rooms || {}).some(id => text(s.rooms[id] && s.rooms[id].setupItems));
   }
 
   // The weekdays (0 = Sunday) a weekly job runs on, as a clean sorted list.
@@ -104,5 +141,5 @@
     return '';
   }
 
-  return { DEFAULT_MINUTES, OFF_BY_DEFAULT, DAY_NAMES, FREQUENCIES, whole, roomConfig, jobDays, validateJob, fmt12, describeJob, fallsOn, firstOccurrence };
+  return { DEFAULTS, DEFAULT_TASKS, TASK_KINDS, OFF_BY_DEFAULT, DAY_NAMES, FREQUENCIES, whole, roomConfig, taskRooms, eventTasks, roomDetail, hasSetupDetails, jobDays, validateJob, fmt12, describeJob, fallsOn, firstOccurrence };
 });

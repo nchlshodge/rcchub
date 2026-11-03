@@ -55,6 +55,9 @@
   .item .body { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
   .lead { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin: 22px 0 8px; }
 
+  .roomblock { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px 14px 2px; margin-bottom: 14px; background: var(--bg-soft); }
+  .roomblock h4 { margin: 0 0 10px; font-family: inherit; font-size: 15px; }
+  .sub { font-size: 12.5px; font-weight: 600; color: var(--ink-3); margin: 4px 0 6px; }
   table.rooms { width: 100%; border-collapse: collapse; font-size: 14.5px; }
   table.rooms th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); padding: 8px 8px; }
   table.rooms td { padding: 7px 8px; border-top: 1px solid var(--line); }
@@ -97,7 +100,7 @@
       </div>
 
       <div id="view-events">
-        <div class="card"><p class="help" style="margin:0;">When an event is approved, Don gets a <b>Setup</b> task (ending when the event starts) and a <b>Tear down &amp; clean up</b> task (starting when it ends) on the cleaning calendar. Fill in what the room needs so the Setup task tells him what to put out. It is copied to the calendar as soon as you save.</p></div>
+        <div class="card"><p class="help" style="margin:0;">For each approved event, tick what it needs: <b>Setup</b> and <b>Cleaning</b> before, <b>Tear down</b> and <b>Cleaning</b> after. Every room the event uses gets its own tasks on the cleaning calendar. Say what needs to be set up in each room, and what can stay up afterwards. It goes to the calendar as soon as you save. An event nobody has marked gets setup before, plus tear down and cleaning after.</p></div>
         <div class="list" id="evList"></div>
       </div>
 
@@ -193,13 +196,15 @@
   $('tabs').addEventListener('click', function(e){ var b = e.target.closest('button[data-tab]'); if (b) show(b.dataset.tab); });
 
   /* ---------- event setup ---------- */
-  var SETUP = [['headcount', 'Expected headcount', 'e.g. 80'], ['chairs', 'Chairs', 'e.g. 80, or "use what is there"'], ['tables', 'Tables', 'e.g. 10 round tables'], ['layout', 'Layout', 'e.g. rounds of 8, theater, classroom']];
+  var TASK_LABEL = { setupBefore: 'Setup', cleanBefore: 'Clean before', tearAfter: 'Tear down', cleanAfter: 'Clean up' };
 
   function eventInfo(r){
     var doc = RL.buildScheduleDoc(r.id, r);
     if (!doc) return null;
-    var on = doc.roomIds.filter(function(i){ return CL.roomConfig(settings, i).tasks; });
-    return { doc: doc, hasTasks: on.length > 0, entered: ['headcount', 'chairs', 'tables', 'layout', 'notes'].some(function(k){ return String((r.setup || {})[k] || '').trim(); }) };
+    var rooms = CL.taskRooms(doc.roomIds, settings, RL.ALL_IDS, RL.BY_ID), tk = CL.eventTasks(r.setup);
+    var names = CL.TASK_KINDS.filter(function(k){ return tk[k]; }).map(function(k){ return TASK_LABEL[k]; });
+    return { doc: doc, rooms: rooms, tk: tk, taskNames: names, hasTasks: rooms.length > 0 && names.length > 0,
+      needsDetails: rooms.length > 0 && tk.setupBefore && !CL.hasSetupDetails(r.setup) };
   }
 
   function drawEvents(){
@@ -207,7 +212,7 @@
     var today = todayIso();
     var rows = requests.map(function(r){ return { r: r, i: eventInfo(r) }; }).filter(function(x){ return x.i && x.i.doc.date >= today; })
       .sort(function(a, b){ return a.i.doc.date < b.i.doc.date ? -1 : a.i.doc.date > b.i.doc.date ? 1 : a.i.doc.startMin - b.i.doc.startMin; });
-    var need = rows.filter(function(x){ return x.i.hasTasks && !x.i.entered; }).length;
+    var need = rows.filter(function(x){ return x.i.needsDetails; }).length;
     $('nEvents').textContent = need ? '(' + need + ' need details)' : '';
     list.replaceChildren();
     if (!rows.length) { list.appendChild(h('div', { class: 'card' }, [h('p', { class: 'help', style: 'margin:0;', text: 'No approved events with a room are coming up.' })])); return; }
@@ -215,11 +220,11 @@
       var r = x.r, doc = x.i.doc, wide = openEvent === r.id;
       var when = doc.allDay ? 'All day' : RL.fmtMinutes(doc.startMin) + ' – ' + RL.fmtMinutes(doc.endMin);
       var onCal = tasks[r.id] && tasks[r.id].hashes && Object.keys(tasks[r.id].hashes).length;
-      var item = h('div', { class: 'item ' + (!x.i.hasTasks ? '' : x.i.entered ? 'done' : 'need') }, [
+      var item = h('div', { class: 'item ' + (!x.i.hasTasks ? '' : x.i.needsDetails ? 'need' : 'done') }, [
         h('div', { class: 'top', onclick: function(){ openEvent = wide ? null : r.id; drawEvents(); } }, [
-          h('div', {}, [h('h3', { text: doc.title }), h('div', { class: 'meta', text: prettyDay(doc.date) + ' · ' + when + ' · ' + roomNames(doc.roomIds) })]),
+          h('div', {}, [h('h3', { text: doc.title }), h('div', { class: 'meta', text: prettyDay(doc.date) + ' · ' + when + ' · ' + roomNames(doc.roomIds) }), x.i.hasTasks ? h('div', { class: 'meta', text: x.i.taskNames.join(' · ') }) : null]),
           h('div', { class: 'pills' }, [
-            !x.i.hasTasks ? h('span', { class: 'pill gray', text: 'No tasks for these rooms' }) : x.i.entered ? h('span', { class: 'pill green', text: 'Setup details entered' }) : h('span', { class: 'pill gold', text: 'Needs setup details' }),
+            !x.i.rooms.length ? h('span', { class: 'pill gray', text: 'No tasks for these rooms' }) : !x.i.hasTasks ? h('span', { class: 'pill gray', text: 'No tasks ticked' }) : x.i.needsDetails ? h('span', { class: 'pill gold', text: 'Needs setup details' }) : h('span', { class: 'pill green', text: x.i.tk.setupBefore ? 'Setup details entered' : 'Ready' }),
             onCal ? h('span', { class: 'pill blue', text: 'On the cleaning calendar' }) : null,
           ]),
         ]),
@@ -229,27 +234,58 @@
     });
   }
 
+  var GENERAL = [['headcount', 'Expected headcount', 'e.g. 80'], ['chairs', 'Chairs (total)', 'e.g. 80, or "use what is there"'], ['tables', 'Tables (total)', 'e.g. 10 round tables'], ['layout', 'Layout', 'e.g. rounds of 8, theater, classroom']];
+
   function eventForm(r, info){
-    var s = r.setup || {}, inputs = {};
+    var s = r.setup || {}, general = {}, rooms = {}, ticks = {};
     var body = h('div', { class: 'body' });
+
+    // which of the four tasks this event needs
+    var before = h('div', { class: 'opts' }), after = h('div', { class: 'opts' });
+    [['setupBefore', before], ['cleanBefore', before], ['tearAfter', after], ['cleanAfter', after]].forEach(function(x){
+      ticks[x[0]] = h('input', { type: 'checkbox', checked: info.tk[x[0]] });
+      x[1].appendChild(h('label', {}, [ticks[x[0]], h('span', { text: x[0] === 'setupBefore' ? 'Setup' : x[0] === 'tearAfter' ? 'Tear down' : 'Cleaning' })]));
+    });
+    body.appendChild(h('div', { class: 'f' }, [h('label', { text: 'What does this event need?' }),
+      h('div', { class: 'sub', text: 'Before the event' }), before, h('div', { class: 'sub', text: 'After the event' }), after,
+      !s.tasks ? h('span', { class: 'help', text: 'Nobody has marked this event yet, so it is getting setup before, and tear down and cleaning after. Save to keep what you tick here.' }) : null]));
+
+    // what to set up, and what can stay up, in each room
+    if (!info.rooms.length) body.appendChild(h('p', { class: 'help', text: 'These rooms are set to no tasks (see Calendar & rooms), so nothing goes on the calendar.' }));
+    info.rooms.forEach(function(room){
+      var d = CL.roomDetail(s, room.id);
+      rooms[room.id] = { setupItems: h('textarea', { maxlength: '1200', placeholder: 'e.g. 10 round tables, podium on the left, two handheld mics, coffee station by the door', text: d.setupItems }),
+        stayUp: h('textarea', { maxlength: '1200', placeholder: 'e.g. the stage and risers can stay; leave the tables for Sunday', text: d.stayUp }) };
+      body.appendChild(h('div', { class: 'roomblock' }, [h('h4', { text: room.name }),
+        field('What needs to be set up here?', rooms[room.id].setupItems),
+        field('What can stay up afterwards? (optional)', rooms[room.id].stayUp, 'Shown on the tear-down task so nobody takes down something that is meant to stay.')]));
+    });
+
     var grid = h('div', { class: 'grid2' });
-    SETUP.forEach(function(f){ inputs[f[0]] = h('input', { type: 'text', maxlength: '200', value: s[f[0]] || '', placeholder: f[2] }); grid.appendChild(field(f[1], inputs[f[0]])); });
+    GENERAL.forEach(function(f){ general[f[0]] = h('input', { type: 'text', maxlength: '200', value: s[f[0]] || '', placeholder: f[2] }); grid.appendChild(field(f[1], general[f[0]])); });
+    body.appendChild(h('div', { class: 'sub', text: 'For the whole event (optional)' }));
     body.appendChild(grid);
-    inputs.notes = h('textarea', { maxlength: '1200', placeholder: 'Anything else Don should know before the event: stage, risers, coffee station, who is bringing what…', text: s.notes || '' });
-    inputs.teardown = h('textarea', { maxlength: '1200', placeholder: 'Anything special for after the event: where chairs go back, what to wipe down, trash…', text: s.teardown || '' });
-    body.appendChild(field('Setup notes', inputs.notes));
-    body.appendChild(field('Tear-down notes', inputs.teardown));
-    var msg = h('div'), btn = h('button', { type: 'button', class: 'btn primary', text: 'Save setup details' });
+    general.notes = h('textarea', { maxlength: '1200', placeholder: 'Anything else the setup crew should know…', text: s.notes || '' });
+    general.teardown = h('textarea', { maxlength: '1200', placeholder: 'Anything special for after the event: where chairs go back, what to wipe down, trash…', text: s.teardown || '' });
+    body.appendChild(field('Setup notes', general.notes));
+    body.appendChild(field('Tear-down notes', general.teardown));
+
+    var msg = h('div'), btn = h('button', { type: 'button', class: 'btn primary', text: 'Save' });
     btn.addEventListener('click', function(){
       btn.disabled = true; msg.replaceChildren();
-      var setup = {}; Object.keys(inputs).forEach(function(k){ var v = inputs[k].value.trim(); if (v) setup[k] = v; });
-      db.collection('eventRequests').doc(r.id).update({ setup: Object.keys(setup).length ? setup : firebase.firestore.FieldValue.delete() }).then(function(){
-        RccAudit.log('cleaning.setup', 'eventRequest', r.id, 'Saved setup details for "' + (r.eventTitle || r.projectTitle || 'an event') + '"');
-        openEvent = null; drawEvents();   // the card goes back to "Setup details entered"
+      var setup = { tasks: {} };
+      CL.TASK_KINDS.forEach(function(k){ setup.tasks[k] = ticks[k].checked; });
+      Object.keys(general).forEach(function(k){ var v = general[k].value.trim(); if (v) setup[k] = v; });
+      var perRoom = {};
+      Object.keys(rooms).forEach(function(id){ var o = {}; ['setupItems', 'stayUp'].forEach(function(k){ var v = rooms[id][k].value.trim(); if (v) o[k] = v; }); if (Object.keys(o).length) perRoom[id] = o; });
+      if (Object.keys(perRoom).length) setup.rooms = perRoom;
+      db.collection('eventRequests').doc(r.id).update({ setup: setup }).then(function(){
+        RccAudit.log('cleaning.setup', 'eventRequest', r.id, 'Saved setup and cleaning details for "' + (r.eventTitle || r.projectTitle || 'an event') + '"');
+        openEvent = null; drawEvents();   // the card goes back to its pills
       }).catch(function(e){ msg.replaceChildren(h('div', { class: 'err', text: 'Could not save: ' + e.message })); }).then(function(){ btn.disabled = false; });
     });
     body.appendChild(msg);
-    body.appendChild(h('div', { class: 'row-actions' }, [btn, !info.hasTasks ? h('span', { class: 'help', text: 'These rooms are set to no tasks (see Calendar & rooms), so nothing goes on the calendar.' }) : null]));
+    body.appendChild(h('div', { class: 'row-actions' }, [btn, h('span', { class: 'help', text: settings.calendarId ? 'The calendar is updated within a minute.' : 'The cleaning calendar has not been created yet, so nothing goes to it.' })]));
     return body;
   }
 
@@ -257,6 +293,7 @@
   var FREQ = [['daily', 'Every day'], ['weekdays', 'Every weekday (Mon–Fri)'], ['weekly', 'Certain days of the week'], ['monthly', 'Once a month']];
   var DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240];
 
+  function jobWhere(j){ var ids = j.roomIds || []; return (ids.length >= RL.ALL_IDS.length ? ['Whole Building'] : ids.map(function(i){ return RL.BY_ID[i] ? RL.BY_ID[i].name : ''; }).filter(Boolean)).concat(j.area ? [j.area] : []).join(' & '); }
   $('addJob').addEventListener('click', function(){ editingJob = ''; drawJobs(); });
 
   function drawJobs(){
@@ -270,7 +307,7 @@
       var bad = CL.validateJob(j);
       list.appendChild(h('div', { class: 'item' + (j.active === false ? ' paused' : '') }, [
         h('div', { class: 'top', style: 'cursor:default;' }, [
-          h('div', {}, [h('h3', { text: (j.title || 'Untitled') + (j.area ? ' (' + j.area + ')' : '') }),
+          h('div', {}, [h('h3', { text: (j.title || 'Untitled') + (jobWhere(j) ? ' (' + jobWhere(j) + ')' : '') }),
             h('div', { class: 'meta', text: bad ? bad : CL.describeJob(j) + (j.time && j.durationMin ? ' · ' + j.durationMin + ' min' : '') + (j.assignedTo ? ' · ' + j.assignedTo : '') })]),
           h('div', { class: 'pills' }, [
             j.active === false ? h('span', { class: 'pill gray', text: 'Paused' }) : onCal ? h('span', { class: 'pill blue', text: 'On the cleaning calendar' }) : h('span', { class: 'pill gold', text: settings.calendarId ? 'Adding to the calendar…' : 'Not on a calendar yet' }),
@@ -291,7 +328,9 @@
     var j = editingJob ? (jobs.filter(function(x){ return x.id === editingJob; })[0] || {}) : { frequency: 'weekly', days: [1], time: '07:00', durationMin: 60, startDate: todayIso(), active: true };
     var f = {};
     f.title = h('input', { type: 'text', maxlength: '120', value: j.title || '', placeholder: 'e.g. Clean the restrooms' });
-    f.area = h('input', { type: 'text', maxlength: '100', value: j.area || '', placeholder: 'e.g. Restrooms, Fellowship Hall, Whole building' });
+    f.area = h('input', { type: 'text', maxlength: '100', value: j.area || '', placeholder: 'e.g. Restrooms, Hallway, Parking lot' });
+    var roomBox = h('div', { class: 'opts' });
+    RL.ROOMS.forEach(function(room){ roomBox.appendChild(h('label', {}, [h('input', { type: 'checkbox', value: room.id, checked: (j.roomIds || []).indexOf(room.id) >= 0 }), h('span', { text: room.name })])); });
     f.frequency = h('select', {}, FREQ.map(function(o){ return h('option', { value: o[0], text: o[1] }); })); f.frequency.value = j.frequency || 'weekly';
     var dayBox = h('div', { class: 'opts' });
     CL.DAY_NAMES.forEach(function(n, i){ dayBox.appendChild(h('label', {}, [h('input', { type: 'checkbox', value: String(i), checked: CL.jobDays(j).indexOf(i) >= 0 }), h('span', { text: n.slice(0, 3) })])); });
@@ -315,19 +354,20 @@
 
     var msg = h('div'), save = h('button', { type: 'button', class: 'btn primary', text: editingJob ? 'Save changes' : 'Add the job' });
     save.addEventListener('click', function(){
-      var out = { title: f.title.value.trim(), area: f.area.value.trim(), frequency: f.frequency.value, assignedTo: f.assignedTo.value.trim(), notes: f.notes.value.trim(),
+      var out = { title: f.title.value.trim(), area: f.area.value.trim(), roomIds: [].map.call(roomBox.querySelectorAll('input:checked'), function(c){ return c.value; }), frequency: f.frequency.value, assignedTo: f.assignedTo.value.trim(), notes: f.notes.value.trim(),
         startDate: f.startDate.value || todayIso(), active: j.active !== false };
       if (out.frequency === 'weekly') { out.days = [].map.call(dayBox.querySelectorAll('input:checked'), function(c){ return Number(c.value); }); out.interval = Number(f.interval.value); }
       if (out.frequency === 'monthly') out.monthDay = Number(f.monthDay.value);
       if (!f.allDay.checked) { out.time = f.time.value; out.durationMin = Number(f.duration.value); }
       if (f.endDate.value) out.endDate = f.endDate.value;
+      if (!out.roomIds.length) delete out.roomIds;
       if (!f.allDay.checked && !out.time) { msg.replaceChildren(h('div', { class: 'err', text: 'Pick a time, or tick "All day".' })); return; }
       var bad = CL.validateJob(out);
       if (bad) { msg.replaceChildren(h('div', { class: 'err', text: bad })); return; }
       save.disabled = true;
       var stamp = firebase.firestore.FieldValue.serverTimestamp(), del = firebase.firestore.FieldValue.delete();
       var write = editingJob
-        ? db.collection('cleaningJobs').doc(editingJob).update(Object.assign({}, out, { updatedAt: stamp }, f.allDay.checked ? { time: del, durationMin: del } : {}, !f.endDate.value ? { endDate: del } : {}, out.frequency !== 'weekly' ? { days: del, interval: del } : {}, out.frequency !== 'monthly' ? { monthDay: del } : {}))
+        ? db.collection('cleaningJobs').doc(editingJob).update(Object.assign({}, out, { updatedAt: stamp }, f.allDay.checked ? { time: del, durationMin: del } : {}, !f.endDate.value ? { endDate: del } : {}, !out.roomIds ? { roomIds: del } : {}, out.frequency !== 'weekly' ? { days: del, interval: del } : {}, out.frequency !== 'monthly' ? { monthDay: del } : {}))
         : db.collection('cleaningJobs').add(Object.assign({}, out, { createdAt: stamp, updatedAt: stamp }));
       write.then(function(ref){
         RccAudit.log('cleaning.job', 'cleaningJob', editingJob || (ref && ref.id) || '', (editingJob ? 'Changed' : 'Added') + ' the cleaning job "' + out.title + '": ' + CL.describeJob(out));
@@ -337,7 +377,7 @@
 
     box.appendChild(h('div', { class: 'card' }, [
       h('h2', { text: editingJob ? 'Change this job' : 'New cleaning job' }),
-      field('What needs doing?', f.title), field('Where?', f.area, 'Optional. Shown in brackets after the name on the calendar.'),
+      field('What needs doing?', f.title), field('Which rooms?', roomBox, 'Optional. Pick the rooms from the list; they go in brackets after the name on the calendar.'), field('Somewhere else? (optional)', f.area),
       field('How often?', f.frequency), weekly, every, monthly,
       h('div', { class: 'f' }, [h('label', { text: 'Time of day' }), h('label', { style: 'font-size:15px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-2);display:flex;gap:8px;align-items:center;' }, [f.allDay, 'All day (no set time)'])]), timeBox,
       field('Who does it?', f.assignedTo, 'Optional. Shown in the calendar event.'), field('Notes / checklist', f.notes),
@@ -413,15 +453,16 @@
 
   function drawRooms(){
     var card = $('roomsCard'); card.replaceChildren();
-    var inputs = {};
-    var defSetup = h('input', { type: 'number', min: '0', max: '480', value: String(CL.whole(settings.setupMin, 0, 480, CL.DEFAULT_MINUTES)) });
-    var defClean = h('input', { type: 'number', min: '0', max: '480', value: String(CL.whole(settings.cleanupMin, 0, 480, CL.DEFAULT_MINUTES)) });
+    var inputs = {}, D = CL.DEFAULTS;
+    var num = function(v, ph){ return h('input', { type: 'number', min: '0', max: '480', value: v, placeholder: ph }); };
+    var defSetup = num(String(CL.whole(settings.setupMin, 0, 480, D.setupMin)), ''), defTear = num(String(CL.whole(settings.teardownMin, 0, 480, D.teardownMin)), ''), defClean = num(String(CL.whole(settings.cleanupMin, 0, 480, D.cleanupMin)), '');
     var tbody = h('tbody');
     RL.ROOMS.forEach(function(room){
       var c = CL.roomConfig(settings, room.id), row = (settings.rooms || {})[room.id] || {};
-      inputs[room.id] = { tasks: h('input', { type: 'checkbox', checked: c.tasks }), setup: h('input', { type: 'number', min: '0', max: '480', value: row.setupMin != null ? String(row.setupMin) : '', placeholder: String(CL.whole(defSetup.value, 0, 480, CL.DEFAULT_MINUTES)) }),
-        clean: h('input', { type: 'number', min: '0', max: '480', value: row.cleanupMin != null ? String(row.cleanupMin) : '', placeholder: String(CL.whole(defClean.value, 0, 480, CL.DEFAULT_MINUTES)) }) };
-      tbody.appendChild(h('tr', {}, [h('td', {}, [h('label', { style: 'display:flex;gap:8px;align-items:center;cursor:pointer;' }, [inputs[room.id].tasks, room.name])]), h('td', {}, [inputs[room.id].setup]), h('td', {}, [inputs[room.id].clean])]));
+      var mine = function(key, def){ return num(row[key] != null ? String(row[key]) : '', String(def.value)); };
+      inputs[room.id] = { tasks: h('input', { type: 'checkbox', checked: c.tasks }), setupMin: mine('setupMin', defSetup), teardownMin: mine('teardownMin', defTear), cleanupMin: mine('cleanupMin', defClean) };
+      tbody.appendChild(h('tr', {}, [h('td', {}, [h('label', { style: 'display:flex;gap:8px;align-items:center;cursor:pointer;' }, [inputs[room.id].tasks, room.name])]),
+        h('td', {}, [inputs[room.id].setupMin]), h('td', {}, [inputs[room.id].teardownMin]), h('td', {}, [inputs[room.id].cleanupMin])]));
     });
     var msg = h('div'), save = h('button', { type: 'button', class: 'btn primary', text: 'Save room settings' });
     var note = function(kind, text){ roomsNote = { kind: kind, text: text }; msg.replaceChildren(h('div', { class: kind, text: text })); };
@@ -430,22 +471,21 @@
       var rooms = {};
       RL.ROOMS.forEach(function(room){
         var i = inputs[room.id], o = { tasks: i.tasks.checked };
-        if (i.setup.value !== '') o.setupMin = CL.whole(i.setup.value, 0, 480, CL.DEFAULT_MINUTES);
-        if (i.clean.value !== '') o.cleanupMin = CL.whole(i.clean.value, 0, 480, CL.DEFAULT_MINUTES);
+        ['setupMin', 'teardownMin', 'cleanupMin'].forEach(function(k){ if (i[k].value !== '') o[k] = CL.whole(i[k].value, 0, 480, D[k]); });
         rooms[room.id] = o;
       });
       save.disabled = true; roomsNote = null; msg.replaceChildren();
-      db.collection('settings').doc('cleaning').set({ setupMin: CL.whole(defSetup.value, 0, 480, CL.DEFAULT_MINUTES), cleanupMin: CL.whole(defClean.value, 0, 480, CL.DEFAULT_MINUTES), rooms: rooms }, { merge: true }).then(function(){
-        RccAudit.log('cleaning.rooms', 'settings', 'cleaning', 'Changed which rooms get setup and tear-down tasks, and how long they take');
+      db.collection('settings').doc('cleaning').set({ setupMin: CL.whole(defSetup.value, 0, 480, D.setupMin), teardownMin: CL.whole(defTear.value, 0, 480, D.teardownMin), cleanupMin: CL.whole(defClean.value, 0, 480, D.cleanupMin), rooms: rooms }, { merge: true }).then(function(){
+        RccAudit.log('cleaning.rooms', 'settings', 'cleaning', 'Changed which rooms get setup, tear-down and cleaning tasks, and how long they take');
         if (!settings.calendarId) { note('ok', 'Saved.'); return; }
         note('help', 'Saved. Updating the calendar…');
         return call({ action: 'sync' }).then(function(r){ note('ok', 'Saved and the calendar is updated: ' + r.written + ' written, ' + r.removed + ' removed.'); });
       }).catch(function(e){ note('err', niceErr(e)); }).then(function(){ save.disabled = false; });
     });
     card.appendChild(h('h2', { text: 'Rooms and timing' }));
-    card.appendChild(h('p', { class: 'help', text: 'Untick a room that should not get setup or tear-down tasks. Leave a room\'s minutes blank to use the default. If an event uses several rooms, the longest time wins. Use 0 to skip just the setup or just the tear-down.' }));
-    card.appendChild(h('div', { class: 'grid2', style: 'margin-top:12px;' }, [field('Default setup time (minutes before the event)', defSetup), field('Default tear-down time (minutes after)', defClean)]));
-    card.appendChild(h('table', { class: 'rooms' }, [h('thead', {}, [h('tr', {}, [h('th', { text: 'Room gets tasks' }), h('th', { text: 'Setup min' }), h('th', { text: 'Tear-down min' })])]), tbody]));
+    card.appendChild(h('p', { class: 'help', text: 'Each room gets its own tasks. Untick a room that should not get any. Leave a room\'s minutes blank to use the default; use 0 to skip just that task. Setup happens before the event, tear down right after it, and cleaning right after that (or before the setup, if an event needs it).' }));
+    card.appendChild(h('div', { style: 'margin-top:12px;' }, [h('div', { class: 'grid2' }, [field('Default setup (minutes before)', defSetup), field('Default tear down (minutes after)', defTear)]), field('Default cleaning (minutes)', defClean)]));
+    card.appendChild(h('table', { class: 'rooms' }, [h('thead', {}, [h('tr', {}, [h('th', { text: 'Room gets tasks' }), h('th', { text: 'Setup' }), h('th', { text: 'Tear down' }), h('th', { text: 'Cleaning' })])]), tbody]));
     card.appendChild(msg);
     card.appendChild(h('div', { class: 'row-actions' }, [save]));
   }
