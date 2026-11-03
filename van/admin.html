@@ -614,6 +614,117 @@ function OilBanner({
     }
   }, x.v.name, ": ", x.st.state === 'overdue' ? 'overdue by ' + fmtMiles(-x.st.left) + ' mi' : 'due in ' + fmtMiles(x.st.left) + ' mi', " (at ", fmtMiles(x.st.nextAt), " mi)")));
 }
+
+// Sending a van to the shop records the odometer first, so the miles it puts on there (and any driving before it went in) can be told apart.
+function MaintenanceSendOut({
+  van,
+  onSave,
+  onCancel
+}) {
+  const [mileage, setMileage] = useState('');
+  const [date, setDate] = useState(todayLocal());
+  const [reason, setReason] = useState('');
+  const [shop, setShop] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const miles = parseMiles(mileage);
+  const lower = miles != null && miles < (Number(van.mileage) || 0) - 2;
+  const canSave = miles != null && date && !saving;
+  async function save(skip) {
+    if (!skip && lower && !confirm('That reading (' + fmtMiles(miles) + ' mi) is LOWER than the last one on file for this van (' + fmtMiles(van.mileage) + ' mi). Use it anyway?')) return;
+    setSaving(true);
+    setErr('');
+    try {
+      await onSave({
+        vanId: van.id,
+        date,
+        mileage: skip ? null : miles,
+        reason: reason.trim(),
+        shop: shop.trim()
+      });
+    } catch (e) {
+      setErr('Could not save: ' + (e.message || e));
+      setSaving(false);
+    }
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTop: '1px solid var(--border)'
+    }
+  }, /*#__PURE__*/React.createElement("h4", {
+    style: {
+      fontSize: 15,
+      marginBottom: 2
+    }
+  }, "Send ", van.name, " to maintenance"), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Last on file: ", fmtMiles(van.mileage || 0), " mi."), /*#__PURE__*/React.createElement("label", null, "Odometer reading now"), /*#__PURE__*/React.createElement("input", {
+    inputMode: "decimal",
+    value: mileage,
+    onChange: e => setMileage(e.target.value),
+    placeholder: "e.g. 52,418"
+  }), lower && /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      color: 'var(--danger)',
+      fontWeight: 600
+    }
+  }, "That is lower than the last reading on file. Double-check it."), /*#__PURE__*/React.createElement("label", null, "Date"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: date,
+    onChange: e => setDate(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", null, "Why is it going in? (optional)"), /*#__PURE__*/React.createElement("input", {
+    value: reason,
+    onChange: e => setReason(e.target.value),
+    placeholder: "e.g. Oil change, brakes squealing"
+  }), /*#__PURE__*/React.createElement("label", null, "Where / who is taking it? (optional)"), /*#__PURE__*/React.createElement("input", {
+    value: shop,
+    onChange: e => setShop(e.target.value),
+    placeholder: "Shop name or staff member"
+  }), err && /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      color: 'var(--danger)',
+      fontWeight: 600
+    }
+  }, err), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 12,
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    style: {
+      marginTop: 0,
+      width: 'auto'
+    },
+    disabled: !canSave,
+    onClick: () => save(false)
+  }, saving ? 'Saving…' : 'Send to maintenance'), /*#__PURE__*/React.createElement("button", {
+    className: "secondary",
+    style: {
+      marginTop: 0,
+      width: 'auto'
+    },
+    disabled: saving,
+    onClick: onCancel
+  }, "Cancel")), /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      marginTop: 10
+    }
+  }, "Can't get to the odometer right now? ", /*#__PURE__*/React.createElement("a", {
+    href: "#",
+    onClick: e => {
+      e.preventDefault();
+      if (!saving) save(true);
+    }
+  }, "Send it without a reading"), " (the miles won't be tracked)."));
+}
 function MaintenanceCheckIn({
   van,
   openNotes,
@@ -637,6 +748,7 @@ function MaintenanceCheckIn({
   const oil = picked.includes('Oil Change');
   const lower = miles != null && miles < (Number(van.mileage) || 0) - 2;
   const canSave = miles != null && date && services.length > 0 && !saving;
+  const inShop = miles != null && van.maintenanceStartMileage != null ? Math.round((miles - Number(van.maintenanceStartMileage)) * 10) / 10 : null;
   async function save() {
     if (lower && !confirm('That reading (' + fmtMiles(miles) + ' mi) is LOWER than the last one on file for this van (' + fmtMiles(van.mileage) + ' mi). Use it anyway?')) return;
     setSaving(true);
@@ -670,7 +782,7 @@ function MaintenanceCheckIn({
     }
   }, "Check ", van.name, " back in from maintenance"), /*#__PURE__*/React.createElement("p", {
     className: "muted"
-  }, "Last on file: ", fmtMiles(van.mileage || 0), " mi."), /*#__PURE__*/React.createElement("label", null, "Odometer reading now"), /*#__PURE__*/React.createElement("input", {
+  }, van.maintenanceStartMileage != null ? 'Went in at ' + fmtMiles(van.maintenanceStartMileage) + ' mi' + (van.maintenanceStartDate ? ' on ' + van.maintenanceStartDate : '') + '.' : 'Last on file: ' + fmtMiles(van.mileage || 0) + ' mi.'), /*#__PURE__*/React.createElement("label", null, "Odometer reading now"), /*#__PURE__*/React.createElement("input", {
     inputMode: "decimal",
     value: mileage,
     onChange: e => setMileage(e.target.value),
@@ -681,7 +793,9 @@ function MaintenanceCheckIn({
       color: 'var(--danger)',
       fontWeight: 600
     }
-  }, "That is lower than the last reading on file. Double-check it."), /*#__PURE__*/React.createElement("label", null, "Date of service"), /*#__PURE__*/React.createElement("input", {
+  }, "That is lower than the last reading on file. Double-check it."), inShop != null && inShop >= 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, fmtMiles(inShop), " mi on it while it was in maintenance."), /*#__PURE__*/React.createElement("label", null, "Date of service"), /*#__PURE__*/React.createElement("input", {
     type: "date",
     value: date,
     onChange: e => setDate(e.target.value)
@@ -860,12 +974,14 @@ function VanDetailCard({
   onRemove,
   onResolveMaint,
   onService,
+  onSendOut,
   onSaveOil,
   onCheck,
   checks
 }) {
   const [expanded, setExpanded] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
+  const [sendingOut, setSendingOut] = useState(false);
   const [checking, setChecking] = useState(false);
   const chk = RCC.vanCheckStatus(van);
   const sortedChecks = (checks || []).slice().sort((a, b) => b.at - a.at);
@@ -904,7 +1020,9 @@ function VanDetailCard({
     className: "muted"
   }, chk.state === 'never' ? 'Never checked' : 'Last checked ' + (chk.days === 0 ? 'today' : chk.days + ' day' + (chk.days === 1 ? '' : 's') + ' ago') + (van.lastCheckClean === false ? ' · needed cleaning' : van.lastCheckClean === true ? ' · clean' : '')), van.borrowed && /*#__PURE__*/React.createElement("div", {
     className: "muted"
-  }, "From ", van.borrowedFrom || 'unspecified org', van.expectedReturnDate ? ` · return by ${van.expectedReturnDate}` : '')), /*#__PURE__*/React.createElement("div", {
+  }, "From ", van.borrowedFrom || 'unspecified org', van.expectedReturnDate ? ` · return by ${van.expectedReturnDate}` : ''), van.status === 'maintenance' && van.maintenanceStartMileage != null && /*#__PURE__*/React.createElement("div", {
+    className: "muted"
+  }, "In maintenance since ", van.maintenanceStartDate || '—', " at ", fmtMiles(van.maintenanceStartMileage), " mi")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -1001,7 +1119,14 @@ function VanDetailCard({
       onSetStatus(van.id, 'available');
       setCheckingIn(false);
     }
-  }), !checkingIn && !checking && /*#__PURE__*/React.createElement("div", {
+  }), van.status !== 'maintenance' && sendingOut && /*#__PURE__*/React.createElement(MaintenanceSendOut, {
+    van: van,
+    onSave: async d => {
+      await onSendOut(d);
+      setSendingOut(false);
+    },
+    onCancel: () => setSendingOut(false)
+  }), !checkingIn && !checking && !sendingOut && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
@@ -1023,7 +1148,7 @@ function VanDetailCard({
     style: {
       marginTop: 0
     },
-    onClick: () => onSetStatus(van.id, 'maintenance')
+    onClick: () => setSendingOut(true)
   }, "Send to Maintenance") : !checkingIn && /*#__PURE__*/React.createElement("button", {
     className: "secondary",
     style: {
@@ -1844,10 +1969,52 @@ function AdminDashboard({
     });
   }
   async function setVanStatus(vanId, status) {
-    await db.collection('vans').doc(vanId).update({
+    const upd = {
       status
-    });
+    };
+    if (status !== 'maintenance') {
+      const del = firebase.firestore.FieldValue.delete();
+      upd.maintenanceStartMileage = del;
+      upd.maintenanceStartDate = del;
+    }
+    await db.collection('vans').doc(vanId).update(upd);
     RccAudit.log('van.status', 'van', vanId, vanLabel(vanId) + ' set to ' + status);
+  }
+  // Sends a van to the shop: the odometer reading (kept in the repair history and as the van's current mileage), the status, and where it went in.
+  async function sendToMaintenance({
+    vanId,
+    date,
+    mileage,
+    reason,
+    shop
+  }) {
+    const van = vans.find(v => v.id === vanId) || {};
+    const miles = parseMiles(mileage);
+    const batch = db.batch();
+    batch.set(db.collection('vanRepairLog').doc(), {
+      vanId,
+      date,
+      serviceType: 'Sent to maintenance',
+      services: [],
+      notes: reason || '',
+      performedBy: shop || '',
+      mileage: miles,
+      oilChange: false,
+      backFromMaintenance: false,
+      sentToMaintenance: true,
+      createdAt: Date.now()
+    });
+    const upd = {
+      status: 'maintenance'
+    };
+    if (miles != null) {
+      upd.maintenanceStartMileage = miles;
+      upd.maintenanceStartDate = date;
+      if (miles > (Number(van.mileage) || 0)) upd.mileage = miles;
+    }
+    batch.update(db.collection('vans').doc(vanId), upd);
+    await batch.commit();
+    RccAudit.log('van.maintenance.sendOut', 'van', vanId, vanLabel(vanId) + ' sent to maintenance' + (miles != null ? ' at ' + fmtMiles(miles) + ' mi' : '') + (reason ? ': ' + reason : ''));
   }
   async function addVan(name, isBorrowed, borrowedFrom, returnDate) {
     await db.collection('vans').add({
@@ -1901,7 +2068,12 @@ function AdminDashboard({
       upd.lastOilChangeMileage = miles;
       upd.lastOilChangeDate = date;
     }
-    if (toAvailable) upd.status = 'available';
+    if (toAvailable) {
+      upd.status = 'available';
+      const del = firebase.firestore.FieldValue.delete();
+      upd.maintenanceStartMileage = del;
+      upd.maintenanceStartDate = del;
+    }
     if (Object.keys(upd).length) batch.update(db.collection('vans').doc(vanId), upd);
     (resolveIds || []).forEach(id => batch.update(db.collection('vanMaintenanceNotes').doc(id), {
       resolved: true
@@ -2361,6 +2533,7 @@ function AdminDashboard({
     onRemove: removeVan,
     onResolveMaint: resolveMaint,
     onService: recordService,
+    onSendOut: sendToMaintenance,
     onCheck: recordVanCheck,
     checks: (vanChecks || []).filter(c => c.vanId === v.id),
     onSaveOil: saveOilInfo
