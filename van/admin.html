@@ -352,11 +352,11 @@ function OdometerShot({
       const saving = uploadPhoto(small, `vanRentalPhotos/${folder}/odo-${uid()}.jpg`);
       let value = null;
       try {
-        value = await window.OdometerRead.readFile(file, van.mileage);
+        value = await Promise.race([window.OdometerRead.readFile(file, van.mileage), new Promise(res => setTimeout(() => res(null), 20000))]);
       } catch (e) {
         console.warn('Odometer read skipped:', e && e.message);
       }
-      const url = await saving;
+      const url = await Promise.race([saving, new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), 60000))]);
       setRead(value);
       onResult(url, value);
       if (value != null && !mileage) setMileage(String(value));
@@ -371,7 +371,7 @@ function OdometerShot({
     className: "camera-box"
   }, /*#__PURE__*/React.createElement("div", {
     className: "muted"
-  }, /*#__PURE__*/React.createElement("strong", null, "Odometer close-up"), " — turn the ignition on so the display is lit, then get close so the mileage fills the photo."), /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("strong", null, "Odometer close-up"), " (optional) — turn the ignition on so the display is lit, then get close so the mileage fills the photo. If the photo won't load, skip it and just type the mileage below."), /*#__PURE__*/React.createElement("input", {
     ref: inputRef,
     type: "file",
     accept: "image/*",
@@ -417,7 +417,7 @@ function OdometerShot({
       marginTop: 8,
       color: '#a8352f'
     }
-  }, "The photo didn't save. Check your connection and try again."));
+  }, "The photo didn't save. You can try again, or skip it and type the mileage below."));
 }
 function VanCheckForm({
   van,
@@ -436,10 +436,9 @@ function VanCheckForm({
   const [err, setErr] = useState('');
   const miles = parseMiles(mileage);
   const lower = miles != null && miles < (Number(van.mileage) || 0) - 2;
-  const canSave = miles != null && odoPhoto && clean !== null && !saving;
+  const canSave = miles != null && clean !== null && !saving;
   const missing = [];
   if (miles == null) missing.push('the odometer reading');
-  if (!odoPhoto) missing.push('the odometer photo');
   if (clean === null) missing.push('whether it is clean');
   async function takeCleanPhoto(file) {
     setCleanUploading(true);
@@ -1580,8 +1579,13 @@ function SafetyBlockAlertCard({
   }
   async function handlePhoto(file) {
     setCleanUploading(true);
-    const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/${uid()}.jpg`);
-    setCleanPhoto(url);
+    try {
+      const small = await shrinkImage(file, 1600);
+      setCleanPhoto(await Promise.race([uploadPhoto(small, `vanRentalPhotos/${rental.id}/${uid()}.jpg`), new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), 60000))]));
+    } catch (e) {
+      console.warn('Photo failed:', e && e.message);
+      alert("That photo didn't save. You can try again, or skip it — photos are optional.");
+    }
     setCleanUploading(false);
   }
   async function completeAsAdmin() {
@@ -1663,13 +1667,13 @@ function SafetyBlockAlertCard({
     value: clean,
     onChange: setClean
   }), /*#__PURE__*/React.createElement(CameraCapture, {
-    label: "Take a photo of the van interior",
+    label: "Take a photo of the van interior (optional)",
     photoUrl: cleanPhoto,
     uploading: cleanUploading,
     onCapture: handlePhoto
   }), /*#__PURE__*/React.createElement("button", {
     className: "primary",
-    disabled: clean === null || !cleanPhoto || saving,
+    disabled: clean === null || saving,
     onClick: completeAsAdmin
   }, saving ? 'Completing...' : 'Complete Checkout'), /*#__PURE__*/React.createElement("button", {
     className: "link-btn",

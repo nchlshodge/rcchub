@@ -342,8 +342,10 @@ async function shrinkImage(file, max) {
   }
 }
 
-// Odometer close-up: the driver photographs the number, the phone reads it (free, on the phone) and suggests it,
-// and the driver confirms or fixes it. Both the photo and what was read are saved.
+// Odometer close-up (optional): the driver photographs the number, the phone reads it (free, on the phone) and suggests it,
+// and the driver confirms or fixes it. Both the photo and what was read are saved. If the photo will not load or save,
+// the driver can skip it and just type the mileage.
+const withTimeout = (p, ms, onTimeout) => Promise.race([p, new Promise((res, rej) => setTimeout(() => onTimeout ? res(onTimeout()) : rej(new Error('timed out')), ms))]);
 function OdometerShot({
   van,
   rentalId,
@@ -363,11 +365,11 @@ function OdometerShot({
       const saving = uploadPhoto(small, `vanRentalPhotos/${rentalId}/${prefix}odo-${uid()}.jpg`);
       let value = null;
       try {
-        value = await window.OdometerRead.readFile(file, van.mileage);
+        value = await withTimeout(window.OdometerRead.readFile(file, van.mileage), 20000, () => null);
       } catch (e) {
         console.warn('Odometer read skipped:', e && e.message);
       }
-      const url = await saving;
+      const url = await withTimeout(saving, 60000);
       setRead(value);
       onResult(url, value);
       if (value != null && !mileage) setMileage(String(value));
@@ -385,7 +387,7 @@ function OdometerShot({
     className: "camera-box"
   }, /*#__PURE__*/React.createElement("div", {
     className: "muted"
-  }, /*#__PURE__*/React.createElement("strong", null, "Odometer close-up"), " — turn the ignition on so the display is lit, then get close so the mileage fills the photo."), /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("strong", null, "Odometer close-up"), " (optional) — turn the ignition on so the display is lit, then get close so the mileage fills the photo. If the photo won't load, skip it and just type the mileage below."), /*#__PURE__*/React.createElement("input", {
     ref: inputRef,
     type: "file",
     accept: "image/*",
@@ -431,7 +433,7 @@ function OdometerShot({
       marginTop: 8,
       color: '#a8352f'
     }
-  }, "The photo didn't save. Please check your connection and try again."));
+  }, "The photo didn't save. You can try again, or skip it and type the mileage below."));
 }
 
 // ---------- Driver Application ----------
@@ -1030,7 +1032,7 @@ function CheckoutFlow({
   const [cleanUploading, setCleanUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  const [step, setStep] = useState(draft.dashPhoto && draft.odoPhoto ? draft.mileage && draft.gas != null ? 3 : draft.mileage ? 2 : 1 : 1);
+  const [step, setStep] = useState(draft.mileage ? draft.gas != null ? 3 : 2 : 1);
   function go(n) {
     setStep(n);
     window.scrollTo({
@@ -1051,8 +1053,13 @@ function CheckoutFlow({
   const wasCleared = rental.checkoutBlocked && rental.checkoutCleared;
   async function handlePhoto(file, setPhoto, setUploading) {
     setUploading(true);
-    const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/${uid()}.jpg`);
-    setPhoto(url);
+    try {
+      const small = await shrinkImage(file, 1600);
+      setPhoto(await Promise.race([uploadPhoto(small, `vanRentalPhotos/${rental.id}/${uid()}.jpg`), new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), 60000))]));
+    } catch (e) {
+      console.warn('Photo failed:', e && e.message);
+      alert("That photo didn't save. You can try again, or skip it — photos are optional.");
+    }
     setUploading(false);
   }
   function toggleLight(id) {
@@ -1092,18 +1099,15 @@ function CheckoutFlow({
       resolved: false
     });
   }
-  const canSubmit = keysConfirmed && mileage && gas !== null && dashPhoto && odoPhoto && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && clean !== null && cleanPhoto && confirmed && !saving;
+  const canSubmit = keysConfirmed && mileage && gas !== null && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && clean !== null && confirmed && !saving;
   // So a greyed-out button always says what is still missing, for the step you are on.
   const missing1 = [];
-  if (!dashPhoto) missing1.push('the dashboard photo');
-  if (!odoPhoto) missing1.push('the odometer close-up photo');
   if (!mileage) missing1.push('the mileage');
   const missing2 = [];
   if (gas === null) missing2.push('the gas level');
   if (otherLightChecked && !otherLightDesc) missing2.push('a description of the other warning light');
   const missing3 = [];
   if (clean === null) missing3.push('whether the van is clean');
-  if (!cleanPhoto) missing3.push('the interior photo');
   if (!confirmed) missing3.push('the confirmation box');
   const missing = step === 1 ? missing1 : step === 2 ? missing2 : missing3;
   async function finishCheckout() {
@@ -1179,7 +1183,7 @@ function CheckoutFlow({
   }), step === 1 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h2", null, "Dashboard"), /*#__PURE__*/React.createElement("p", {
     className: "muted"
   }, "Two photos — the whole dashboard, then a close-up of the odometer — and the mileage it shows."), /*#__PURE__*/React.createElement(CameraCapture, {
-    label: "Take a photo of the full dashboard",
+    label: "Take a photo of the full dashboard (optional)",
     photoUrl: dashPhoto,
     uploading: dashUploading,
     onCapture: f => handlePhoto(f, setDashPhoto, setDashUploading)
@@ -1268,7 +1272,7 @@ function CheckoutFlow({
     value: clean,
     onChange: setClean
   }), /*#__PURE__*/React.createElement(CameraCapture, {
-    label: "Take a photo of the van interior",
+    label: "Take a photo of the van interior (optional)",
     photoUrl: cleanPhoto,
     uploading: cleanUploading,
     onCapture: f => handlePhoto(f, setCleanPhoto, setCleanUploading)
@@ -1356,22 +1360,25 @@ function ReturnFlow({
   function toggleLight(id) {
     setCheckedLights(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
-  const canSubmit = mileage && gas !== null && clean !== null && cleanPhoto && odoPhoto && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && problems !== null && !saving;
+  const canSubmit = mileage && gas !== null && clean !== null && safetyLightsOn.length === 0 && (!otherLightChecked || otherLightDesc) && problems !== null && !saving;
   const missing1 = [];
-  if (!odoPhoto) missing1.push('the odometer close-up photo');
   if (!mileage) missing1.push('the mileage');
   if (gas === null) missing1.push('the gas level');
   const missing2 = [];
   if (clean === null) missing2.push('whether the van is clean');
-  if (!cleanPhoto) missing2.push('the interior photo');
   if (otherLightChecked && !otherLightDesc) missing2.push('a description of the other warning light');
   const missing3 = [];
   if (problems === null) missing3.push('whether there were any problems');
   const missing = step === 1 ? missing1 : step === 2 ? missing2 : missing3;
   async function handlePhoto(file) {
     setCleanUploading(true);
-    const url = await uploadPhoto(file, `vanRentalPhotos/${rental.id}/return-${uid()}.jpg`);
-    setCleanPhoto(url);
+    try {
+      const small = await shrinkImage(file, 1600);
+      setCleanPhoto(await Promise.race([uploadPhoto(small, `vanRentalPhotos/${rental.id}/return-${uid()}.jpg`), new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), 60000))]));
+    } catch (e) {
+      console.warn('Photo failed:', e && e.message);
+      alert("That photo didn't save. You can try again, or skip it — photos are optional.");
+    }
     setCleanUploading(false);
   }
   async function finishReturn() {
@@ -1457,7 +1464,7 @@ function ReturnFlow({
     value: clean,
     onChange: setClean
   }), /*#__PURE__*/React.createElement(CameraCapture, {
-    label: "Take a photo of the van interior at turn-in",
+    label: "Take a photo of the van interior at turn-in (optional)",
     photoUrl: cleanPhoto,
     uploading: cleanUploading,
     onCapture: handlePhoto
