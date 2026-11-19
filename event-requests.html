@@ -798,6 +798,8 @@
     try { const snap = await db.collection('settings').doc('accessLetter').get(); s = snap.exists ? snap.data() : null; }
     catch (ex) { RCC.notify('Could not load the letter. Try again.\n(' + ex.message + ')', { kind: 'error' }); return; }
     if (!s || !s.body) { RCC.notify('The standard letter has not been set up yet (settings/accessLetter).', { kind: 'error' }); return; }
+    let cs = {};
+    try { const cSnap = await db.collection('settings').doc('cleaning').get(); if (cSnap.exists) cs = cSnap.data() || {}; } catch (ex) { /* the usual minutes are used */ }
     const defaults = Object.assign({}, ...LETTER_FIELDS.map(f => ({ [f[0]]: f[2] })), s.defaults || {});
     const first = String(r.requesterName || '').trim().split(/\s+/)[0] || 'there';
     const dlg = document.createElement('dialog');
@@ -817,7 +819,19 @@
     const g = id => dlg.querySelector('#' + id);
     const dd = parseISO(r.eventDate), su = r.setup || {};
     const roomList = arr(r.onsiteRoom).filter(x => x !== 'Other').concat(r.onsiteRoomOther ? [r.onsiteRoomOther] : []).join(', ');
+    // The timeline follows the event's own times: set-up starts the usual number of minutes before it (longest of the rooms used),
+    // and clean-up finishes after tear-down and cleaning (the same minutes the Cleaning calendar uses).
+    const minsOf = key => {
+      const ids = RoomLogic.roomsForRequest(r), dflt = { setupMin: 60, teardownMin: 30, cleanupMin: 30 }[key];
+      const pick = id => { const rc = (cs.rooms || {})[id] || {}; const n = Number(rc[key] != null ? rc[key] : cs[key]); return Number.isFinite(n) && n >= 0 ? n : dflt; };
+      return ids.length ? Math.max(...ids.map(pick)) : (Number.isFinite(Number(cs[key])) && cs[key] !== '' && cs[key] != null ? Number(cs[key]) : dflt);
+    };
+    const a = RoomLogic.toMinutes(r.startTime), z = RoomLogic.toMinutes(r.endTime);
+    const hm = m => RoomLogic.fmtMinutes(((m % 1440) + 1440) % 1440);
+    const setupStart = a == null ? 'X' : hm(Math.max(0, a - minsOf('setupMin')));
+    const cleanEnd = z == null ? 'X' : hm(z + minsOf('teardownMin') + minsOf('cleanupMin'));
     const known = {
+      setupStart, cleanEnd,
       host: r.requesterName || 'X', title: titleOf(r),
       date: dd ? fmtLong(dd) : 'X', location: roomList || r.location || 'X',
       startTime: fmtTime(r.startTime) || 'X', endTime: fmtTime(r.endTime) || 'X',
@@ -842,7 +856,7 @@
     });
     g('lt_edittpl').addEventListener('click', async () => {
       if (!tplMode) {
-        tplMode = true; g('lt_text').value = s.body; g('lt_dirty').textContent = '— the STANDARD wording, used for every event. {{name}}, {{host}}, {{date}}, {{location}}, {{time}}, {{startTime}}, {{endTime}}, {{guestCount}}, {{accessFrom}}, {{accessTo}}, {{extraRate}}, {{attendantFee}}, {{deposit}} are filled in for each letter.'; g('lt_help').style.display = 'none';
+        tplMode = true; g('lt_text').value = s.body; g('lt_dirty').textContent = '— the STANDARD wording, used for every event. {{name}}, {{host}}, {{date}}, {{location}}, {{time}}, {{startTime}}, {{endTime}}, {{setupStart}}, {{cleanEnd}}, {{guestCount}}, {{accessFrom}}, {{accessTo}}, {{extraRate}}, {{attendantFee}}, {{deposit}} are filled in for each letter.'; g('lt_help').style.display = 'none';
         g('lt_send').style.display = 'none'; g('lt_edittpl').textContent = 'Save as the standard wording'; g('lt_cancel').textContent = 'Back to the letter'; return;
       }
       const body = g('lt_text').value.trim();
