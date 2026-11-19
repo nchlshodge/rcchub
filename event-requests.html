@@ -605,6 +605,7 @@
   // Approve or deny. Both email the requester (the server does that when the status changes), so Deny asks first
   // and both say plainly what happened. A failure is shown and nothing is changed.
   document.addEventListener('click', async e => {
+    if (e.target.id === 'letterStart' && isAdmin && openId) { const lr = allRequests.find(x => x.id === openId); if (lr) openLetter(lr); return; }
     if (e.target.id === 'showAllClash') { clashOnly = false; render(); return; }
     const kb = e.target.closest('[data-keep-both]');
     if (kb && isAdmin && currentUser) {
@@ -773,6 +774,100 @@
     }).join('');
   }
 
+  // ---- Building access letter: how to get in and lock up when no staff are there. The wording (and the door code) lives only
+  // in settings/accessLetter, which only admins can read; it is not in this page. The admin fills in the blanks, can change
+  // any of the text, and sends it; the server emails the requester (Nick and Stephanie are copied).
+  const LETTER_FIELDS = [['accessFrom', 'Building opens', '8:30 AM'], ['accessTo', 'Building must be empty by', '2:30 PM'], ['extraRate', 'Charge per extra hour', '$25'],
+    ['attendantFee', 'Attendant payment (cash)', '$150'], ['deposit', 'Incidentals check', '$150']];
+  const validEmailAddr = v => /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(String(v || '').trim());
+  function letterRowHtml(r) {
+    if (!isAdmin || statusOf(r) !== 'approved' || !isAtChurch(r) || !validEmailAddr(r.email)) return '';
+    let sent = '';
+    if (r.accessLetterSentAt) {
+      const d = new Date(r.accessLetterSentAt);
+      sent = '<span class="hint" style="display:block;margin-top:6px;">✓ Sent to ' + esc(r.accessLetterSentTo || r.email) + (isNaN(d) ? '' : ' on ' + esc(d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }))) + (r.accessLetterSentBy ? ' by ' + esc(r.accessLetterSentBy) : '') + '.</span>';
+    }
+    return '<div class="p-sec"><h4>Event details letter</h4><div class="box"><button type="button" class="btn soft" id="letterStart">✉️ ' + (r.accessLetterSentAt ? 'Send the event details letter again' : 'Send the event details letter') + '</button>' +
+      '<span class="hint" style="display:block;margin-top:6px;">The event details, timeline, layout, how to get in and lock up when no staff are there, and the hours and fees. You see it first and can change anything before it goes to ' + esc(r.email) + '.</span>' + sent + '</div></div>';
+  }
+  function renderLetter(tpl, vals) {
+    return String(tpl || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (vals[k] != null && (vals[k] !== '' || k === 'guestCount') ? vals[k] : m));
+  }
+  async function openLetter(r) {
+    let s;
+    try { const snap = await db.collection('settings').doc('accessLetter').get(); s = snap.exists ? snap.data() : null; }
+    catch (ex) { RCC.notify('Could not load the letter. Try again.\n(' + ex.message + ')', { kind: 'error' }); return; }
+    if (!s || !s.body) { RCC.notify('The standard letter has not been set up yet (settings/accessLetter).', { kind: 'error' }); return; }
+    const defaults = Object.assign({}, ...LETTER_FIELDS.map(f => ({ [f[0]]: f[2] })), s.defaults || {});
+    const first = String(r.requesterName || '').trim().split(/\s+/)[0] || 'there';
+    const dlg = document.createElement('dialog');
+    dlg.style.cssText = 'width:min(680px,94vw);max-height:92vh;border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;background:var(--card);color:var(--ink);';
+    dlg.innerHTML = '<div class="ef"><h3 style="margin:0 0 4px;font-family:Playfair Display,serif;font-weight:500;font-size:22px;">Event details letter</h3>' +
+      '<p class="hint" style="margin:0 0 12px;">To <b>' + esc(r.requesterName || '') + '</b> (' + esc(r.email) + '). Nick and Stephanie are copied.</p>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px;">' +
+        '<div class="fld"><label class="lbl" for="lt_name">First name</label><input type="text" id="lt_name" value="' + esc(first) + '"></div>' +
+        LETTER_FIELDS.map(f => '<div class="fld"><label class="lbl" for="lt_' + f[0] + '">' + esc(f[1]) + '</label><input type="text" id="lt_' + f[0] + '" value="' + esc(defaults[f[0]]) + '"></div>').join('') + '</div>' +
+      '<div class="fld"><label class="lbl" for="lt_subject">Subject</label><input type="text" id="lt_subject"></div>' +
+      '<div class="fld"><label class="lbl" for="lt_text">Letter <span id="lt_dirty" class="hint" style="text-transform:none;letter-spacing:0;font-weight:400;"></span></label><textarea id="lt_text" style="min-height:min(430px,52vh);font-family:inherit;line-height:1.5;"></textarea>' +
+        '<span class="hint" id="lt_help" style="display:block;margin-top:6px;">This is the whole letter. Change anything here and it changes <b>only this event\'s</b> letter. To change the letter for every future event, use <b>Edit the standard wording</b>. **bold** and *italic* show as bold and italic in the email.</span></div>' +
+      '<div class="errbox" id="lt_err"></div>' +
+      '<div class="actions" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;"><button type="button" class="btn primary" id="lt_send">Send letter</button><button type="button" class="btn" id="lt_cancel">Cancel</button>' +
+        '<button type="button" class="btn small soft" id="lt_edittpl" style="margin-left:auto;">Edit the standard wording</button></div></div>';
+    document.body.appendChild(dlg);
+    const g = id => dlg.querySelector('#' + id);
+    const dd = parseISO(r.eventDate), su = r.setup || {};
+    const roomList = arr(r.onsiteRoom).filter(x => x !== 'Other').concat(r.onsiteRoomOther ? [r.onsiteRoomOther] : []).join(', ');
+    const known = {
+      host: r.requesterName || 'X', title: titleOf(r),
+      date: dd ? fmtLong(dd) : 'X', location: roomList || r.location || 'X',
+      startTime: fmtTime(r.startTime) || 'X', endTime: fmtTime(r.endTime) || 'X',
+      time: r.startTime ? fmtTime(r.startTime) + (r.endTime ? ' – ' + fmtTime(r.endTime) : '') : 'X',
+      guestCount: String(su.headcount || '').trim(),
+    };
+    const vals = () => Object.assign({ name: g('lt_name').value.trim() || 'there' }, known, ...LETTER_FIELDS.map(f => ({ [f[0]]: g('lt_' + f[0]).value.trim() })));
+    let dirty = false, tplMode = false;
+    const fill = () => {
+      g('lt_text').value = renderLetter(s.body, vals());
+      g('lt_subject').value = renderLetter(s.subject || 'Building access details: {{title}}', vals());
+      dirty = false; g('lt_dirty').textContent = '';
+    };
+    fill();
+    dlg.querySelectorAll('input').forEach(i => i.addEventListener('input', () => { if (tplMode) return; if (!dirty || i.id === 'lt_subject') { if (i.id !== 'lt_subject') fill(); } else if (i.id !== 'lt_subject') g('lt_dirty').textContent = '— you changed the text by hand, so the blanks above no longer update it'; }));
+    g('lt_text').addEventListener('input', () => { if (!tplMode) { dirty = true; g('lt_dirty').textContent = '— you changed the text by hand, so the blanks above no longer update it'; } });
+    const close = () => { dlg.close(); dlg.remove(); };
+    const fail = m => { const b = g('lt_err'); b.textContent = m; b.classList.add('show'); };
+    g('lt_cancel').addEventListener('click', () => {
+      if (tplMode) { tplMode = false; g('lt_send').style.display = ''; g('lt_edittpl').textContent = 'Edit the standard wording'; g('lt_help').style.display = ''; fill(); g('lt_err').classList.remove('show'); return; }
+      close();
+    });
+    g('lt_edittpl').addEventListener('click', async () => {
+      if (!tplMode) {
+        tplMode = true; g('lt_text').value = s.body; g('lt_dirty').textContent = '— the STANDARD wording, used for every event. {{name}}, {{host}}, {{date}}, {{location}}, {{time}}, {{startTime}}, {{endTime}}, {{guestCount}}, {{accessFrom}}, {{accessTo}}, {{extraRate}}, {{attendantFee}}, {{deposit}} are filled in for each letter.'; g('lt_help').style.display = 'none';
+        g('lt_send').style.display = 'none'; g('lt_edittpl').textContent = 'Save as the standard wording'; g('lt_cancel').textContent = 'Back to the letter'; return;
+      }
+      const body = g('lt_text').value.trim();
+      if (body.length < 50) return fail('The standard wording is too short.');
+      g('lt_edittpl').disabled = true;
+      try { await db.collection('settings').doc('accessLetter').set({ body }, { merge: true }); s.body = body; RccAudit.log('event.accessLetterWording', 'settings', 'accessLetter', 'Changed the standard event details letter'); }
+      catch (ex) { g('lt_edittpl').disabled = false; return fail('Could not save: ' + ex.message); }
+      g('lt_edittpl').disabled = false; tplMode = false; g('lt_send').style.display = ''; g('lt_edittpl').textContent = 'Edit the standard wording'; g('lt_cancel').textContent = 'Cancel'; g('lt_help').style.display = ''; fill(); g('lt_err').classList.remove('show');
+      RCC.notify('Saved as the standard wording.', { kind: 'ok' });
+    });
+    g('lt_send').addEventListener('click', async () => {
+      const text = g('lt_text').value;
+      if (/\{\{\s*\w+\s*\}\}/.test(text)) return fail('A blank is still unfilled (it looks like {{…}}). Fill it in above or in the text.');
+      const xs = (text.match(/\(X\)|:\s*X\s*$|\bX!|Hi X\b/gm) || []).length;
+      if (!confirm((xs ? 'The letter still has ' + xs + ' "X" placeholder' + (xs === 1 ? '' : 's') + ' to fill in or remove (like "(X) Rolling Black Tables").\n\nSend it anyway?\n\n' : '') + 'Send this letter to ' + r.email + '?')) return;
+      const b = g('lt_send'); b.disabled = true; b.textContent = 'Sending…'; g('lt_err').classList.remove('show');
+      try { await firebase.functions().httpsCallable('sendAccessLetter')({ requestId: r.id, text, subject: g('lt_subject').value }); }
+      catch (ex) { b.disabled = false; b.textContent = 'Send letter'; return fail('Not sent: ' + (ex.message || 'please try again')); }
+      RccAudit.log('event.accessLetter.ui', 'eventRequest', r.id, 'Sent the building access letter for "' + titleOf(r) + '"');
+      close(); RCC.notify('The letter was emailed to ' + r.email + '.', { kind: 'ok' });
+    });
+    dlg.addEventListener('cancel', e => { e.preventDefault(); g('lt_cancel').click(); });
+    dlg.showModal();
+  }
+
   function drawDrawer() {
     const r = allRequests.find(x => x.id === openId);
     if (!r) { closeDetail(); return; }
@@ -788,6 +883,7 @@
       (clashHtml(r) ? '<div class="p-sec">' + clashHtml(r) + '</div>' : '') +
       (isAdmin && statusOf(r) === 'new' ? '<div class="p-sec">' + approveRowHtml(r) + '</div>' : '') +
       completeRowHtml(r) +
+      letterRowHtml(r) +
       '<div class="p-sec"><h4>Progress</h4><div class="box">' + stepsHtml(r) + dueRowHtml(r) + '</div></div>' +
       (pcoApplies(r) ? '<div class="p-sec"><h4>Planning Center</h4><div class="box">' + pcoBoxHtml(r) + '</div></div>' : '') +
       (marketingApplies(r) ? '<div class="p-sec"><h4>Marketing plan</h4><div class="box">' + RCC.marketingPlanHtml(r, isAdmin || isMarketing) + ((isAdmin || isMarketing) ? '<span class="hint" style="display:block;margin-top:8px;">Tap an option to add or remove it. It saves right away and leaves a note.</span>' : '') + '</div></div>' : '') +
