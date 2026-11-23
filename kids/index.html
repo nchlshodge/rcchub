@@ -98,7 +98,7 @@
 
     <div class="formerr" id="formErr">A few things need a look — they're highlighted above.</div>
     <div class="submit-row">
-      <span class="note">Your details go to the church office and our kids team, and are added to our church database so we can reach you.</span>
+      <span class="note">Our kids team checks your details, then adds them to our church database so we can reach you.</span>
       <button type="submit" class="btn-submit" id="submitBtn">Sign up</button>
     </div>
   </form>
@@ -106,7 +106,7 @@
   <section class="done" id="done">
     <div class="tick">✓</div>
     <h2>You're signed up</h2>
-    <p>Thank you! Our kids team has your details and will be in touch if they need anything.</p>
+    <p>Thank you! Our kids team will check your details and be in touch if they need anything.</p>
     <button class="btn" id="againBtn" type="button">Sign up another family</button>
   </section>
 </div>
@@ -193,10 +193,11 @@
       parentLast: $('pLast').value.trim(),
       parentPhone: $('pPhone').value.trim(),
       children: children,
+      source: 'form',
       submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
     };
     var btn = $('submitBtn'); btn.disabled = true; btn.textContent = 'Sending…';
-    // Planning Center is updated from the server when this is saved (Cloud Function onNewKidsSignup).
+    // A kids leader checks it on the Kids Roster; only then is it added to Planning Center (onKidsSignupApproved).
     db.collection('kidsSignups').add(signup).then(showDone).catch(function (err) {
       console.error('Failed to save sign-up:', err);
       alert('Something went wrong sending your sign-up. Please try again, or contact the church office if this keeps happening.');

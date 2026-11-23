@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://www.gstatic.com">
+  <link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/playfair-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="rcc-base.css">
+<title>RCC — Kids Check-In</title>
+<meta name="theme-color" content="#2557b8">
+<link rel="stylesheet" href="rcc-ui.css">
+<style>
+  body { background: var(--bg); }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 0 clamp(14px, 3vw, 28px); height: 60px; border-bottom: 1px solid var(--line); background: rgba(246,242,234,.9); position: sticky; top: 0; z-index: 10; }
+  .bar img { width: 32px; height: 32px; border-radius: 50%; }
+  .bar b { font-family: 'Playfair Display', serif; font-weight: 500; font-size: 20px; color: var(--blue); }
+  .bar .who { margin-left: auto; font-size: 12.5px; color: var(--ink-3); text-align: right; }
+  .bar .who button { background: none; border: none; color: var(--blue); font: inherit; font-weight: 600; cursor: pointer; padding: 0; }
+  .stage { max-width: 760px; margin: 0 auto; padding: clamp(22px, 5vw, 56px) clamp(14px, 3vw, 24px) 60px; }
+  .screen { display: none; animation: rise .4s var(--ease) both; }
+  .screen.on { display: block; }
+  .screen h1 { font-size: clamp(32px, 5vw, 46px); margin-bottom: 6px; }
+  .screen .sub { color: var(--ink-2); font-size: 17px; margin-bottom: 24px; }
+  .step-dots { display: flex; gap: 8px; margin-bottom: 18px; }
+  .step-dots i { width: 34px; height: 6px; border-radius: 3px; background: var(--line-2); }
+  .step-dots i.on { background: var(--blue); }
+
+  .big { font-family: inherit; font-size: 22px; color: var(--ink); background: #fff; border: 2px solid var(--line-2); border-radius: 16px; padding: 16px 20px; width: 100%; }
+  .big:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 5px rgba(37,87,184,.14); }
+  .big.err { border-color: var(--red); background: #fff7f6; }
+  .lbl { display: block; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin: 18px 0 8px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .pair .lbl { margin-top: 0; }
+  .hint { color: var(--red-ink); font-size: 15px; margin-top: 10px; min-height: 1.2em; }
+
+  .roster { display: grid; gap: 10px; margin-top: 18px; }
+  .kidrow { display: flex; align-items: center; gap: 16px; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 18px; box-shadow: var(--shadow-1); cursor: pointer; font: inherit; color: var(--ink); transition: transform .12s var(--ease), border-color .15s; }
+  .kidrow:hover, .kidrow:focus-visible { border-color: var(--blue); transform: translateY(-1px); outline: none; }
+  .kidrow .av { width: 52px; height: 52px; border-radius: 50%; background: var(--blue-soft); color: var(--blue-ink); font-weight: 700; font-size: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .kidrow .nm { font-family: 'Playfair Display', serif; font-size: 24px; line-height: 1.15; }
+  .kidrow .gr { font-size: 14px; color: var(--ink-3); }
+  .kidrow .go { margin-left: auto; font-size: 26px; color: var(--blue); }
+  .muted { color: var(--ink-3); font-size: 15px; text-align: center; padding: 18px 0; }
+  .newkid { display: block; margin: 22px auto 0; }
+
+  .actions { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
+  .go-btn { flex: 1 1 220px; background: var(--blue); color: #fff; border: none; border-radius: 999px; padding: 18px 30px; font-size: 19px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 20px rgba(37,87,184,.3); }
+  .go-btn:disabled { opacity: .6; cursor: wait; }
+  .back-btn { flex: 0 1 auto; background: #fff; color: var(--ink-2); border: 1px solid var(--line-2); border-radius: 999px; padding: 18px 26px; font-size: 17px; font-weight: 600; cursor: pointer; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 8px 24px; box-shadow: var(--shadow-1); }
+  .card .line { display: flex; justify-content: space-between; gap: 16px; padding: 16px 0; border-top: 1px dashed var(--line-2); font-size: 18px; }
+  .card .line:first-child { border-top: none; }
+  .card .line span { color: var(--ink-3); font-size: 14px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding-top: 4px; }
+  .card .line b { text-align: right; font-size: 22px; font-weight: 600; }
+
+  .done { text-align: center; padding-top: 30px; }
+  .done .tick { width: 96px; height: 96px; border-radius: 50%; background: var(--green-soft); color: var(--green); display: inline-flex; align-items: center; justify-content: center; font-size: 48px; margin-bottom: 20px; }
+  .done .sub { margin: 0 auto 10px; max-width: 34ch; }
+  .done small { color: var(--ink-3); }
+  .blocked { text-align: center; padding-top: 40px; }
+  @media (max-width: 560px) { .pair { grid-template-columns: 1fr; } .card .line { flex-direction: column; gap: 2px; } .card .line b { text-align: left; } }
+</style>
+</head>
+<body>
+<div id="rccBoot" class="rcc-boot" role="status"><img src="assets/rcc-logo-plain-96.png" width="64" height="64" alt=""><b>RCC</b><span>Loading…</span></div>
+
+<div id="loginScreen" class="rcc-login" style="display:none;">
+  <img src="assets/rcc-logo-plain-96.png" alt="">
+  <h1>Kids Check-In</h1>
+  <p>A kids team leader signs in to set up this screen.</p>
+  <button id="googleSignInBtn" type="button">Sign in with Google</button>
+</div>
+
+<div id="app" style="display:none;">
+  <header class="bar"><img src="assets/rcc-logo-plain-96.png" alt=""><b>Kids Check-In</b>
+    <div class="who">Set up by <span id="staffName"></span><br><button type="button" id="signOut">Sign out</button> · <a href="kids-signups.html">Roster</a></div>
+  </header>
+  <main class="stage">
+    <section class="screen" id="sFind">
+      <div class="step-dots"><i class="on"></i><i></i><i></i></div>
+      <h1>Hi! What's your name?</h1>
+      <p class="sub">Type the start of your first or last name, then tap yourself.</p>
+      <input class="big" id="q" type="search" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Your name" aria-label="Your name">
+      <div class="roster" id="results" aria-live="polite"></div>
+      <button type="button" class="btn soft newkid" id="newKidBtn">I can't find my name</button>
+    </section>
+
+    <section class="screen" id="sNew">
+      <div class="step-dots"><i class="on"></i><i></i><i></i></div>
+      <h1>Welcome! What's your name?</h1>
+      <p class="sub">We'll add you so your leaders can reach your family.</p>
+      <div class="pair">
+        <div><label class="lbl" for="kFirst">First name</label><input class="big" id="kFirst" autocomplete="off" autocapitalize="words" maxlength="60"></div>
+        <div><label class="lbl" for="kLast">Last name</label><input class="big" id="kLast" autocomplete="off" autocapitalize="words" maxlength="60"></div>
+      </div>
+      <p class="hint" id="newHint"></p>
+      <div class="actions"><button type="button" class="back-btn" data-back="sFind">Back</button><button type="button" class="go-btn" id="newNext">Next</button></div>
+    </section>
+
+    <section class="screen" id="sParent">
+      <div class="step-dots"><i class="on"></i><i class="on"></i><i></i></div>
+      <h1>Who's your grown-up?</h1>
+      <p class="sub">Your parent or guardian, and a phone number where we can reach them.</p>
+      <div class="pair">
+        <div><label class="lbl" for="pFirst">Their first name</label><input class="big" id="pFirst" autocomplete="off" autocapitalize="words" maxlength="60"></div>
+        <div><label class="lbl" for="pLast">Their last name</label><input class="big" id="pLast" autocomplete="off" autocapitalize="words" maxlength="60"></div>
+      </div>
+      <label class="lbl" for="pPhone">Their phone number</label>
+      <input class="big" id="pPhone" type="tel" inputmode="numeric" autocomplete="off" placeholder="(585) 555-0123" maxlength="20">
+      <p class="hint" id="parentHint"></p>
+      <div class="actions"><button type="button" class="back-btn" id="parentBack">Back</button><button type="button" class="go-btn" id="parentNext">Next</button></div>
+    </section>
+
+    <section class="screen" id="sCheck">
+      <div class="step-dots"><i class="on"></i><i class="on"></i><i class="on"></i></div>
+      <h1>Does this look right?</h1>
+      <p class="sub">Check each one carefully. A leader will double-check it too.</p>
+      <div class="card">
+        <div class="line"><span>You</span><b id="cKid"></b></div>
+        <div class="line"><span>Your grown-up</span><b id="cParent"></b></div>
+        <div class="line"><span>Their phone</span><b id="cPhone"></b></div>
+      </div>
+      <p class="hint" id="checkHint"></p>
+      <div class="actions"><button type="button" class="back-btn" data-back="sParent">Fix something</button><button type="button" class="go-btn" id="confirmBtn">Yes, that's right!</button></div>
+    </section>
+
+    <section class="screen done" id="sDone">
+      <div class="tick">✓</div>
+      <h1 id="doneTitle">Thanks!</h1>
+      <p class="sub">A leader will check it and then add it to our list.</p>
+      <small>Next kid in a moment…</small>
+      <div class="actions" style="justify-content:center"><button type="button" class="go-btn" style="flex:0 1 auto" id="nextKid">Next kid</button></div>
+    </section>
+
+    <section class="screen blocked" id="sBlocked">
+      <div class="empty"><b>This screen is for the kids team</b>An admin can turn on <i>Kids Ministry</i> for your account (Admin → People &amp; Access → Roles).</div>
+    </section>
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-functions-compat.js"></script>
+<script src="rcc-common.js"></script>
+<script>
+(function () {
+  var fbApp; try { fbApp = firebase.app(); } catch (e) { fbApp = firebase.initializeApp(RCC.firebaseConfig); }
+  var auth = firebase.auth();
+  var db = firebase.firestore();
+  // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
+  RCC.tuneFirestore(db);
+  var IDLE_MS = 90 * 1000;        // an unattended screen goes back to the start (and forgets what was typed)
+  var DONE_MS = 6 * 1000;         // the thank-you screen moves on by itself
+  var SEARCH_DELAY_MS = 300;
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function digits(s) { var d = String(s || '').replace(/\D/g, ''); return d.length === 11 && d[0] === '1' ? d.slice(1) : d; }
+  function pretty(d) { return '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6); }
+  function gradeText(g) { return g == null ? '' : g === -1 ? 'Pre-K' : g === 0 ? 'Kindergarten' : 'Grade ' + g; }
+
+  var staff = null, kid = null, from = 'sFind', idleTimer = null, doneTimer = null, searchTimer = null, searchSeq = 0;
+
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(function (s) { s.classList.toggle('on', s.id === id); });
+    var first = $(id).querySelector('input'); if (first) setTimeout(function () { first.focus(); }, 50);
+    window.scrollTo({ top: 0 });
+  }
+  function reset() {
+    clearTimeout(doneTimer); kid = null;
+    ['q', 'kFirst', 'kLast', 'pFirst', 'pLast', 'pPhone'].forEach(function (id) { $(id).value = ''; $(id).classList.remove('err'); });
+    ['newHint', 'parentHint', 'checkHint'].forEach(function (id) { $(id).textContent = ''; });
+    $('results').replaceChildren();
+    show('sFind');
+  }
+  function poke() { clearTimeout(idleTimer); idleTimer = setTimeout(function () { if (!$('sFind').classList.contains('on')) reset(); }, IDLE_MS); }
+  ['click', 'keydown', 'input', 'touchstart'].forEach(function (ev) { document.addEventListener(ev, poke, { passive: true }); });
+
+  /* ---------- sign-in: the device is set up by kids staff ---------- */
+  $('googleSignInBtn').addEventListener('click', function () { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function (e) { alert('Sign-in failed: ' + e.message); }); });
+  $('signOut').addEventListener('click', function () { auth.signOut(); });
+  auth.onAuthStateChanged(function (user) {
+    $('rccBoot').hidden = true;
+    if (!user) { staff = null; $('loginScreen').style.display = 'flex'; $('app').style.display = 'none'; return; }
+    $('loginScreen').style.display = 'none'; $('app').style.display = 'block';
+    $('staffName').textContent = user.displayName || user.email || '';
+    db.collection('users').doc(user.uid).get().then(function (doc) {
+      var d = doc.exists ? doc.data() : {};
+      staff = (d.isAdmin === true || (d.roles && d.roles.kids === true)) ? user : null;
+      if (staff) reset(); else show('sBlocked');
+    }, function () { show('sBlocked'); });
+  });
+
+  /* ---------- step 1: find yourself (Planning Center, through the server) ---------- */
+  function renderResults(kids, q) {
+    var box = $('results');
+    if (!kids.length) { box.replaceChildren(el('div', 'muted', q.length < 2 ? '' : 'No one by that name yet. Check the spelling, or tap "I can\'t find my name".')); return; }
+    box.replaceChildren.apply(box, kids.map(function (k) {
+      var b = el('button', 'kidrow'); b.type = 'button';
+      b.appendChild(el('span', 'av', (k.first || '?').charAt(0).toUpperCase()));
+      var t = el('span'); t.appendChild(el('div', 'nm', k.first + ' ' + k.last)); if (k.grade != null) t.appendChild(el('div', 'gr', gradeText(k.grade)));
+      b.appendChild(t); b.appendChild(el('span', 'go', '›'));
+      b.addEventListener('click', function () { kid = { first: k.first, last: k.last, pcoId: k.id }; from = 'sFind'; toParent(); });
+      return b;
+    }));
+  }
+  $('q').addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    var q = $('q').value.trim(), seq = ++searchSeq;
+    if (q.length < 2) { renderResults([], q); return; }
+    searchTimer = setTimeout(function () {
+      $('results').replaceChildren(el('div', 'muted', 'Looking…'));
+      firebase.functions().httpsCallable('searchKids')({ q: q }).then(function (r) {
+        if (seq === searchSeq) renderResults((r.data && r.data.kids) || [], q);
+      }, function (e) {
+        if (seq === searchSeq) $('results').replaceChildren(el('div', 'muted', 'Search isn\'t working right now (' + e.message + '). Tap "I can\'t find my name" instead.'));
+      });
+    }, SEARCH_DELAY_MS);
+  });
+  $('newKidBtn').addEventListener('click', function () { show('sNew'); });
+  $('newNext').addEventListener('click', function () {
+    var f = $('kFirst').value.trim(), l = $('kLast').value.trim();
+    $('kFirst').classList.toggle('err', !f); $('kLast').classList.toggle('err', !l);
+    if (!f || !l) { $('newHint').textContent = 'Please type your first and last name.'; return; }
+    kid = { first: f, last: l, pcoId: null }; from = 'sNew'; toParent();
+  });
+
+  /* ---------- step 2: your grown-up ---------- */
+  function toParent() { if (!$('pLast').value) $('pLast').value = kid.last; show('sParent'); }
+  $('parentBack').addEventListener('click', function () { show(from); });
+  $('parentNext').addEventListener('click', function () {
+    var f = $('pFirst').value.trim(), l = $('pLast').value.trim(), d = digits($('pPhone').value);
+    $('pFirst').classList.toggle('err', !f); $('pLast').classList.toggle('err', !l); $('pPhone').classList.toggle('err', d.length !== 10);
+    if (!f || !l) { $('parentHint').textContent = 'Please type your grown-up\'s first and last name.'; return; }
+    if (d.length !== 10) { $('parentHint').textContent = 'The phone number needs 10 numbers, like 585 555 0123.'; return; }
+    $('parentHint').textContent = '';
+    $('cKid').textContent = kid.first + ' ' + kid.last;
+    $('cParent').textContent = f + ' ' + l;
+    $('cPhone').textContent = pretty(d);
+    show('sCheck');
+  });
+  document.querySelectorAll('[data-back]').forEach(function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-back')); }); });
+
+  /* ---------- step 3: the kid confirms; saved for a leader to verify ---------- */
+  $('confirmBtn').addEventListener('click', function () {
+    if (!staff || !kid) return;
+    var btn = $('confirmBtn'); btn.disabled = true; btn.textContent = 'Saving…';
+    var child = { first: kid.first, last: kid.last }; if (kid.pcoId) child.pcoId = kid.pcoId;
+    db.collection('kidsSignups').add({
+      parentFirst: $('pFirst').value.trim(),
+      parentLast: $('pLast').value.trim(),
+      parentPhone: $('pPhone').value.trim(),
+      children: [child],
+      source: 'station',
+      createdBy: staff.uid,
+      kidConfirmed: true,
+      submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }).then(function () {
+      $('doneTitle').textContent = 'Thanks, ' + kid.first + '!';
+      show('sDone');
+      doneTimer = setTimeout(reset, DONE_MS);
+    }, function (e) {
+      $('checkHint').textContent = 'That didn\'t save. Please ask a leader. (' + e.message + ')';
+    }).then(function () { btn.disabled = false; btn.textContent = 'Yes, that\'s right!'; });
+  });
+  $('nextKid').addEventListener('click', reset);
+})();
+</script>
+</body>
+</html>
