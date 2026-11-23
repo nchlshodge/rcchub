@@ -79,7 +79,7 @@
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function digits(s) { var d = String(s || '').replace(/\D/g, ''); return d.length === 11 && d[0] === '1' ? d.slice(1) : d; }
   function prettyPhone(s) { var d = digits(s); return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : String(s || ''); }
-  var PCO_PERSON = 'https://people.planningcenteronline.com/people/';
+  var PCO_PERSON = 'https://people.planningcenteronline.com/people/AC';   // Planning Center's own profile links put AC before the id
   var STATUS = { added: ['green', 'In Planning Center'], sending: ['blue', 'Adding to Planning Center…'], error: ['red', 'Not fully added'], skipped: ['gold', 'Not sent'] };
 
   var formUrl = new URL('kids/', location.href).href;
