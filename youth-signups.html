@@ -7,7 +7,7 @@
   <link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/playfair-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="rcc-base.css">
-<title>RCC — Kids Roster</title>
+<title>RCC — Youth Roster</title>
 <meta name="theme-color" content="#2557b8">
 <link rel="stylesheet" href="rcc-ui.css">
 <style>
@@ -31,9 +31,9 @@
   .rhead, .row { display: grid; grid-template-columns: 2.1fr 1.6fr 1.3fr 1fr; gap: 14px; align-items: center; padding: 12px 18px; }
   .rhead { background: var(--bg-soft); font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
   .row { border-top: 1px solid var(--line); }
-  .kid .nm { font-family: 'Playfair Display', serif; font-size: 19px; color: var(--ink); line-height: 1.25; }
-  .kid .av { display: inline-flex; width: 34px; height: 34px; border-radius: 50%; background: var(--blue-soft); color: var(--blue-ink); font-weight: 700; align-items: center; justify-content: center; margin-right: 10px; vertical-align: middle; font-family: 'Inter', sans-serif; font-size: 15px; }
-  .kid .tags { margin: 4px 0 0 44px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .who .nm { font-family: 'Playfair Display', serif; font-size: 19px; color: var(--ink); line-height: 1.25; }
+  .who .av { display: inline-flex; width: 34px; height: 34px; border-radius: 50%; background: var(--blue-soft); color: var(--blue-ink); font-weight: 700; align-items: center; justify-content: center; margin-right: 10px; vertical-align: middle; font-family: 'Inter', sans-serif; font-size: 15px; }
+  .who .tags { margin: 4px 0 0 44px; display: flex; gap: 6px; flex-wrap: wrap; }
   .par { font-size: 15px; color: var(--ink); }
   .par a { font-weight: 600; text-decoration: none; white-space: nowrap; }
   .par small, .when { display: block; font-size: 12.5px; color: var(--ink-3); }
@@ -61,8 +61,8 @@
 
 <div id="loginScreen" class="rcc-login" style="display:none;">
   <img src="assets/rcc-logo-plain-96.png" alt="">
-  <h1>Kids Roster</h1>
-  <p>Sign in to see the kids and their grown-ups.</p>
+  <h1>Youth Roster</h1>
+  <p>Sign in to see students and their parents.</p>
   <button id="googleSignInBtn" type="button">Sign in with Google</button>
 </div>
 
@@ -70,10 +70,10 @@
   <header id="rccNav"></header>
   <main class="wrap">
     <section class="hero">
-      <span class="eyebrow">Kids ministry</span>
-      <h1>Kids roster</h1>
-      <p>Kids give us their grown-up's name and phone at the check-in screen. A leader checks each one (call the number, or compare with Planning Center) and approves it; only then is it added to Planning Center.</p>
-      <div class="links" id="staffLinks" hidden><a class="btn primary" href="kids-station.html">Open the kids check-in screen</a></div>
+      <span class="eyebrow">Youth ministry</span>
+      <h1>Youth roster</h1>
+      <p>Students give us their parent or guardian's name and phone at the Youth check-in screen. A leader checks each one (call the number, or compare with Planning Center) and approves it; only then is it added to Planning Center.</p>
+      <div class="links" id="staffLinks" hidden><a class="btn primary" href="youth-station.html">Open the Youth check-in screen</a></div>
     </section>
 
     <div class="share">Parents can also use this link: <code id="formUrl"></code><button type="button" class="btn small soft" id="copyBtn">Copy link</button></div>
@@ -84,7 +84,7 @@
       <button type="button" class="tab" data-tab="rejected">Turned down<b id="nRejected">0</b></button>
     </div>
     <div class="tools" id="tools" hidden>
-      <input type="search" id="q" placeholder="Search a child, grown-up, or phone number" aria-label="Search the roster">
+      <input type="search" id="q" placeholder="Search a student, parent, or phone number" aria-label="Search the roster">
       <span class="count" id="count"></span>
     </div>
     <div id="list"><div class="empty">Loading…</div></div>
@@ -113,13 +113,13 @@
   var PCO_PERSON = 'https://people.planningcenteronline.com/people/AC';   // Planning Center's own profile links put AC before the id
   var STATUS = { sending: ['blue', 'Adding to Planning Center…'], added: ['green', 'In Planning Center'], error: ['red', 'Not fully added'], skipped: ['gold', 'Not sent'] };
 
-  var formUrl = new URL('kids/', location.href).href;
+  var formUrl = new URL('youth/', location.href).href;
   $('formUrl').textContent = formUrl;
   $('copyBtn').addEventListener('click', function () {
     navigator.clipboard.writeText(formUrl).then(function () { $('copyBtn').textContent = 'Copied ✓'; setTimeout(function () { $('copyBtn').textContent = 'Copy link'; }, 1600); });
   });
 
-  var me = null, rows = [], isAdmin = false, isKidsStaff = false, tab = 'pending', unsub = null;
+  var me = null, rows = [], isAdmin = false, isYouthStaff = false, tab = 'pending', unsub = null;
   var open = {};   // row id -> 'compare' | 'edit' (which helper panel is showing)
   var compareCache = {};
 
@@ -136,20 +136,20 @@
     db.collection('users').doc(user.uid).get().then(function (doc) {
       var data = doc.exists ? doc.data() : {};
       isAdmin = data.isAdmin === true;
-      isKidsStaff = isAdmin || !!(data.roles && data.roles.kids === true);
-      $('staffLinks').hidden = !isKidsStaff;
-      RccShell.render($('rccNav'), { active: 'kids', user: user, onSignOut: function () { auth.signOut(); }, roles: Object.assign({}, data.roles || {}, { isAdmin: isAdmin }) });
+      isYouthStaff = isAdmin || !!(data.roles && data.roles.youth === true);
+      $('staffLinks').hidden = !isYouthStaff;
+      RccShell.render($('rccNav'), { active: 'youth', user: user, onSignOut: function () { auth.signOut(); }, roles: Object.assign({}, data.roles || {}, { isAdmin: isAdmin }) });
       render();
-    }, function () { RccShell.render($('rccNav'), { active: 'kids', user: user, onSignOut: function () { auth.signOut(); }, roles: {} }); });
+    }, function () { RccShell.render($('rccNav'), { active: 'youth', user: user, onSignOut: function () { auth.signOut(); }, roles: {} }); });
     // The rules decide who may read these (approved members); a refusal means this person isn't approved yet.
-    unsub = db.collection('kidsSignups').orderBy('submittedAt', 'desc').onSnapshot(function (snap) {
+    unsub = db.collection('youthSignups').orderBy('submittedAt', 'desc').onSnapshot(function (snap) {
       rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
       $('tools').hidden = false; $('tabs').hidden = false;
       render();
     }, function (err) {
       $('tools').hidden = true; $('tabs').hidden = true;
       var box = el('div', 'empty'); box.appendChild(el('b', '', 'Access restricted'));
-      box.appendChild(document.createTextNode(err.code === 'permission-denied' ? 'The kids roster is for approved hub members. Your account may still be waiting for approval.' : 'Could not load the roster: ' + err.message));
+      box.appendChild(document.createTextNode(err.code === 'permission-denied' ? 'The youth roster is for approved hub members. Your account may still be waiting for approval.' : 'Could not load the roster: ' + err.message));
       $('list').replaceChildren(box);
     });
   });
@@ -161,19 +161,19 @@
 
   // (sign-ups from before staff review existed went straight to Planning Center: they have a pcoStatus but no status)
   function stateOf(r) { return r.status === 'approved' || r.pcoStatus ? 'added' : r.status === 'rejected' ? 'rejected' : 'pending'; }
-  function kidName(r, c) { return [c.first, c.last || r.parentLast].filter(Boolean).join(' '); }
-  function haystack(r) { return ((r.children || []).map(function (c) { return kidName(r, c); }).join(' ') + ' ' + r.parentFirst + ' ' + r.parentLast + ' ' + digits(r.parentPhone)).toLowerCase(); }
+  function studentName(r, c) { return [c.first, c.last || r.parentLast].filter(Boolean).join(' '); }
+  function haystack(r) { return ((r.children || []).map(function (c) { return studentName(r, c); }).join(' ') + ' ' + r.parentFirst + ' ' + r.parentLast + ' ' + digits(r.parentPhone)).toLowerCase(); }
   function whenText(r) { var d = r.submittedAt && r.submittedAt.toDate ? r.submittedAt.toDate() : null; return d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''; }
 
   /* ---------- staff actions ---------- */
   function review(r, status, extra) {
     var change = Object.assign({ status: status, reviewedBy: me.uid, reviewedByName: me.displayName || me.email || '', reviewedAt: firebase.firestore.FieldValue.serverTimestamp() }, extra || {});
-    return db.collection('kidsSignups').doc(r.id).update(change).then(function () {
-      if (window.RccAudit) RccAudit.log('kids.signup.' + status, 'kidsSignup', r.id, (status === 'approved' ? 'Verified and approved' : 'Turned down') + ' the sign-up for ' + (r.children || []).map(function (c) { return kidName(r, c); }).join(', '));
+    return db.collection('youthSignups').doc(r.id).update(change).then(function () {
+      if (window.RccAudit) RccAudit.log('youth.signup.' + status, 'youthSignup', r.id, (status === 'approved' ? 'Verified and approved' : 'Turned down') + ' the sign-up for ' + (r.children || []).map(function (c) { return studentName(r, c); }).join(', '));
     }, function (e) { alert('Could not save: ' + e.message); });
   }
   function approve(r) {
-    if (!confirm('Approve and add to Planning Center?\n\n' + (r.children || []).map(function (c) { return kidName(r, c); }).join(', ') + '\nGrown-up: ' + r.parentFirst + ' ' + r.parentLast + ', ' + prettyPhone(r.parentPhone) + '\n\nOnly approve once you\'ve checked the grown-up\'s details.')) return;
+    if (!confirm('Approve and add to Planning Center?\n\n' + (r.children || []).map(function (c) { return studentName(r, c); }).join(', ') + '\nParent / guardian: ' + r.parentFirst + ' ' + r.parentLast + ', ' + prettyPhone(r.parentPhone) + '\n\nOnly approve once you\'ve checked the parent\'s details.')) return;
     review(r, 'approved');
   }
   function reject(r) {
@@ -181,20 +181,20 @@
     if (why === null) return;
     review(r, 'rejected', { reviewNote: why.trim().slice(0, 300) });
   }
-  function reopen(r) { db.collection('kidsSignups').doc(r.id).update({ status: 'pending', reviewedBy: me.uid, reviewNote: '' }).catch(function (e) { alert('Could not save: ' + e.message); }); }
+  function reopen(r) { db.collection('youthSignups').doc(r.id).update({ status: 'pending', reviewedBy: me.uid, reviewNote: '' }).catch(function (e) { alert('Could not save: ' + e.message); }); }
   function saveEdit(r, panel) {
     var v = function (k) { return panel.querySelector('[name=' + k + ']').value.trim(); };
     if (!v('pf') || !v('pl') || digits(v('ph')).length !== 10) { alert('Fill in the first name, last name and a 10-digit phone number.'); return; }
-    db.collection('kidsSignups').doc(r.id).update({ parentFirst: v('pf'), parentLast: v('pl'), parentPhone: v('ph') }).then(function () {
+    db.collection('youthSignups').doc(r.id).update({ parentFirst: v('pf'), parentLast: v('pl'), parentPhone: v('ph') }).then(function () {
       delete open[r.id];
-      if (window.RccAudit) RccAudit.log('kids.signup.edit', 'kidsSignup', r.id, 'Corrected the grown-up\'s details on a kids sign-up');
+      if (window.RccAudit) RccAudit.log('youth.signup.edit', 'youthSignup', r.id, 'Corrected the parent\'s details on a youth sign-up');
     }, function (e) { alert('Could not save: ' + e.message); });
   }
   function toggle(r, what) { open[r.id] = open[r.id] === what ? null : what; if (what === 'compare' && open[r.id] && !compareCache[r.id]) loadCompare(r); render(); }
   function loadCompare(r) {
     var c = (r.children || []).filter(function (x) { return x.pcoId; })[0];
     compareCache[r.id] = { loading: true };
-    firebase.functions().httpsCallable('kidHouseholdInfo')({ pcoId: c.pcoId }).then(function (res) {
+    firebase.functions().httpsCallable('youthHouseholdInfo')({ pcoId: c.pcoId }).then(function (res) {
       compareCache[r.id] = { households: (res.data && res.data.households) || [] }; render();
     }, function (e) { compareCache[r.id] = { error: e.message }; render(); });
   }
@@ -202,7 +202,7 @@
   /* ---------- the roster ---------- */
   function comparePanel(r) {
     var p = el('div', 'detail'), c = compareCache[r.id] || {};
-    p.appendChild(el('h4', '', 'Already in Planning Center for this kid'));
+    p.appendChild(el('h4', '', 'Already in Planning Center for this student'));
     if (c.loading) { p.appendChild(el('div', '', 'Looking it up…')); return p; }
     if (c.error) { p.appendChild(el('div', '', 'Could not look it up: ' + c.error)); return p; }
     var typed = digits(r.parentPhone), any = false;
@@ -216,12 +216,12 @@
       });
       p.appendChild(el('div', '', h.name)); p.appendChild(ul);
     });
-    if (!any) p.appendChild(el('div', 'warn', 'No grown-ups on file for this kid yet: call the number to check it.'));
+    if (!any) p.appendChild(el('div', 'warn', 'No parents on file for this student yet: call the number to check it.'));
     return p;
   }
   function editPanel(r) {
     var p = el('div', 'detail edit');
-    [['pf', 'Grown-up first name', r.parentFirst], ['pl', 'Last name', r.parentLast], ['ph', 'Phone', r.parentPhone]].forEach(function (f) {
+    [['pf', 'Parent first name', r.parentFirst], ['pl', 'Last name', r.parentLast], ['ph', 'Phone', r.parentPhone]].forEach(function (f) {
       var l = el('label', '', f[1]), i = el('input'); i.name = f[0]; i.value = f[2] || ''; i.maxLength = f[0] === 'ph' ? 20 : 60; l.appendChild(i); p.appendChild(l);
     });
     p.appendChild(btn('primary', 'Save', function () { saveEdit(r, p); }));
@@ -229,16 +229,16 @@
   }
   function row(r) {
     var x = el('div', 'row'), st = stateOf(r);
-    var k = el('div', 'kid');
+    var k = el('div', 'who');
     (r.children || []).forEach(function (c, i) {
-      var line = el('div', 'nm'); line.appendChild(el('span', 'av', (c.first || '?').charAt(0).toUpperCase())); line.appendChild(document.createTextNode(kidName(r, c)));
+      var line = el('div', 'nm'); line.appendChild(el('span', 'av', (c.first || '?').charAt(0).toUpperCase())); line.appendChild(document.createTextNode(studentName(r, c)));
       if (i) line.style.marginTop = '6px';
       k.appendChild(line);
     });
     var tags = el('div', 'tags');
     var picked = (r.children || []).some(function (c) { return c.pcoId; });
-    tags.appendChild(el('span', 'pill ' + (picked ? 'blue' : 'gray'), picked ? 'Found in Planning Center' : 'New kid'));
-    tags.appendChild(el('span', 'pill gray', r.source === 'station' ? 'Kid confirmed at check-in' : 'Parent form'));
+    tags.appendChild(el('span', 'pill ' + (picked ? 'blue' : 'gray'), picked ? 'Found in Planning Center' : 'New student'));
+    tags.appendChild(el('span', 'pill gray', r.source === 'station' ? 'Student confirmed at check-in' : 'Parent form'));
     if (st === 'added' || r.pcoStatus) { var s = STATUS[r.pcoStatus] || ['blue', 'Waiting to be added']; tags.appendChild(el('span', 'pill ' + s[0], s[1])); }
     k.appendChild(tags);
     x.appendChild(k);
@@ -254,17 +254,17 @@
     x.appendChild(w);
 
     var a = el('div', 'acts');
-    if (isKidsStaff && st === 'pending') {
+    if (isYouthStaff && st === 'pending') {
       if (picked) a.appendChild(btn('soft', open[r.id] === 'compare' ? 'Hide' : 'Compare', function () { toggle(r, 'compare'); }));
       a.appendChild(btn('', open[r.id] === 'edit' ? 'Cancel' : 'Edit', function () { toggle(r, 'edit'); }));
       a.appendChild(btn('', 'Turn down', function () { reject(r); }));
       a.appendChild(btn('primary', 'Verify & add', function () { approve(r); }));
     }
-    if (isKidsStaff && st === 'rejected') a.appendChild(btn('', 'Back to verify', function () { reopen(r); }));
+    if (isYouthStaff && st === 'rejected') a.appendChild(btn('', 'Back to verify', function () { reopen(r); }));
     if (r.pcoParentId) { var lnk = el('a', 'btn soft', 'Planning Center ↗'); lnk.href = PCO_PERSON + encodeURIComponent(r.pcoParentId); lnk.target = '_blank'; lnk.rel = 'noopener'; a.appendChild(lnk); }
     if (isAdmin) a.appendChild(btn('', 'Delete', function () {
       if (!confirm('Delete this sign-up from the hub? (Planning Center is not changed.)')) return;
-      db.collection('kidsSignups').doc(r.id).delete().then(function () { if (window.RccAudit) RccAudit.log('kids.signupDeleted', 'kidsSignup', r.id, 'Deleted a kids sign-up'); }, function (e) { alert('Could not delete: ' + e.message); });
+      db.collection('youthSignups').doc(r.id).delete().then(function () { if (window.RccAudit) RccAudit.log('youth.signupDeleted', 'youthSignup', r.id, 'Deleted a youth sign-up'); }, function (e) { alert('Could not delete: ' + e.message); });
     }));
     x.appendChild(a);
 
@@ -285,8 +285,8 @@
       if (stateOf(r) !== tab) return false;
       var h = haystack(r); return !q || h.indexOf(q) >= 0 || (qd.length >= 3 && h.indexOf(qd) >= 0);
     });
-    var kids = shown.reduce(function (n, r) { return n + (r.children || []).length; }, 0);
-    $('count').textContent = kids + ' kid' + (kids === 1 ? '' : 's');
+    var students = shown.reduce(function (n, r) { return n + (r.children || []).length; }, 0);
+    $('count').textContent = students + ' student' + (students === 1 ? '' : 's');
     if (!shown.length) {
       var box = el('div', 'empty');
       box.appendChild(el('b', '', q ? 'No matches' : tab === 'pending' ? 'Nothing to verify' : tab === 'added' ? 'No one added yet' : 'Nothing turned down'));
@@ -294,7 +294,7 @@
       $('list').replaceChildren(box); return;
     }
     var table = el('div', 'roster');
-    var head = el('div', 'rhead'); ['Kid', 'Grown-up', 'Signed up', ''].forEach(function (t) { head.appendChild(el('span', '', t)); });
+    var head = el('div', 'rhead'); ['Student', 'Parent / guardian', 'Signed up', ''].forEach(function (t) { head.appendChild(el('span', '', t)); });
     table.appendChild(head);
     shown.forEach(function (r) { table.appendChild(row(r)); });
     $('list').replaceChildren(table);

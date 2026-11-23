@@ -988,7 +988,7 @@
 
   // ── App Access ──
   const MODULE_LABELS = { bedside: 'Bedside', incidentReport: 'Incident Report', vanRental: 'Van Usage', eventRequest: 'Event Request', timeOff: 'Time Off Request' };
-  const ROLE_LABELS = { overview: 'Overview', vanAdmin: 'Van Usage Admin (Department Head)', bedsideAdmin: 'Bedside Admin (Department Head)', graphics: 'Graphics Team (Department Head)', marketing: 'Marketing Team (Department Head)', clearances: 'Volunteer Clearances (view only)', facilities: 'Facilities Team (work orders)', kids: 'Kids Ministry (check-in screen, verify sign-ups)' };
+  const ROLE_LABELS = { overview: 'Overview', vanAdmin: 'Van Usage Admin (Department Head)', bedsideAdmin: 'Bedside Admin (Department Head)', graphics: 'Graphics Team (Department Head)', marketing: 'Marketing Team (Department Head)', clearances: 'Volunteer Clearances (view only)', facilities: 'Facilities Team (work orders)', youth: 'Youth Ministry (check-in screen, verify sign-ups)' };
   function loadModuleManagement() {
     db.collection('users').onSnapshot(snap => {
       const users = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));

@@ -7,7 +7,7 @@
   <link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/playfair-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="rcc-base.css">
-<title>RCC — Kids Check-In</title>
+<title>RCC — Youth Check-In</title>
 <meta name="theme-color" content="#2557b8">
 <link rel="stylesheet" href="rcc-ui.css">
 <style>
@@ -35,14 +35,14 @@
   .hint { color: var(--red-ink); font-size: 15px; margin-top: 10px; min-height: 1.2em; }
 
   .roster { display: grid; gap: 10px; margin-top: 18px; }
-  .kidrow { display: flex; align-items: center; gap: 16px; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 18px; box-shadow: var(--shadow-1); cursor: pointer; font: inherit; color: var(--ink); transition: transform .12s var(--ease), border-color .15s; }
-  .kidrow:hover, .kidrow:focus-visible { border-color: var(--blue); transform: translateY(-1px); outline: none; }
-  .kidrow .av { width: 52px; height: 52px; border-radius: 50%; background: var(--blue-soft); color: var(--blue-ink); font-weight: 700; font-size: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .kidrow .nm { font-family: 'Playfair Display', serif; font-size: 24px; line-height: 1.15; }
-  .kidrow .gr { font-size: 14px; color: var(--ink-3); }
-  .kidrow .go { margin-left: auto; font-size: 26px; color: var(--blue); }
+  .namerow { display: flex; align-items: center; gap: 16px; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 18px; box-shadow: var(--shadow-1); cursor: pointer; font: inherit; color: var(--ink); transition: transform .12s var(--ease), border-color .15s; }
+  .namerow:hover, .namerow:focus-visible { border-color: var(--blue); transform: translateY(-1px); outline: none; }
+  .namerow .av { width: 52px; height: 52px; border-radius: 50%; background: var(--blue-soft); color: var(--blue-ink); font-weight: 700; font-size: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .namerow .nm { font-family: 'Playfair Display', serif; font-size: 24px; line-height: 1.15; }
+  .namerow .gr { font-size: 14px; color: var(--ink-3); }
+  .namerow .go { margin-left: auto; font-size: 26px; color: var(--blue); }
   .muted { color: var(--ink-3); font-size: 15px; text-align: center; padding: 18px 0; }
-  .newkid { display: block; margin: 22px auto 0; }
+  .newstudent { display: block; margin: 22px auto 0; }
 
   .actions { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
   .go-btn { flex: 1 1 220px; background: var(--blue); color: #fff; border: none; border-radius: 999px; padding: 18px 30px; font-size: 19px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 20px rgba(37,87,184,.3); }
@@ -68,23 +68,23 @@
 
 <div id="loginScreen" class="rcc-login" style="display:none;">
   <img src="assets/rcc-logo-plain-96.png" alt="">
-  <h1>Kids Check-In</h1>
-  <p>A kids team leader signs in to set up this screen.</p>
+  <h1>Youth Check-In</h1>
+  <p>A youth leader signs in to set up this screen.</p>
   <button id="googleSignInBtn" type="button">Sign in with Google</button>
 </div>
 
 <div id="app" style="display:none;">
-  <header class="bar"><img src="assets/rcc-logo-plain-96.png" alt=""><b>Kids Check-In</b>
-    <div class="who">Set up by <span id="staffName"></span><br><button type="button" id="signOut">Sign out</button> · <a href="kids-signups.html">Roster</a></div>
+  <header class="bar"><img src="assets/rcc-logo-plain-96.png" alt=""><b>Youth Check-In</b>
+    <div class="who">Set up by <span id="staffName"></span><br><button type="button" id="signOut">Sign out</button> · <a href="youth-signups.html">Roster</a></div>
   </header>
   <main class="stage">
     <section class="screen" id="sFind">
       <div class="step-dots"><i class="on"></i><i></i><i></i></div>
-      <h1>Hi! What's your name?</h1>
+      <h1>Hey! Find your name</h1>
       <p class="sub">Type the start of your first or last name, then tap yourself.</p>
       <input class="big" id="q" type="search" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Your name" aria-label="Your name">
       <div class="roster" id="results" aria-live="polite"></div>
-      <button type="button" class="btn soft newkid" id="newKidBtn">I can't find my name</button>
+      <button type="button" class="btn soft newstudent" id="newStudentBtn">I can't find my name</button>
     </section>
 
     <section class="screen" id="sNew">
@@ -92,8 +92,8 @@
       <h1>Welcome! What's your name?</h1>
       <p class="sub">We'll add you so your leaders can reach your family.</p>
       <div class="pair">
-        <div><label class="lbl" for="kFirst">First name</label><input class="big" id="kFirst" autocomplete="off" autocapitalize="words" maxlength="60"></div>
-        <div><label class="lbl" for="kLast">Last name</label><input class="big" id="kLast" autocomplete="off" autocapitalize="words" maxlength="60"></div>
+        <div><label class="lbl" for="sFirst">First name</label><input class="big" id="sFirst" autocomplete="off" autocapitalize="words" maxlength="60"></div>
+        <div><label class="lbl" for="sLast">Last name</label><input class="big" id="sLast" autocomplete="off" autocapitalize="words" maxlength="60"></div>
       </div>
       <p class="hint" id="newHint"></p>
       <div class="actions"><button type="button" class="back-btn" data-back="sFind">Back</button><button type="button" class="go-btn" id="newNext">Next</button></div>
@@ -101,8 +101,8 @@
 
     <section class="screen" id="sParent">
       <div class="step-dots"><i class="on"></i><i class="on"></i><i></i></div>
-      <h1>Who's your grown-up?</h1>
-      <p class="sub">Your parent or guardian, and a phone number where we can reach them.</p>
+      <h1>Your parent or guardian</h1>
+      <p class="sub">Who should your leaders contact? Add their name and a phone number we can reach them on.</p>
       <div class="pair">
         <div><label class="lbl" for="pFirst">Their first name</label><input class="big" id="pFirst" autocomplete="off" autocapitalize="words" maxlength="60"></div>
         <div><label class="lbl" for="pLast">Their last name</label><input class="big" id="pLast" autocomplete="off" autocapitalize="words" maxlength="60"></div>
@@ -118,8 +118,8 @@
       <h1>Does this look right?</h1>
       <p class="sub">Check each one carefully. A leader will double-check it too.</p>
       <div class="card">
-        <div class="line"><span>You</span><b id="cKid"></b></div>
-        <div class="line"><span>Your grown-up</span><b id="cParent"></b></div>
+        <div class="line"><span>You</span><b id="cStudent"></b></div>
+        <div class="line"><span>Parent / guardian</span><b id="cParent"></b></div>
         <div class="line"><span>Their phone</span><b id="cPhone"></b></div>
       </div>
       <p class="hint" id="checkHint"></p>
@@ -130,12 +130,12 @@
       <div class="tick">✓</div>
       <h1 id="doneTitle">Thanks!</h1>
       <p class="sub">A leader will check it and then add it to our list.</p>
-      <small>Next kid in a moment…</small>
-      <div class="actions" style="justify-content:center"><button type="button" class="go-btn" style="flex:0 1 auto" id="nextKid">Next kid</button></div>
+      <small>Next student in a moment…</small>
+      <div class="actions" style="justify-content:center"><button type="button" class="go-btn" style="flex:0 1 auto" id="nextStudent">Next student</button></div>
     </section>
 
     <section class="screen blocked" id="sBlocked">
-      <div class="empty"><b>This screen is for the kids team</b>An admin can turn on <i>Kids Ministry</i> for your account (Admin → People &amp; Access → Roles).</div>
+      <div class="empty"><b>This screen is for the youth team</b>An admin can turn on <i>Youth Ministry</i> for your account (Admin → People &amp; Access → Roles).</div>
     </section>
   </main>
 </div>
@@ -161,7 +161,7 @@
   function pretty(d) { return '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6); }
   function gradeText(g) { return g == null ? '' : g === -1 ? 'Pre-K' : g === 0 ? 'Kindergarten' : 'Grade ' + g; }
 
-  var staff = null, kid = null, from = 'sFind', idleTimer = null, doneTimer = null, searchTimer = null, searchSeq = 0;
+  var staff = null, student = null, from = 'sFind', idleTimer = null, doneTimer = null, searchTimer = null, searchSeq = 0;
 
   function show(id) {
     document.querySelectorAll('.screen').forEach(function (s) { s.classList.toggle('on', s.id === id); });
@@ -169,8 +169,8 @@
     window.scrollTo({ top: 0 });
   }
   function reset() {
-    clearTimeout(doneTimer); kid = null;
-    ['q', 'kFirst', 'kLast', 'pFirst', 'pLast', 'pPhone'].forEach(function (id) { $(id).value = ''; $(id).classList.remove('err'); });
+    clearTimeout(doneTimer); student = null;
+    ['q', 'sFirst', 'sLast', 'pFirst', 'pLast', 'pPhone'].forEach(function (id) { $(id).value = ''; $(id).classList.remove('err'); });
     ['newHint', 'parentHint', 'checkHint'].forEach(function (id) { $(id).textContent = ''; });
     $('results').replaceChildren();
     show('sFind');
@@ -178,7 +178,7 @@
   function poke() { clearTimeout(idleTimer); idleTimer = setTimeout(function () { if (!$('sFind').classList.contains('on')) reset(); }, IDLE_MS); }
   ['click', 'keydown', 'input', 'touchstart'].forEach(function (ev) { document.addEventListener(ev, poke, { passive: true }); });
 
-  /* ---------- sign-in: the device is set up by kids staff ---------- */
+  /* ---------- sign-in: the device is set up by youth staff ---------- */
   $('googleSignInBtn').addEventListener('click', function () { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function (e) { alert('Sign-in failed: ' + e.message); }); });
   $('signOut').addEventListener('click', function () { auth.signOut(); });
   auth.onAuthStateChanged(function (user) {
@@ -188,21 +188,21 @@
     $('staffName').textContent = user.displayName || user.email || '';
     db.collection('users').doc(user.uid).get().then(function (doc) {
       var d = doc.exists ? doc.data() : {};
-      staff = (d.isAdmin === true || (d.roles && d.roles.kids === true)) ? user : null;
+      staff = (d.isAdmin === true || (d.roles && d.roles.youth === true)) ? user : null;
       if (staff) reset(); else show('sBlocked');
     }, function () { show('sBlocked'); });
   });
 
-  /* ---------- step 1: find yourself (Planning Center, through the server) ---------- */
-  function renderResults(kids, q) {
+  /* ---------- step 1: find yourself (the KNGDM YTH check-in roster, through the server) ---------- */
+  function renderResults(list, q) {
     var box = $('results');
-    if (!kids.length) { box.replaceChildren(el('div', 'muted', q.length < 2 ? '' : 'No one by that name yet. Check the spelling, or tap "I can\'t find my name".')); return; }
-    box.replaceChildren.apply(box, kids.map(function (k) {
-      var b = el('button', 'kidrow'); b.type = 'button';
+    if (!list.length) { box.replaceChildren(el('div', 'muted', q.length < 2 ? '' : 'No one by that name yet. Check the spelling, or tap "I can\'t find my name".')); return; }
+    box.replaceChildren.apply(box, list.map(function (k) {
+      var b = el('button', 'namerow'); b.type = 'button';
       b.appendChild(el('span', 'av', (k.first || '?').charAt(0).toUpperCase()));
       var t = el('span'); t.appendChild(el('div', 'nm', k.first + ' ' + k.last)); if (k.grade != null) t.appendChild(el('div', 'gr', gradeText(k.grade)));
       b.appendChild(t); b.appendChild(el('span', 'go', '›'));
-      b.addEventListener('click', function () { kid = { first: k.first, last: k.last, pcoId: k.id }; from = 'sFind'; toParent(); });
+      b.addEventListener('click', function () { student = { first: k.first, last: k.last, pcoId: k.id }; from = 'sFind'; toParent(); });
       return b;
     }));
   }
@@ -212,60 +212,60 @@
     if (q.length < 2) { renderResults([], q); return; }
     searchTimer = setTimeout(function () {
       $('results').replaceChildren(el('div', 'muted', 'Looking…'));
-      firebase.functions().httpsCallable('searchKids')({ q: q }).then(function (r) {
-        if (seq === searchSeq) renderResults((r.data && r.data.kids) || [], q);
+      firebase.functions().httpsCallable('searchYouth')({ q: q }).then(function (r) {
+        if (seq === searchSeq) renderResults((r.data && r.data.youth) || [], q);
       }, function (e) {
         if (seq === searchSeq) $('results').replaceChildren(el('div', 'muted', 'Search isn\'t working right now (' + e.message + '). Tap "I can\'t find my name" instead.'));
       });
     }, SEARCH_DELAY_MS);
   });
-  $('newKidBtn').addEventListener('click', function () { show('sNew'); });
+  $('newStudentBtn').addEventListener('click', function () { show('sNew'); });
   $('newNext').addEventListener('click', function () {
-    var f = $('kFirst').value.trim(), l = $('kLast').value.trim();
-    $('kFirst').classList.toggle('err', !f); $('kLast').classList.toggle('err', !l);
+    var f = $('sFirst').value.trim(), l = $('sLast').value.trim();
+    $('sFirst').classList.toggle('err', !f); $('sLast').classList.toggle('err', !l);
     if (!f || !l) { $('newHint').textContent = 'Please type your first and last name.'; return; }
-    kid = { first: f, last: l, pcoId: null }; from = 'sNew'; toParent();
+    student = { first: f, last: l, pcoId: null }; from = 'sNew'; toParent();
   });
 
-  /* ---------- step 2: your grown-up ---------- */
-  function toParent() { if (!$('pLast').value) $('pLast').value = kid.last; show('sParent'); }
+  /* ---------- step 2: parent or guardian ---------- */
+  function toParent() { if (!$('pLast').value) $('pLast').value = student.last; show('sParent'); }
   $('parentBack').addEventListener('click', function () { show(from); });
   $('parentNext').addEventListener('click', function () {
     var f = $('pFirst').value.trim(), l = $('pLast').value.trim(), d = digits($('pPhone').value);
     $('pFirst').classList.toggle('err', !f); $('pLast').classList.toggle('err', !l); $('pPhone').classList.toggle('err', d.length !== 10);
-    if (!f || !l) { $('parentHint').textContent = 'Please type your grown-up\'s first and last name.'; return; }
+    if (!f || !l) { $('parentHint').textContent = 'Please type your parent or guardian\'s first and last name.'; return; }
     if (d.length !== 10) { $('parentHint').textContent = 'The phone number needs 10 numbers, like 585 555 0123.'; return; }
     $('parentHint').textContent = '';
-    $('cKid').textContent = kid.first + ' ' + kid.last;
+    $('cStudent').textContent = student.first + ' ' + student.last;
     $('cParent').textContent = f + ' ' + l;
     $('cPhone').textContent = pretty(d);
     show('sCheck');
   });
   document.querySelectorAll('[data-back]').forEach(function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-back')); }); });
 
-  /* ---------- step 3: the kid confirms; saved for a leader to verify ---------- */
+  /* ---------- step 3: the student confirms; saved for a leader to verify ---------- */
   $('confirmBtn').addEventListener('click', function () {
-    if (!staff || !kid) return;
+    if (!staff || !student) return;
     var btn = $('confirmBtn'); btn.disabled = true; btn.textContent = 'Saving…';
-    var child = { first: kid.first, last: kid.last }; if (kid.pcoId) child.pcoId = kid.pcoId;
-    db.collection('kidsSignups').add({
+    var child = { first: student.first, last: student.last }; if (student.pcoId) child.pcoId = student.pcoId;
+    db.collection('youthSignups').add({
       parentFirst: $('pFirst').value.trim(),
       parentLast: $('pLast').value.trim(),
       parentPhone: $('pPhone').value.trim(),
       children: [child],
       source: 'station',
       createdBy: staff.uid,
-      kidConfirmed: true,
+      studentConfirmed: true,
       submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
     }).then(function () {
-      $('doneTitle').textContent = 'Thanks, ' + kid.first + '!';
+      $('doneTitle').textContent = 'Thanks, ' + student.first + '!';
       show('sDone');
       doneTimer = setTimeout(reset, DONE_MS);
     }, function (e) {
       $('checkHint').textContent = 'That didn\'t save. Please ask a leader. (' + e.message + ')';
     }).then(function () { btn.disabled = false; btn.textContent = 'Yes, that\'s right!'; });
   });
-  $('nextKid').addEventListener('click', reset);
+  $('nextStudent').addEventListener('click', reset);
 })();
 </script>
 </body>

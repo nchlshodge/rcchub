@@ -7,7 +7,7 @@
   <link rel="preload" href="../assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="../assets/fonts/playfair-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="../rcc-base.css">
-<title>RCC — Kids Sign-Up</title>
+<title>RCC — Youth Sign-Up</title>
 <meta name="theme-color" content="#2557b8">
 <link rel="stylesheet" href="../rcc-ui.css">
 <style>
@@ -32,12 +32,12 @@
   .f.err .msg { display: block; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
-  .kid { padding: 14px 0 0; border-top: 1px dashed var(--line-2); }
-  .kid:first-child { border-top: none; padding-top: 0; }
-  .kid .row { grid-template-columns: 1fr 1fr auto; align-items: start; }
-  .kid .rm { margin-top: 26px; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line-2); background: #fff; color: var(--ink-3); font-size: 18px; cursor: pointer; }
-  .kid .rm:hover { color: var(--red); border-color: var(--red); }
-  .kid:only-child .rm { visibility: hidden; }
+  .student { padding: 14px 0 0; border-top: 1px dashed var(--line-2); }
+  .student:first-child { border-top: none; padding-top: 0; }
+  .student .row { grid-template-columns: 1fr 1fr auto; align-items: start; }
+  .student .rm { margin-top: 26px; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line-2); background: #fff; color: var(--ink-3); font-size: 18px; cursor: pointer; }
+  .student .rm:hover { color: var(--red); border-color: var(--red); }
+  .student:only-child .rm { visibility: hidden; }
   .trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 
   .formerr { display: none; background: var(--red-soft); color: var(--red-ink); border-radius: var(--radius-md); padding: 12px 16px; font-size: 14px; margin-bottom: 16px; }
@@ -56,9 +56,9 @@
 
   @media (max-width: 560px) {
     .row { grid-template-columns: 1fr; gap: 0; }
-    .kid .row { grid-template-columns: 1fr 1fr; gap: 0 12px; }
-    .kid .rm { grid-column: 1 / -1; justify-self: end; margin: -6px 0 10px; width: auto; height: auto; padding: 6px 14px; border-radius: 999px; font-size: 13px; }
-    .kid .rm::after { content: " Remove"; }
+    .student .row { grid-template-columns: 1fr 1fr; gap: 0 12px; }
+    .student .rm { grid-column: 1 / -1; justify-self: end; margin: -6px 0 10px; width: auto; height: auto; padding: 6px 14px; border-radius: 999px; font-size: 13px; }
+    .student .rm::after { content: " Remove"; }
     .step .hint { margin-left: 0; }
     .top a.brand span { display: none; }
   }
@@ -67,20 +67,20 @@
 <body>
 
 <nav class="top">
-  <a class="brand" href="https://rochesterchristian.church"><img src="../assets/rcc-logo-plain-96.png" alt="">RCC <span>· Kids</span></a>
+  <a class="brand" href="https://rochesterchristian.church"><img src="../assets/rcc-logo-plain-96.png" alt="">RCC <span>· Youth</span></a>
 </nav>
 
 <div class="wrap">
   <section class="hero" id="intro">
-    <span class="eyebrow">Kids ministry</span>
-    <h1>Kids sign-up</h1>
-    <p>Tell us who your kids are and how to reach you. It takes about a minute.</p>
+    <span class="eyebrow">Youth ministry</span>
+    <h1>Youth sign-up</h1>
+    <p>Tell us which students are yours and how to reach you. It takes about a minute.</p>
   </section>
 
   <form id="kForm" novalidate>
     <section class="step">
       <h2><i>1</i>Parent or guardian</h2>
-      <p class="hint">Who should we call about your kids?</p>
+      <p class="hint">Who should our youth leaders contact?</p>
       <div class="row">
         <div class="f"><label for="pFirst">First name <em>*</em></label><input type="text" id="pFirst" autocomplete="given-name" maxlength="60"><span class="msg">Add your first name.</span></div>
         <div class="f"><label for="pLast">Last name <em>*</em></label><input type="text" id="pLast" autocomplete="family-name" maxlength="60"><span class="msg">Add your last name.</span></div>
@@ -90,15 +90,15 @@
     </section>
 
     <section class="step">
-      <h2><i>2</i>Your kids</h2>
+      <h2><i>2</i>Your students</h2>
       <p class="hint">Leave a last name blank if it's the same as yours.</p>
-      <div id="kids"></div>
-      <button type="button" class="btn soft" id="addKid">＋ Add another child</button>
+      <div id="students"></div>
+      <button type="button" class="btn soft" id="addStudent">＋ Add another student</button>
     </section>
 
     <div class="formerr" id="formErr">A few things need a look — they're highlighted above.</div>
     <div class="submit-row">
-      <span class="note">Our kids team checks your details, then adds them to our church database so we can reach you.</span>
+      <span class="note">Our youth team checks your details, then adds them to our church database so we can reach you.</span>
       <button type="submit" class="btn-submit" id="submitBtn">Sign up</button>
     </div>
   </form>
@@ -106,17 +106,17 @@
   <section class="done" id="done">
     <div class="tick">✓</div>
     <h2>You're signed up</h2>
-    <p>Thank you! Our kids team will check your details and be in touch if they need anything.</p>
+    <p>Thank you! Our youth team will check your details and be in touch if they need anything.</p>
     <button class="btn" id="againBtn" type="button">Sign up another family</button>
   </section>
 </div>
 
-<template id="kidRow">
-  <div class="kid">
+<template id="studentRow">
+  <div class="student">
     <div class="row">
-      <div class="f"><label data-for="first">Child's first name <em>*</em></label><input type="text" data-k="first" maxlength="60" autocomplete="off"><span class="msg">Add a first name.</span></div>
+      <div class="f"><label data-for="first">Student's first name <em>*</em></label><input type="text" data-k="first" maxlength="60" autocomplete="off"><span class="msg">Add a first name.</span></div>
       <div class="f"><label data-for="last">Last name</label><input type="text" data-k="last" maxlength="60" autocomplete="off"></div>
-      <button type="button" class="rm" aria-label="Remove this child">✕</button>
+      <button type="button" class="rm" aria-label="Remove this student">✕</button>
     </div>
   </div>
 </template>
@@ -130,16 +130,16 @@
   var db = firebase.firestore();
   // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
   RCC.tuneFirestore(db);
-  var MAX_KIDS = 8;   // keep in step with the kidsSignups rule
+  var MAX_STUDENTS = 8;   // keep in step with the youthSignups rule
   function $(id) { return document.getElementById(id); }
   function digits(s) { var d = String(s || '').replace(/\D/g, ''); return d.length === 11 && d[0] === '1' ? d.slice(1) : d; }
 
-  /* ---------- child rows ---------- */
+  /* ---------- student rows ---------- */
   var n = 0;
-  function addKid() {
-    if ($('kids').children.length >= MAX_KIDS) return null;
+  function addStudent() {
+    if ($('students').children.length >= MAX_STUDENTS) return null;
     n++;
-    var el = $('kidRow').content.firstElementChild.cloneNode(true);
+    var el = $('studentRow').content.firstElementChild.cloneNode(true);
     ['first', 'last'].forEach(function (k) {
       var id = 'k' + k[0] + n;
       el.querySelector('[data-k=' + k + ']').id = id;
@@ -147,19 +147,19 @@
     });
     el.querySelector('.rm').addEventListener('click', function () { el.remove(); syncAdd(); });
     el.querySelector('[data-k=first]').addEventListener('input', function (e) { e.target.closest('.f').classList.remove('err'); });
-    $('kids').appendChild(el);
+    $('students').appendChild(el);
     syncAdd(); syncLastHints();
     return el;
   }
-  function syncAdd() { $('addKid').hidden = $('kids').children.length >= MAX_KIDS; }
+  function syncAdd() { $('addStudent').hidden = $('students').children.length >= MAX_STUDENTS; }
   // placeholder shows the parent's last name, so it's clear what a blank means
   function syncLastHints() {
     var last = $('pLast').value.trim();
     document.querySelectorAll('[data-k=last]').forEach(function (i) { i.placeholder = last || 'Same as yours'; });
   }
-  $('addKid').addEventListener('click', function () { var el = addKid(); if (el) el.querySelector('input').focus(); });
+  $('addStudent').addEventListener('click', function () { var el = addStudent(); if (el) el.querySelector('input').focus(); });
   $('pLast').addEventListener('input', syncLastHints);
-  addKid();
+  addStudent();
 
   ['pFirst', 'pLast', 'pPhone'].forEach(function (id) { $(id).addEventListener('input', function () { $(id).closest('.f').classList.remove('err'); }); });
 
@@ -169,12 +169,12 @@
     flag($('pFirst'), !$('pFirst').value.trim());
     flag($('pLast'), !$('pLast').value.trim());
     flag($('pPhone'), digits($('pPhone').value).length !== 10);
-    var rows = Array.prototype.slice.call(document.querySelectorAll('.kid'));
-    var anyKid = rows.some(function (r) { return r.querySelector('[data-k=first]').value.trim(); });
-    // at least one child; and a row with only a last name needs a first name too
+    var rows = Array.prototype.slice.call(document.querySelectorAll('.student'));
+    var anyStudent = rows.some(function (r) { return r.querySelector('[data-k=first]').value.trim(); });
+    // at least one student; and a row with only a last name needs a first name too
     rows.forEach(function (r, i) {
       var f = r.querySelector('[data-k=first]'), l = r.querySelector('[data-k=last]');
-      flag(f, !f.value.trim() && (anyKid ? !!l.value.trim() : i === 0));
+      flag(f, !f.value.trim() && (anyStudent ? !!l.value.trim() : i === 0));
     });
     return first;
   }
@@ -185,7 +185,7 @@
     $('formErr').classList.toggle('show', !!missing);
     if (missing) { missing.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     if ($('website').value) { showDone(); return; }   // filled in by a bot, not a person
-    var children = Array.prototype.slice.call(document.querySelectorAll('.kid')).map(function (r) {
+    var children = Array.prototype.slice.call(document.querySelectorAll('.student')).map(function (r) {
       return { first: r.querySelector('[data-k=first]').value.trim(), last: r.querySelector('[data-k=last]').value.trim() };
     }).filter(function (c) { return c.first; });
     var signup = {
@@ -197,8 +197,8 @@
       submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
     };
     var btn = $('submitBtn'); btn.disabled = true; btn.textContent = 'Sending…';
-    // A kids leader checks it on the Kids Roster; only then is it added to Planning Center (onKidsSignupApproved).
-    db.collection('kidsSignups').add(signup).then(showDone).catch(function (err) {
+    // A youth leader checks it on the Youth Roster; only then is it added to Planning Center (onYouthSignupApproved).
+    db.collection('youthSignups').add(signup).then(showDone).catch(function (err) {
       console.error('Failed to save sign-up:', err);
       alert('Something went wrong sending your sign-up. Please try again, or contact the church office if this keeps happening.');
     }).then(function () { btn.disabled = false; btn.textContent = 'Sign up'; });
@@ -210,7 +210,7 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   $('againBtn').addEventListener('click', function () {
-    $('kForm').reset(); $('kids').replaceChildren(); addKid();
+    $('kForm').reset(); $('students').replaceChildren(); addStudent();
     document.querySelectorAll('.err').forEach(function (el) { el.classList.remove('err'); });
     $('formErr').classList.remove('show');
     $('kForm').style.display = ''; $('intro').style.display = ''; $('done').classList.remove('show');
