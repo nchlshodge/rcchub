@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://www.gstatic.com">
+  <link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/playfair-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="rcc-base.css">
+<title>RCC — Kids Sign-Ups</title>
+<meta name="theme-color" content="#2557b8">
+<link rel="stylesheet" href="rcc-ui.css">
+<style>
+  .wrap { max-width: 900px; margin: 0 auto; padding: clamp(20px, 4vw, 44px) clamp(14px, 3vw, 24px) 90px; }
+  .share { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; margin-bottom: 18px; box-shadow: var(--shadow-1); font-size: 14px; color: var(--ink-2); }
+  .share code { background: var(--bg-soft); padding: 4px 10px; border-radius: 8px; font-size: 13px; word-break: break-all; }
+  .tools { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .tools input { flex: 1 1 240px; font-family: inherit; font-size: 16px; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 10px 18px; }
+  .tools input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 4px rgba(37,87,184,.12); }
+  .tools .count { color: var(--ink-3); font-size: 13px; }
+
+  .fam { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 12px; box-shadow: var(--shadow-1); display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; }
+  .fam .kids { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--ink); }
+  .fam .parent { color: var(--ink-2); font-size: 14.5px; }
+  .fam .parent a { font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .fam .side { grid-row: 1 / span 2; grid-column: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-size: 12.5px; color: var(--ink-3); text-align: right; }
+  .fam .side a { font-weight: 600; text-decoration: none; }
+  .fam .err { grid-column: 1 / -1; font-size: 12.5px; color: var(--red-ink); }
+  .fam .del { font-size: 12px; padding: 4px 12px; }
+  @media (max-width: 560px) { .fam { grid-template-columns: 1fr; } .fam .side { grid-row: auto; grid-column: 1; flex-direction: row; flex-wrap: wrap; align-items: center; text-align: left; } }
+</style>
+</head>
+<body>
+<div id="rccBoot" class="rcc-boot" role="status"><img src="assets/rcc-logo-plain-96.png" width="64" height="64" alt=""><b>RCC</b><span>Loading…</span></div>
+
+<div id="loginScreen" class="rcc-login" style="display:none;">
+  <img src="assets/rcc-logo-plain-96.png" alt="">
+  <h1>Kids Sign-Ups</h1>
+  <p>Sign in to see the families who signed up.</p>
+  <button id="googleSignInBtn" type="button">Sign in with Google</button>
+</div>
+
+<div id="appShell" style="display:none;">
+  <header id="rccNav"></header>
+  <main class="wrap">
+    <section class="hero">
+      <span class="eyebrow">Kids ministry</span>
+      <h1>Kids sign-ups</h1>
+      <p>Families who filled in the kids form. Each one is added to Planning Center automatically.</p>
+    </section>
+
+    <div class="share">Send families this link:
+      <code id="formUrl"></code>
+      <button type="button" class="btn small soft" id="copyBtn">Copy link</button>
+    </div>
+
+    <div class="tools" id="tools" hidden>
+      <input type="search" id="q" placeholder="Search a child, parent, or phone number" aria-label="Search sign-ups">
+      <span class="count" id="count"></span>
+    </div>
+    <div id="list"><div class="empty">Loading…</div></div>
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="rcc-shell.js"></script>
+<script src="rcc-common.js"></script>
+<script src="rcc-audit.js"></script>
+<script>
+(function () {
+  var fbApp; try { fbApp = firebase.app(); } catch (e) { fbApp = firebase.initializeApp(RCC.firebaseConfig); }
+  var auth = firebase.auth();
+  var db = firebase.firestore();
+  // If a network blocks Firestore's streaming connection, quietly fall back to one that works.
+  RCC.tuneFirestore(db);
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function digits(s) { var d = String(s || '').replace(/\D/g, ''); return d.length === 11 && d[0] === '1' ? d.slice(1) : d; }
+  function prettyPhone(s) { var d = digits(s); return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : String(s || ''); }
+  var PCO_PERSON = 'https://people.planningcenteronline.com/people/';
+  var STATUS = { added: ['green', 'In Planning Center'], sending: ['blue', 'Adding to Planning Center…'], error: ['red', 'Not fully added'], skipped: ['gold', 'Not sent'] };
+
+  var formUrl = new URL('kids/', location.href).href;
+  $('formUrl').textContent = formUrl;
+  $('copyBtn').addEventListener('click', function () {
+    navigator.clipboard.writeText(formUrl).then(function () { $('copyBtn').textContent = 'Copied ✓'; setTimeout(function () { $('copyBtn').textContent = 'Copy link'; }, 1600); });
+  });
+
+  var rows = [], isAdmin = false, unsub = null;
+
+  $('googleSignInBtn').addEventListener('click', function () {
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function (err) { alert('Sign-in failed: ' + err.message); });
+  });
+
+  auth.onAuthStateChanged(function (user) {
+    $('rccBoot').hidden = true;
+    if (unsub) { unsub(); unsub = null; }
+    if (!user) { $('loginScreen').style.display = 'flex'; $('appShell').style.display = 'none'; return; }
+    $('loginScreen').style.display = 'none'; $('appShell').style.display = 'block';
+    db.collection('users').doc(user.uid).get().then(function (doc) {
+      var data = doc.exists ? doc.data() : {};
+      isAdmin = data.isAdmin === true;
+      RccShell.render($('rccNav'), { active: 'kids', user: user, onSignOut: function () { auth.signOut(); }, roles: Object.assign({}, data.roles || {}, { isAdmin: isAdmin }) });
+      render();
+    }, function () { RccShell.render($('rccNav'), { active: 'kids', user: user, onSignOut: function () { auth.signOut(); }, roles: {} }); });
+    // The rules decide who may read these (approved members); a refusal means this person isn't approved yet.
+    unsub = db.collection('kidsSignups').orderBy('submittedAt', 'desc').onSnapshot(function (snap) {
+      rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      $('tools').hidden = false;
+      render();
+    }, function (err) {
+      $('tools').hidden = true;
+      var box = el('div', 'empty'); box.appendChild(el('b', '', 'Access restricted'));
+      box.appendChild(document.createTextNode(err.code === 'permission-denied' ? 'Kids sign-ups are for approved hub members. Your account may still be waiting for approval.' : 'Could not load sign-ups: ' + err.message));
+      $('list').replaceChildren(box);
+    });
+  });
+
+  function kidNames(r) { return (r.children || []).map(function (c) { return [c.first, c.last || r.parentLast].filter(Boolean).join(' '); }); }
+  function haystack(r) { return (kidNames(r).join(' ') + ' ' + r.parentFirst + ' ' + r.parentLast + ' ' + digits(r.parentPhone)).toLowerCase(); }
+
+  function card(r) {
+    var c = el('article', 'fam');
+    c.appendChild(el('div', 'kids', kidNames(r).join(', ') || '(no names)'));
+    var side = el('div', 'side');
+    var st = STATUS[r.pcoStatus] || ['gray', 'Waiting to be added'];
+    side.appendChild(el('span', 'pill ' + st[0], st[1]));
+    if (r.pcoParentId) { var a = el('a', '', 'Open in Planning Center ↗'); a.href = PCO_PERSON + encodeURIComponent(r.pcoParentId); a.target = '_blank'; a.rel = 'noopener'; side.appendChild(a); }
+    var when = r.submittedAt && r.submittedAt.toDate ? r.submittedAt.toDate() : null;
+    if (when) side.appendChild(el('span', '', when.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })));
+    if (isAdmin) {
+      var del = el('button', 'btn small del', 'Delete');
+      del.type = 'button';
+      del.addEventListener('click', function () {
+        if (!confirm('Delete this sign-up from the hub? (Planning Center is not changed.)')) return;
+        db.collection('kidsSignups').doc(r.id).delete().then(function () {
+          if (window.RccAudit) RccAudit.log('kids.signupDeleted', 'kidsSignup', r.id, 'Deleted a kids sign-up');
+        }, function (e) { alert('Could not delete: ' + e.message); });
+      });
+      side.appendChild(del);
+    }
+    c.appendChild(side);
+    var p = el('div', 'parent');
+    p.appendChild(document.createTextNode('Parent: ' + [r.parentFirst, r.parentLast].join(' ') + ' · '));
+    var tel = el('a', '', prettyPhone(r.parentPhone)); tel.href = 'tel:' + digits(r.parentPhone);
+    p.appendChild(tel);
+    c.appendChild(p);
+    if (r.pcoStatus === 'error' || r.pcoStatus === 'skipped') c.appendChild(el('div', 'err', (r.pcoError || '') + ' — please add or finish this family in Planning Center by hand.'));
+    return c;
+  }
+
+  function render() {
+    if ($('tools').hidden) return;
+    var q = $('q').value.trim().toLowerCase(), qd = digits(q);
+    var shown = rows.filter(function (r) { var h = haystack(r); return !q || h.indexOf(q) >= 0 || (qd.length >= 3 && h.indexOf(qd) >= 0); });
+    var kids = shown.reduce(function (n, r) { return n + (r.children || []).length; }, 0);
+    $('count').textContent = shown.length + ' famil' + (shown.length === 1 ? 'y' : 'ies') + ', ' + kids + ' kid' + (kids === 1 ? '' : 's');
+    if (!shown.length) {
+      var box = el('div', 'empty'); box.appendChild(el('b', '', rows.length ? 'No matches' : 'No sign-ups yet'));
+      box.appendChild(document.createTextNode(rows.length ? 'Try a different name or number.' : 'Share the form link above with families.'));
+      $('list').replaceChildren(box); return;
+    }
+    $('list').replaceChildren.apply($('list'), shown.map(card));
+  }
+  $('q').addEventListener('input', render);
+})();
+</script>
+</body>
+</html>
